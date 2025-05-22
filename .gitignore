@@ -1,0 +1,133 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+ovenv/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Audio files
+*.wav
+*.mp3
+*.ogg
+audio_output/
+temp_audio/
+
+# Firebase
+firebase-debug.log
+.firebase/
+
+# Node modules (if using Node.js tools)
+node_modules/
+
+# Docker
+.dockerignore
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Virtual environments (additional common names)
+pyvenv.cfg
+pip-selfcheck.json
+
+# Google Cloud credentials
+*.json
+service-account*.json
+google-credentials*.json
+
+# API Keys and secrets
+secrets/
+*.key
+*.pem
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+.cache/
+*.cache
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+*~
