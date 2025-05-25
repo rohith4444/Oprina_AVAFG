@@ -12,7 +12,9 @@ Acts as a facade pattern to simplify memory operations for agents.
 
 import uuid
 import asyncio
-import logging
+import sys, os, time
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.logging.logger import setup_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
@@ -36,7 +38,8 @@ class MemoryManager:
     
     def __init__(self):
         """Initialize memory manager with all memory services."""
-        self.logger = logging.getLogger("memory_manager")
+        self.logger = setup_logger("memory_manager", console_output=True)
+        self.logger.info("memory manager logging initialized")
         
         # Initialize individual memory services
         self.redis_cache = get_redis_cache()
@@ -67,7 +70,7 @@ class MemoryManager:
         """
         try:
             # Create session in session memory service
-            session_id = self.session_memory.create_session(user_id, session_id)
+            session_id = await self.session_memory.create_session(user_id, session_id)
             
             # Initialize Redis cache for the session
             self.redis_cache.cache_session_data(session_id, {
@@ -90,7 +93,7 @@ class MemoryManager:
             self.logger.error(f"Failed to create Oprina session: {e}")
             raise
     
-    def get_session_context(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_session_context(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Get comprehensive session context from all memory services.
         
@@ -103,7 +106,7 @@ class MemoryManager:
         """
         try:
             # Get session state
-            session = self.session_memory.get_session(user_id, session_id)
+            session = await self.session_memory.get_session(user_id, session_id)
             if not session:
                 return None
             
@@ -145,7 +148,7 @@ class MemoryManager:
             self.logger.error(f"Failed to get session context: {e}")
             return None
     
-    def update_session_context(self, user_id: str, session_id: str, updates: Dict[str, Any]) -> bool:
+    async def update_session_context(self, user_id: str, session_id: str, updates: Dict[str, Any]) -> bool:
         """
         Update session context across relevant memory services.
         
@@ -162,7 +165,7 @@ class MemoryManager:
             
             # Update session memory if session-related updates
             if any(key.startswith(('agent_', 'email_', 'user_', 'session_')) for key in updates.keys()):
-                session_success = self.session_memory.update_session_state(user_id, session_id, updates)
+                session_success = await self.session_memory.update_session_state(user_id, session_id, updates)
                 success &= session_success
             
             # Update cache for performance-critical data
@@ -220,7 +223,7 @@ class MemoryManager:
             )
             
             # Update session conversation history
-            self.session_memory.add_conversation_entry(user_id, session_id, {
+            await self.session_memory.add_conversation_entry(user_id, session_id, {
                 "message_id": message_id,
                 "conversation_id": conversation_id,
                 "type": message_type,
@@ -396,7 +399,7 @@ class MemoryManager:
             self.logger.error(f"Failed to cache user emails: {e}")
             return False
     
-    def get_user_emails_with_context(self, user_id: str, session_id: str) -> Dict[str, Any]:
+    async def get_user_emails_with_context(self, user_id: str, session_id: str) -> Dict[str, Any]:
         """
         Get user emails with full context.
         
@@ -413,7 +416,7 @@ class MemoryManager:
             metadata = self.redis_cache.get_email_metadata(user_id)
             
             # Get email context from session
-            email_context = self.session_memory.get_email_context(user_id, session_id)
+            email_context = await self.session_memory.get_email_context(user_id, session_id)
             
             # Get adaptive settings based on learned patterns
             adaptive_settings = self.long_term_memory.get_adaptive_response_settings(user_id, {
@@ -441,7 +444,7 @@ class MemoryManager:
                 "cache_status": {"emails_cached": False, "metadata_cached": False}
             }
     
-    def update_email_context_across_services(
+    async def update_email_context_across_services(
         self,
         user_id: str,
         session_id: str,
@@ -460,7 +463,7 @@ class MemoryManager:
         """
         try:
             # Update in session memory
-            session_success = self.session_memory.update_email_context(user_id, session_id, email_context)
+            session_success = await self.session_memory.update_email_context(user_id, session_id, email_context)
             
             # Update in cache for quick access
             cache_key = f"{user_id}:email_context"
@@ -476,7 +479,7 @@ class MemoryManager:
     # Agent Coordination
     # =============================================================================
     
-    def set_agent_coordination_data(
+    async def set_agent_coordination_data(
         self,
         session_id: str,
         agent_name: str,
@@ -498,10 +501,10 @@ class MemoryManager:
         try:
             if persistent:
                 # Store in session memory for persistence
-                session = self.session_memory.get_session("system", session_id)  # Use system user for coordination
+                session = await self.session_memory.get_session("system", session_id)  # Use system user for coordination
                 if session:
                     user_id = session.state.get("user_id", "system")
-                    return self.session_memory.update_agent_state(user_id, session_id, agent_name, data)
+                    return await self.session_memory.update_agent_state(user_id, session_id, agent_name, data)
             else:
                 # Store in Redis cache for quick access
                 return self.redis_cache.set_agent_context(session_id, agent_name, data)
@@ -512,7 +515,7 @@ class MemoryManager:
             self.logger.error(f"Failed to set agent coordination data: {e}")
             return False
     
-    def get_agent_coordination_data(self, session_id: str, agent_name: str) -> Optional[Dict[str, Any]]:
+    async def get_agent_coordination_data(self, session_id: str, agent_name: str) -> Optional[Dict[str, Any]]:
         """
         Get agent coordination data from cache and session.
         
@@ -530,10 +533,10 @@ class MemoryManager:
                 return cached_data
             
             # Fall back to session memory
-            session = self.session_memory.get_session("system", session_id)
+            session = await self.session_memory.get_session("system", session_id)
             if session:
                 user_id = session.state.get("user_id", "system")
-                return self.session_memory.get_agent_state(user_id, session_id, agent_name)
+                return await self.session_memory.get_agent_state(user_id, session_id, agent_name)
             
             return None
             
@@ -569,7 +572,7 @@ class MemoryManager:
     # Smart Suggestions and Adaptive Behavior
     # =============================================================================
     
-    def get_smart_suggestions_for_context(
+    async def get_smart_suggestions_for_context(
         self,
         user_id: str,
         session_id: str,
@@ -591,7 +594,7 @@ class MemoryManager:
             base_suggestions = self.long_term_memory.get_smart_suggestions(user_id, context)
             
             # Enhance with session context
-            session_context = self.get_session_context(user_id, session_id)
+            session_context = await self.get_session_context(user_id, session_id)
             if session_context:
                 # Add session-specific suggestions
                 email_context = session_context.get("session_state", {}).get("current_email_context", {})
@@ -815,7 +818,7 @@ class MemoryManager:
             self.logger.error(f"Failed to generate context summary: {e}")
             return {"summary": "Error generating summary"}
     
-    def reset_user_memory(
+    async def reset_user_memory(
         self,
         user_id: str,
         components: Optional[List[str]] = None,
@@ -860,7 +863,7 @@ class MemoryManager:
             
             # Reset sessions
             if "sessions" in components and session_id:
-                session_deleted = self.session_memory.delete_session(user_id, session_id)
+                session_deleted = await self.session_memory.delete_session(user_id, session_id)
                 results["sessions"] = session_deleted
             
             return results
@@ -1010,7 +1013,7 @@ async def test_memory_manager():
     print(f"Cached emails: {email_cached}")
     
     # Test smart suggestions
-    suggestions = memory_manager.get_smart_suggestions_for_context(
+    suggestions = await memory_manager.get_smart_suggestions_for_context(
         test_user_id, session_id, {"email_count": 2}
     )
     print(f"Smart suggestions: {len(suggestions)}")
