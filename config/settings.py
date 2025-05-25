@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = Field(..., description="Supabase project URL")
     SUPABASE_ANON_KEY: str = Field(..., description="Supabase anonymous key")
     SUPABASE_SERVICE_ROLE_KEY: str = Field(..., description="Supabase service role key")
+    SUPABASE_DATABASE_PASSWORD: str = Field(..., description="Supabase database password")
     
     # Redis Configuration - Upstash Support
     REDIS_PROVIDER: str = Field(

@@ -10,13 +10,13 @@ This module provides Redis caching functionality for:
 Uses Upstash Redis for cloud-based caching with fallback to local Redis.
 """
 
-import json
+import json, sys, os
 import asyncio
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
-import logging
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.logging.logger import setup_logger
 from contextlib import asynccontextmanager
-
 from config.settings import settings
 
 
@@ -28,7 +28,8 @@ class RedisCacheService:
     
     def __init__(self):
         """Initialize Redis cache service."""
-        self.logger = logging.getLogger("redis_cache")
+        self.logger = setup_logger("redis_cache", console_output=True)
+        self.logger.info("redis cache logging initialized")
         self._client = None
         self._is_connected = False
         self._connection_pool = None
@@ -123,7 +124,7 @@ class RedisCacheService:
     
     def is_connected(self) -> bool:
         """Check if Redis is connected and responsive."""
-        if not self._is_connected or self._client is None:
+        if not self._is_connected or self.client is None:
             return False
         
         try:
@@ -644,6 +645,7 @@ async def test_redis_cache():
     """Test Redis cache functionality."""
     cache = get_redis_cache()
     
+    _ = cache.client  # This creates the connection
     print("Testing Redis Cache Service...")
     
     # Health check

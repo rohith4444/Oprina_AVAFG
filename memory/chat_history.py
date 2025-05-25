@@ -13,12 +13,12 @@ Key Features:
 - Message metadata tracking
 """
 
-import uuid
-import logging
+import uuid, sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.logging.logger import setup_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
-
 from supabase import create_client, Client
 from config.settings import settings
 
@@ -60,7 +60,8 @@ class ChatHistoryService:
     
     def __init__(self):
         """Initialize chat history service."""
-        self.logger = logging.getLogger("chat_history")
+        self.logger = setup_logger("chat_history", console_output=True)
+        self.logger.info("chat history logging initialized")
         self._client: Optional[Client] = None
         
         # Table names
@@ -83,10 +84,16 @@ class ChatHistoryService:
         except Exception as e:
             self.logger.error(f"Failed to initialize Supabase client: {e}")
             raise
+    @property
+    def client(self):
+        """Get Supabase client, creating connection if needed."""
+        if self._client is None:
+            self._initialize_client()
+        return self._client
     
     def is_configured(self) -> bool:
         """Check if service is properly configured."""
-        return self._client is not None
+        return self.client is not None
     
     # =============================================================================
     # Conversation Management
@@ -868,6 +875,7 @@ async def test_chat_history():
     
     # Health check
     health = await chat_history.health_check()
+    
     print(f"Health Check: {health['status']}")
     
     if health["status"] != "healthy":
