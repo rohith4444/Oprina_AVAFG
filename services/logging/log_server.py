@@ -103,6 +103,7 @@ class ResilientLogRecordStreamHandler(socketserver.StreamRequestHandler):
             
             # Console handler with colors
             console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.stream.reconfigure(encoding='utf-8')
             console_handler.setFormatter(ColoredFormatter())
             logger.addHandler(console_handler)
             

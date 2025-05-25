@@ -1,8 +1,39 @@
+# =============================================================================
+# Oprina Project - Git Ignore Rules
+# =============================================================================
+
+# =============================================================================
+# Environment & Configuration
+# =============================================================================
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+
+# Configuration backups
+.env.backup
+.env.bak
+*.env.backup
+
+#viurtual environments
+ovenv/
+
+# =============================================================================
 # Python
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -22,104 +53,209 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual Environments
-ovenv/
+# PyInstaller
+*.manifest
+*.spec
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
 
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-# Audio files
-*.wav
-*.mp3
-*.ogg
-audio_output/
-temp_audio/
-
-# Firebase
-firebase-debug.log
-.firebase/
-
-# Node modules (if using Node.js tools)
-node_modules/
-
-# Docker
-.dockerignore
-
-# Testing
-.coverage
-.pytest_cache/
+# Unit test / coverage reports
+htmlcov/
 .tox/
 .nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
 
+# IPython
+profile_default/
+ipython_config.py
+
 # pyenv
 .python-version
 
-# Celery
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
 celerybeat-schedule
 celerybeat.pid
 
-# Virtual environments (additional common names)
-pyvenv.cfg
-pip-selfcheck.json
+# SageMath parsed files
+*.sage.py
 
-# Google Cloud credentials
-*.json
-service-account*.json
-google-credentials*.json
+# Environments
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# API Keys and secrets
-secrets/
-*.key
-*.pem
+# Spyder project settings
+.spyderproject
+.spyproject
 
-# Database
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# =============================================================================
+# IDEs and Editors
+# =============================================================================
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+#python files
+dir_structure.py
+display_dir_structure.py
+
+# =============================================================================
+# Operating System
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# Application Specific
+# =============================================================================
+
+# Database files
 *.db
 *.sqlite
 *.sqlite3
+my_agent_data.db
 
-# Cache
-.cache/
-*.cache
+# Log files
+*.log
+logs/
+log/
+*.log.*
+*.out
 
 # Temporary files
 tmp/
@@ -127,7 +263,229 @@ temp/
 *.tmp
 *.temp
 
+# Audio files (generated TTS/STT cache)
+audio_cache/
+*.wav
+*.mp3
+*.m4a
+*.ogg
+uploads/audio/
+
+# Avatar animation cache
+avatar_cache/
+*.blend1
+*.blend2
+
+# Gmail API credentials cache
+gmail_credentials/
+token.json
+credentials.json
+
+# =============================================================================
+# Development & Testing
+# =============================================================================
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+test_results/
+test-results/
+
+# Performance profiling
+*.prof
+*.profile
+
+# Memory dumps
+*.dmp
+
+# Debugging
+debug/
+*.debug
+
+# =============================================================================
+# Dependencies & Package Managers
+# =============================================================================
+
+# Node.js (if using any JS tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# =============================================================================
+# Cloud & Deployment
+# =============================================================================
+
+# Docker
+.dockerignore
+Dockerfile.prod
+
+# Kubernetes
+*.kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# =============================================================================
+# AI/ML Specific
+# =============================================================================
+
+# Model files
+*.model
+*.pkl
+*.pickle
+models/
+checkpoints/
+
+# Data files
+data/
+datasets/
+*.csv
+*.json
+*.parquet
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# =============================================================================
+# Memory & Cache
+# =============================================================================
+
+# Redis dumps
+dump.rdb
+appendonly.aof
+
+# Cache directories
+cache/
+.cache/
+__pycache__/
+
+# Session storage
+sessions/
+session_data/
+
+# =============================================================================
+# Documentation
+# =============================================================================
+
+# Generated docs
+docs/_build/
+docs/build/
+site/
+
+# =============================================================================
+# Security & Secrets
+# =============================================================================
+
+# API keys and secrets
+secrets/
+*.key
+*.pem
+*.p12
+*.crt
+*.cert
+*.ca-bundle
+
+# JWT tokens
+*.jwt
+
+# OAuth tokens
+*token*
+*secret*
+*credential*
+
+# =============================================================================
+# Backup Files
+# =============================================================================
+
 # Backup files
 *.bak
 *.backup
-*~
+*.old
+*.orig
+
+# =============================================================================
+# Project Specific
+# =============================================================================
+
+# Oprina specific
+oprina_data/
+user_sessions/
+conversation_history/
+email_cache/
+
+# Development artifacts
+dev_tools/
+scripts/dev/
+tools/
+
+# Local configuration overrides
+local_config.py
+dev_settings.py
+
+# =============================================================================
+# Frontend (if applicable)
+# =============================================================================
+
+# Bolt.new generated files
+.bolt/
+bolt_cache/
+
+# Build outputs
+build/
+dist/
+out/
+
+# =============================================================================
+# Monitoring & Analytics
+# =============================================================================
+
+# Performance monitoring
+perf/
+metrics/
+analytics/
+
+# Error tracking
+errors/
+crash_reports/
+
+# =============================================================================
+# Hackathon Specific (Temporary)
+# =============================================================================
+
+# Submission materials (keep in separate repo)
+submission/
+demo_videos/
+hackathon_docs/
+
+# Development notes (keep local)
+dev_notes.md
+todo.md
+ideas.txt
+
+# =============================================================================
+# Example of what TO COMMIT
+# =============================================================================
+
+# DO commit these files:
+# - requirements.txt
+# - .env.example
+# - config/settings.py
+# - All source code files
+# - Documentation
+# - Tests
+# - README files
+# - Docker configurations
+# - CI/CD configurations
+
+# =============================================================================
+# Custom Rules (Add project-specific ignores below)
+# =============================================================================
+
+# Add any additional project-specific files to ignore here
