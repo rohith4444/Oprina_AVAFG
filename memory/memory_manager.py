@@ -17,10 +17,10 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
-from .redis_cache import RedisCacheService, get_redis_cache
-from .session_memory import SessionMemoryService, get_session_memory
-from .chat_history import ChatHistoryService, get_chat_history, ChatMessage, Conversation
-from .long_term_memory import LongTermMemoryService, get_long_term_memory
+from memory.redis_cache import RedisCacheService, get_redis_cache
+from memory.session_memory import SessionMemoryService, get_session_memory
+from memory.chat_history import ChatHistoryService, get_chat_history, ChatMessage, Conversation
+from memory.long_term_memory import LongTermMemoryService, get_long_term_memory
 
 
 class MemoryManager:

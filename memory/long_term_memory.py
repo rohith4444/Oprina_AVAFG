@@ -13,14 +13,14 @@ Key Features:
 - Cross-session learning
 """
 
-import logging
+import sys, os, time
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.logging.logger import setup_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 
 from google.adk.memory import InMemoryMemoryService
-from google.adk.memory.memory_service import MemoryService
-
 from config.settings import settings
 
 
@@ -53,8 +53,10 @@ class LongTermMemoryService:
     
     def __init__(self):
         """Initialize long-term memory service."""
-        self.logger = logging.getLogger("long_term_memory")
-        self._memory_service: Optional[MemoryService] = None
+        self.logger = setup_logger("long_term_memory", console_output=True)
+        self.logger.info("long term memory logging initialized")
+        self._memory_service: Optional[InMemoryMemoryService] = None
+        self._pattern_storage: Dict[str, Dict[str, Any]] = {}
         
         # Learning configuration
         self.learning_enabled = True
@@ -550,14 +552,7 @@ class LongTermMemoryService:
             if not self._memory_service:
                 return None
             
-            # Use memory service to retrieve pattern
-            # Note: Implementation depends on ADK MemoryService API
-            # This is a placeholder for the actual implementation
-            
-            # For InMemoryMemoryService, we might need to implement
-            # a simple key-value store or use the service's storage methods
-            
-            return None  # Placeholder
+            return self._pattern_storage.get(pattern_key)
             
         except Exception as e:
             self.logger.error(f"Failed to get pattern from memory: {e}")
@@ -569,11 +564,8 @@ class LongTermMemoryService:
             if not self._memory_service:
                 return False
             
-            # Use memory service to store pattern
-            # Note: Implementation depends on ADK MemoryService API
-            # This is a placeholder for the actual implementation
-            
-            return True  # Placeholder
+            self._pattern_storage[pattern_key] = pattern_data
+            return True 
             
         except Exception as e:
             self.logger.error(f"Failed to store pattern in memory: {e}")

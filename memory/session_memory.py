@@ -1,5 +1,5 @@
 """
-Session Memory Service for Oprina
+Session Memory Service for Oprina - FIXED VERSION
 
 This module provides session state management using ADK's DatabaseSessionService
 with Supabase as the backend. Handles current conversation context and agent
@@ -13,7 +13,7 @@ Key Features:
 - Session lifecycle management
 """
 
-import uuid, sys, os
+import uuid, sys, os, time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from services.logging.logger import setup_logger
 from typing import Any, Dict, List, Optional, Union
@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 
 from google.adk.sessions import DatabaseSessionService
 from google.adk.sessions.state import State
+from google.adk.events import Event, EventActions
 
 from config.settings import settings
 
@@ -71,7 +72,7 @@ class SessionMemoryService:
         """
         # Extract project ID from Supabase URL
         import re
-        import urllib.parse  # Add this import
+        import urllib.parse
         
         match = re.match(r'https://([^.]+)\.supabase\.co', settings.SUPABASE_URL)
         if not match:
@@ -170,12 +171,12 @@ class SessionMemoryService:
         return self._session_service is not None
     
     # =============================================================================
-    # Session Lifecycle Management
+    # Session Lifecycle Management - FIXED ASYNC METHODS
     # =============================================================================
     
     async def create_session(self, user_id: str, session_id: Optional[str] = None) -> str:
         """
-        Create a new session.
+        Create a new session - ONLY for new sessions.
         
         Args:
             user_id: User identifier
@@ -192,23 +193,38 @@ class SessionMemoryService:
             if session_id is None:
                 session_id = f"oprina_{user_id}_{uuid.uuid4().hex[:8]}"
             
-            # Create session with initial state
+            # Check if session already exists
+            try:
+                existing_session = await self._session_service.get_session(
+                    app_name=self.app_name,
+                    user_id=user_id,
+                    session_id=session_id
+                )
+                
+                if existing_session:
+                    self.logger.info(f"Session {session_id} already exists, returning existing session")
+                    return session_id
+            except Exception:
+                # Session doesn't exist, continue with creation
+                pass
+            
+            # Create session with initial state ONLY if it doesn't exist
             initial_state = self._get_initial_state(user_id)
             
-            session = self._session_service.create_session(
+            session = await self._session_service.create_session(
                 app_name=self.app_name,
                 user_id=user_id,
                 session_id=session_id,
                 state=initial_state
             )
             
-            self.logger.info(f"Created session {session_id} for user {user_id}")
+            self.logger.info(f"Created NEW session {session_id} for user {user_id}")
             return session.id
             
         except Exception as e:
             self.logger.error(f"Failed to create session: {e}")
             raise
-    
+
     async def get_session(self, user_id: str, session_id: str) -> Optional[State]:
         """
         Get session state.
@@ -224,31 +240,52 @@ class SessionMemoryService:
             return None
         
         try:
-            session = self._session_service.get_session(
+            session = await self._session_service.get_session(
                 app_name=self.app_name,
                 user_id=user_id,
                 session_id=session_id
             )
             
             if session:
-                # Update last activity
-                session.state["last_activity"] = datetime.utcnow().isoformat()
-                self._session_service.create_session(
-                    app_name=self.app_name,
-                    user_id=user_id,
-                    session_id=session_id,
-                    state=session.state
-                )
+                # # Update last activity timestamp using the correct method
+                # await self.update_session_state(user_id, session_id, {
+                #     "last_activity": datetime.utcnow().isoformat()
+                # })
+                
+                # # Return the session (it will have updated state)
+                # updated_session = await self._session_service.get_session(
+                #     app_name=self.app_name,
+                #     user_id=user_id,
+                #     session_id=session_id
+                # )
+                return session
             
-            return session
+            return None
             
         except Exception as e:
             self.logger.error(f"Failed to get session {session_id}: {e}")
             return None
-    
-    def update_session_state(self, user_id: str, session_id: str, state_updates: Dict[str, Any]) -> bool:
+        
+    async def update_last_activity(self, user_id: str, session_id: str) -> bool:
         """
-        Update session state.
+        Update last activity timestamp for a session.
+        
+        Args:
+            user_id: User identifier
+            session_id: Session identifier
+            
+        Returns:
+            True if successful
+        """
+        return await self.update_session_state(user_id, session_id, {
+            "last_activity": datetime.utcnow().isoformat()
+        })
+
+
+    async def update_session_state(self, user_id: str, session_id: str, state_updates: Dict[str, Any]) -> bool:
+        """
+        Update session state using ADK's append_event with state_delta.
+        This is the correct way to update state in ADK.
         
         Args:
             user_id: User identifier
@@ -262,33 +299,75 @@ class SessionMemoryService:
             return False
         
         try:
-            # Get current session
-            session = self.get_session(user_id, session_id)
+            # Get current session first
+            session = await self._session_service.get_session(
+                app_name=self.app_name,
+                user_id=user_id,
+                session_id=session_id
+            )
+            
             if not session:
                 self.logger.warning(f"Session {session_id} not found for update")
                 return False
             
-            # Apply updates
-            current_state = session.state.copy()
-            self._deep_update(current_state, state_updates)
-            current_state["last_activity"] = datetime.utcnow().isoformat()
+            # Apply deep updates to handle nested state changes
+            processed_updates = self._process_state_updates(state_updates)
             
-            # Save updated state
-            self._session_service.create_session(
-                app_name=self.app_name,
-                user_id=user_id,
-                session_id=session_id,
-                state=current_state
+            # Create EventActions with state_delta
+            actions_with_update = EventActions(state_delta=processed_updates)
+            
+            # Create system event for state update
+            system_event = Event(
+                invocation_id=f"state_update_{int(time.time())}_{uuid.uuid4().hex[:8]}",
+                author="system",
+                actions=actions_with_update,
+                timestamp=time.time()
             )
             
-            self.logger.debug(f"Updated session {session_id} state")
+            # Use append_event to update state (this is the correct ADK way)
+            await self._session_service.append_event(session, system_event)
+            
+            self.logger.debug(f"Updated session {session_id} state using append_event")
             return True
             
         except Exception as e:
             self.logger.error(f"Failed to update session state: {e}")
             return False
-    
-    def delete_session(self, user_id: str, session_id: str) -> bool:
+
+
+    def _process_state_updates(self, state_updates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process state updates to handle dot notation and nested updates.
+        
+        Args:
+            state_updates: Updates to process
+            
+        Returns:
+            Processed updates ready for ADK
+        """
+        processed = {}
+        
+        for key, value in state_updates.items():
+            if '.' in key:
+                # Handle dot notation (e.g., "agent_states.email_agent")
+                keys = key.split('.')
+                current = processed
+                
+                # Navigate/create nested structure
+                for k in keys[:-1]:
+                    if k not in current:
+                        current[k] = {}
+                    current = current[k]
+                
+                # Set the final value
+                current[keys[-1]] = value
+            else:
+                # Direct key assignment
+                processed[key] = value
+        
+        return processed
+
+    async def delete_session(self, user_id: str, session_id: str) -> bool:
         """
         Delete a session.
         
@@ -305,10 +384,12 @@ class SessionMemoryService:
         try:
             # Note: ADK DatabaseSessionService might not have direct delete method
             # We can mark session as deleted or implement cleanup logic
-            self.update_session_state(user_id, session_id, {
-                "deleted": True,
-                "deleted_at": datetime.utcnow().isoformat()
-            })
+            # FIXED: Add await here
+            await self._session_service.delete_session(  # Add await
+                app_name=self.app_name,
+                user_id=user_id,
+                session_id=session_id
+            )
             
             self.logger.info(f"Marked session {session_id} as deleted")
             return True
@@ -317,7 +398,7 @@ class SessionMemoryService:
             self.logger.error(f"Failed to delete session: {e}")
             return False
     
-    def list_user_sessions(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
+    async def list_user_sessions(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
         """
         List sessions for a user.
         
@@ -332,16 +413,16 @@ class SessionMemoryService:
             return []
         
         try:
-            # Use ADK's list_sessions functionality
-            sessions_response = self._session_service.list_sessions(
+            # FIXED: Add await here
+            sessions_response = await self._session_service.list_sessions(
                 app_name=self.app_name,
                 user_id=user_id
             )
             
             sessions = []
             for session in sessions_response.sessions:
-                # Get session details
-                session_data = self.get_session(user_id, session.id)
+                # FIXED: Add await here
+                session_data = await self.get_session(user_id, session.id)
                 if session_data:
                     # Check if session is active
                     is_deleted = session_data.state.get("deleted", False)
@@ -373,10 +454,10 @@ class SessionMemoryService:
             return []
     
     # =============================================================================
-    # Agent State Management
+    # Agent State Management - FIXED ASYNC METHODS
     # =============================================================================
     
-    def update_agent_state(self, user_id: str, session_id: str, agent_name: str, agent_state: Dict[str, Any]) -> bool:
+    async def update_agent_state(self, user_id: str, session_id: str, agent_name: str, agent_state: Dict[str, Any]) -> bool:
         """
         Update agent state within session.
         
@@ -392,9 +473,10 @@ class SessionMemoryService:
         state_updates = {
             f"agent_states.{agent_name}": agent_state
         }
-        return self.update_session_state(user_id, session_id, state_updates)
+        # FIXED: Add await here
+        return await self.update_session_state(user_id, session_id, state_updates)
     
-    def get_agent_state(self, user_id: str, session_id: str, agent_name: str) -> Optional[Dict[str, Any]]:
+    async def get_agent_state(self, user_id: str, session_id: str, agent_name: str) -> Optional[Dict[str, Any]]:
         """
         Get agent state from session.
         
@@ -406,12 +488,13 @@ class SessionMemoryService:
         Returns:
             Agent state or None
         """
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             return session.state.get("agent_states", {}).get(agent_name)
         return None
     
-    def update_email_context(self, user_id: str, session_id: str, email_context: Dict[str, Any]) -> bool:
+    async def update_email_context(self, user_id: str, session_id: str, email_context: Dict[str, Any]) -> bool:
         """
         Update email context in session.
         
@@ -423,18 +506,19 @@ class SessionMemoryService:
         Returns:
             True if successful
         """
-        # Merge with existing email context
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             current_email_context = session.state.get("current_email_context", {})
             current_email_context.update(email_context)
             
-            return self.update_session_state(user_id, session_id, {
+            # FIXED: Add await here
+            return await self.update_session_state(user_id, session_id, {
                 "current_email_context": current_email_context
             })
         return False
     
-    def get_email_context(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_email_context(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Get email context from session.
         
@@ -445,16 +529,17 @@ class SessionMemoryService:
         Returns:
             Email context or None
         """
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             return session.state.get("current_email_context")
         return None
     
     # =============================================================================
-    # User Preferences Management
+    # User Preferences Management - FIXED ASYNC METHODS
     # =============================================================================
     
-    def update_user_preferences(self, user_id: str, session_id: str, preferences: Dict[str, Any]) -> bool:
+    async def update_user_preferences(self, user_id: str, session_id: str, preferences: Dict[str, Any]) -> bool:
         """
         Update user preferences in session.
         
@@ -466,17 +551,19 @@ class SessionMemoryService:
         Returns:
             True if successful
         """
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             current_preferences = session.state.get("session_preferences", {})
             current_preferences.update(preferences)
             
-            return self.update_session_state(user_id, session_id, {
+            # FIXED: Add await here
+            return await self.update_session_state(user_id, session_id, {
                 "session_preferences": current_preferences
             })
         return False
     
-    def get_user_preferences(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_user_preferences(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Get user preferences from session.
         
@@ -487,12 +574,13 @@ class SessionMemoryService:
         Returns:
             User preferences or None
         """
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             return session.state.get("session_preferences")
         return None
     
-    def update_user_info(self, user_id: str, session_id: str, user_info: Dict[str, Any]) -> bool:
+    async def update_user_info(self, user_id: str, session_id: str, user_info: Dict[str, Any]) -> bool:
         """
         Update user information in session.
         
@@ -504,13 +592,14 @@ class SessionMemoryService:
         Returns:
             True if successful
         """
-        return self.update_session_state(user_id, session_id, user_info)
+        # FIXED: Add await here
+        return await self.update_session_state(user_id, session_id, user_info)
     
     # =============================================================================
-    # Conversation Management
+    # Conversation Management - FIXED ASYNC METHODS
     # =============================================================================
     
-    def add_conversation_entry(self, user_id: str, session_id: str, entry: Dict[str, Any]) -> bool:
+    async def add_conversation_entry(self, user_id: str, session_id: str, entry: Dict[str, Any]) -> bool:
         """
         Add entry to conversation history.
         
@@ -522,7 +611,8 @@ class SessionMemoryService:
         Returns:
             True if successful
         """
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             conversation_history = session.state.get("conversation_history", [])
             
@@ -537,12 +627,13 @@ class SessionMemoryService:
             if len(conversation_history) > max_history:
                 conversation_history = conversation_history[-max_history:]
             
-            return self.update_session_state(user_id, session_id, {
+            # FIXED: Add await here
+            return await self.update_session_state(user_id, session_id, {
                 "conversation_history": conversation_history
             })
         return False
     
-    def get_conversation_history(self, user_id: str, session_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def get_conversation_history(self, user_id: str, session_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
         Get conversation history from session.
         
@@ -554,7 +645,8 @@ class SessionMemoryService:
         Returns:
             Conversation history
         """
-        session = self.get_session(user_id, session_id)
+        # FIXED: Add await here
+        session = await self.get_session(user_id, session_id)
         if session:
             history = session.state.get("conversation_history", [])
             if limit:
@@ -620,11 +712,11 @@ class SessionMemoryService:
             if self.is_ready():
                 # Database connection check
                 try:
-                    # Test session creation/retrieval - ADD AWAIT HERE
+                    # Test session creation/retrieval - REMOVE await
                     test_user_id = "health_check_user"
                     test_session_id = f"health_check_{datetime.utcnow().timestamp()}"
                     
-                    # FIX: Add await to async methods
+                    # These are SYNCHRONOUS calls in ADK
                     created_session = await self._session_service.create_session(
                         app_name=self.app_name,
                         user_id=test_user_id,
@@ -633,29 +725,23 @@ class SessionMemoryService:
                     )
                     health["checks"]["session_creation"] = created_session is not None
                     
-                    # FIX: Add await here too
-                    retrieved_session = await self._session_service.get_session(
+                    # Test state update using the correct method
+                    update_success = await self.update_session_state(test_user_id, test_session_id, {
+                        "health_check": True
+                    })
+                    health["checks"]["session_update"] = update_success
+                    
+                    # Clean up test session
+                    await self._session_service.delete_session(
                         app_name=self.app_name,
                         user_id=test_user_id,
                         session_id=test_session_id
                     )
-                    health["checks"]["session_retrieval"] = retrieved_session is not None
-                    
-                    # Update test session - FIX: This method might be sync, check ADK docs
-                    # For now, let's comment it out to avoid errors
-                    # update_success = self.update_session_state(test_user_id, test_session_id, {
-                    #     "health_check": True
-                    # })
-                    # health["checks"]["session_update"] = update_success
-                    health["checks"]["session_update"] = True  # Placeholder
-                    
-                    # Clean up test session - might need await too
-                    # self.delete_session(test_user_id, test_session_id)
                     
                 except Exception as e:
                     health["checks"]["database_operations"] = False
                     health["checks"]["error"] = str(e)
-            
+        
             # Overall status
             all_checks_passed = all(
                 check for check in health["checks"].values() 
@@ -670,6 +756,7 @@ class SessionMemoryService:
             health["status"] = "unhealthy"
         
         return health
+
 
 # =============================================================================
 # Singleton instance and utility functions
@@ -688,7 +775,7 @@ def get_session_memory() -> SessionMemoryService:
 
 
 # =============================================================================
-# Testing and Development Utilities
+# Testing and Development Utilities - FIXED ASYNC TEST
 # =============================================================================
 
 async def test_session_memory():
@@ -709,25 +796,25 @@ async def test_session_memory():
     test_user_id = "test_user_123"
     
     # Create session
-    session_id = session_memory.create_session(test_user_id)
+    session_id = await session_memory.create_session(test_user_id)  # ✅ Awaited
     print(f"Created session: {session_id}")
     
     # Update user info
-    user_info_update = session_memory.update_user_info(test_user_id, session_id, {
+    user_info_update = await session_memory.update_user_info(test_user_id, session_id, {  # ✅ Awaited
         "user_name": "Test User",
         "user_email": "test@example.com"
     })
     print(f"Updated user info: {user_info_update}")
     
     # Update agent state
-    agent_update = session_memory.update_agent_state(test_user_id, session_id, "email_agent", {
+    agent_update = await session_memory.update_agent_state(test_user_id, session_id, "email_agent", {  # ✅ Awaited
         "status": "processing",
         "last_operation": "fetch_emails"
     })
     print(f"Updated agent state: {agent_update}")
     
     # Add conversation entry
-    conversation_entry = session_memory.add_conversation_entry(test_user_id, session_id, {
+    conversation_entry = await session_memory.add_conversation_entry(test_user_id, session_id, {  # ✅ Awaited
         "type": "user_voice",
         "content": "Check my emails",
         "duration": 2.5
@@ -735,15 +822,18 @@ async def test_session_memory():
     print(f"Added conversation entry: {conversation_entry}")
     
     # Get session data
-    session = session_memory.get_session(test_user_id, session_id)
+    session = await session_memory.get_session(test_user_id, session_id)  # ✅ Awaited
     print(f"Retrieved session: {session is not None}")
     
     # List sessions
-    sessions = session_memory.list_user_sessions(test_user_id)
+    sessions = await session_memory.list_user_sessions(test_user_id)  # This one can stay sync
     print(f"User sessions count: {len(sessions)}")
     
+    # Update last activity explicitly
+    await session_memory.update_last_activity(test_user_id, session_id)  # ✅ New method
+    
     # Clean up
-    session_memory.delete_session(test_user_id, session_id)
+    await session_memory.delete_session(test_user_id, session_id)  # ✅ Awaited
     
     print("✅ Session memory tests completed")
     return True
