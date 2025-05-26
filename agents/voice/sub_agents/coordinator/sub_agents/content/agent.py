@@ -13,16 +13,30 @@ user preferences to provide personalized content assistance.
 """
 
 import os
+import sys
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
+# Calculate project root more reliably
+current_file = os.path.abspath(__file__)
+# From: agents/voice/sub_agents/coordinator/sub_agents/content/agent.py
+# Need to go up 6 levels to reach project root
+project_root = current_file
+for _ in range(7):  # 6 levels + 1 for the file itself
+    project_root = os.path.dirname(project_root)
+
+# Add to Python path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Import external packages
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools import FunctionTool
-from dotenv import load_dotenv
 
-# Import content processing capabilities
-from .content_processing import (
+# Import your project modules (absolute imports)
+from config.settings import settings
+from agents.voice.sub_agents.coordinator.sub_agents.content.content_processing import (
     content_processor,
     process_email_content,
     SummaryDetail,
@@ -30,8 +44,8 @@ from .content_processing import (
     ContentType
 )
 
-# Import shared tools
-from ...common.shared_tools import (
+# Import shared tools (absolute import)
+from agents.voice.sub_agents.common.shared_tools import (
     update_session_state,
     get_session_context,
     log_agent_action,
@@ -41,10 +55,6 @@ from ...common.shared_tools import (
     measure_performance,
     complete_performance_measurement
 )
-
-# Load environment variables
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..', '.env'))
-
 
 # Content processing tools for the agent
 def summarize_email_content(
@@ -397,12 +407,11 @@ def optimize_content_for_voice(
 
 # Create content processing tools
 content_tools = [
-    FunctionTool(func=summarize_email_content, name="summarize_email_content"),
-    FunctionTool(func=generate_email_reply, name="generate_email_reply"),
-    FunctionTool(func=analyze_email_content, name="analyze_email_content"),
-    FunctionTool(func=optimize_content_for_voice, name="optimize_content_for_voice")
+    FunctionTool(func=summarize_email_content),
+    FunctionTool(func=generate_email_reply),
+    FunctionTool(func=analyze_email_content),
+    FunctionTool(func=optimize_content_for_voice)
 ]
-
 
 def create_content_agent():
     """
@@ -415,8 +424,8 @@ def create_content_agent():
     
     # Define model for the agent
     model = LiteLlm(
-        model=os.getenv("CONTENT_MODEL", "gemini-2.5-flash-preview-05-20"),
-        api_key=os.environ.get("GOOGLE_API_KEY")
+        model=settings.CONTENT_MODEL,
+        api_key=settings.GOOGLE_API_KEY
     )
     
     # Create the Content Agent
@@ -606,7 +615,7 @@ if __name__ == "__main__":
             """
             
             # Test summarization
-            from .content_processing import content_processor, SummaryDetail
+            from agents.voice.sub_agents.coordinator.sub_agents.content.content_processing import content_processor, SummaryDetail
             summary_prompt = content_processor.generate_summary_prompt(
                 test_email, SummaryDetail.BRIEF
             )
@@ -616,7 +625,7 @@ if __name__ == "__main__":
             reply_prompt = content_processor.generate_reply_prompt(
                 {"sender": "sarah@company.com", "subject": "Q3 Campaign Follow-up", "body": test_email},
                 "I'll send the revised budget by Thursday",
-                content_processor.ReplyStyle.PROFESSIONAL
+                ReplyStyle.PROFESSIONAL
             )
             print("  ✅ Email reply prompt generation")
             

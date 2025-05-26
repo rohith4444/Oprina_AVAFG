@@ -17,12 +17,25 @@ Key Features:
 """
 
 import re
-import html
+import html, os, sys
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 
+from contextlib import AsyncExitStack
+
+# Calculate project root more reliably
+current_file = os.path.abspath(__file__)
+# From: agents/voice/sub_agents/coordinator/sub_agents/email/mcp_integration.py
+# Need to go up 6 levels to reach project root
+project_root = current_file
+for _ in range(7):  # 6 levels + 1 for the file itself
+    project_root = os.path.dirname(project_root)
+
+# Add to Python path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from services.logging.logger import setup_logger
 
 # Configure logging
