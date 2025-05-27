@@ -2,12 +2,13 @@
 Tool discovery and invocation for MCP modular tools.
 
 This file provides the discovery and invocation logic for all registered MCP tools.
-- Imports all tool modules (e.g., gmail_tools) to ensure registration.
+- Imports all tool modules (e.g., gmail_tools, calendar_tools) to ensure registration.
 - Allows the backend and ADK agent to list available tools and call them by name.
 - The agent uses list_tools() to discover capabilities and run_tool() to invoke tools with arguments.
 """
 from google_mcp.mcp_tool import TOOL_REGISTRY
-import google_mcp.gmail_tools  # Ensure all Gmail tools are registered
+import google_mcp.gmail_tools    # Ensure all Gmail tools are registered
+import google_mcp.calendar_tools # Ensure all Calendar tools are registered
 
 def list_tools():
     """
@@ -37,4 +38,4 @@ def run_tool(tool_name, **kwargs):
     tool = tool_cls()
     return tool.run(**kwargs)
 
-print('Registered tools:', list(TOOL_REGISTRY.keys())) 
+print('Registered tools:', list(TOOL_REGISTRY.keys()))

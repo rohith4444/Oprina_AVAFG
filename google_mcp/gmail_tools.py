@@ -31,81 +31,25 @@ from email.mime.base import MIMEBase
 from email import encoders
 from pathlib import Path
 from config.settings import settings
+from services.google_cloud.gmail_auth import get_gmail_service as get_auth_service
 
-# Use settings instead of hardcoded values
-SCOPES = settings.GOOGLE_API_SCOPES
-CLIENT_SECRET_FILE = settings.google_client_secret_path
-TOKEN_FILE = settings.google_token_path
 
+# Add project root to path
+current_file = os.path.abspath(__file__)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+from services.logging.logger import setup_logger
+logger = setup_logger("gmail_tools", console_output=True)
 
 def get_gmail_service():
-    """
-    Returns an authenticated Gmail API service instance.
-    Handles both 'web' and 'installed' OAuth credential types.
-    """
-    creds = None
-    
-    # Validate that client secret file exists
-    if not settings.validate_google_credentials():
-        raise FileNotFoundError(
-            f"Google client secret file not found: {CLIENT_SECRET_FILE}\n"
-            f"Please ensure you've downloaded the OAuth credentials and placed them in the credentials folder"
-        )
-    
-    # Check if token file exists
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
-    
-    # If credentials don't exist or are invalid, refresh or get new ones  
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            # Handle both 'web' and 'installed' credential types
-            try:
-                flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-                creds = flow.run_local_server(port=8080)
-            except Exception as e:
-                # If that fails, try checking if it's a 'web' type credential
-                import json
-                with open(CLIENT_SECRET_FILE, 'r') as f:
-                    client_config = json.load(f)
-                
-                if 'web' in client_config:
-                    # Convert web credentials to installed format for local development
-                    web_config = client_config['web']
-                    installed_config = {
-                        'installed': {
-                            'client_id': web_config['client_id'],
-                            'client_secret': web_config['client_secret'],
-                            'auth_uri': web_config.get('auth_uri', 'https://accounts.google.com/o/oauth2/auth'),
-                            'token_uri': web_config.get('token_uri', 'https://oauth2.googleapis.com/token'),
-                            'redirect_uris': ['http://localhost:8080/']
-                        }
-                    }
-                    
-                    # Create temporary installed-type config
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
-                        json.dump(installed_config, temp_file)
-                        temp_file.flush()
-                        
-                        # Use the temporary config file
-                        flow = InstalledAppFlow.from_client_secrets_file(temp_file.name, SCOPES)
-                        creds = flow.run_local_server(port=8080)
-                        
-                        # Clean up temp file
-                        os.unlink(temp_file.name)
-                else:
-                    # Re-raise original exception if not a web credential
-                    raise e
-        
-        # Ensure token directory exists and save credentials
-        os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
-        with open(TOKEN_FILE, 'w') as token:
-            token.write(creds.to_json())
-    
-    return build('gmail', 'v1', credentials=creds)
+    """Returns an authenticated Gmail API service instance."""
+    try:
+        return get_auth_service()
+    except Exception as e:
+        logger.error(f"New auth service failed: {e}")
+        # Could add legacy fallback here if needed
+        raise
 
 # =========================================================
 # 1. Email Reading & Searching
