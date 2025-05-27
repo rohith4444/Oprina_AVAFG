@@ -14,7 +14,7 @@ Key Features:
 
 import os
 import sys
-import asyncio
+import asyncio, datetime
 from typing import Dict, List, Any, Optional, Tuple
 from contextlib import AsyncExitStack
 
@@ -267,7 +267,7 @@ class CalendarMCPIntegration:
             comprehensive_status = {
                 "integration_ready": self.connected,
                 "service_type": "calendar",
-                "timestamp": bridge_test.get("test_timestamp", "unknown"),
+                "timestamp": datetime.utcnow().isoformat(),  # ✅ Fixed
                 **connection_status,
                 **auth_status,
                 **tool_details
