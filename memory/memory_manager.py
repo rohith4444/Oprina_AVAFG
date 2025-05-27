@@ -475,6 +475,122 @@ class MemoryManager:
             self.logger.error(f"Failed to update email context: {e}")
             return False
     
+    async def update_calendar_context_across_services(
+        self,
+        user_id: str,
+        session_id: str,
+        calendar_context: Dict[str, Any]
+    ) -> bool:
+        """
+        Update calendar context across session memory and cache.
+        
+        Args:
+            user_id: User identifier
+            session_id: Session identifier
+            calendar_context: Calendar context updates
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Update in session memory
+            session_success = await self.session_memory.update_calendar_context(user_id, session_id, calendar_context)
+            
+            # Update in cache for quick access
+            cache_key = f"{user_id}:calendar_context"
+            cache_success = self.redis_cache.set(cache_key, calendar_context, prefix="temp")
+            
+            return session_success and cache_success
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update calendar context: {e}")
+            return False
+
+    def cache_calendar_events(self, user_id: str, events: List[Dict], ttl_seconds: Optional[int] = None) -> bool:
+        """
+        Cache calendar events with metadata tracking.
+        
+        Args:
+            user_id: User identifier
+            events: Calendar events data
+            ttl_seconds: Cache TTL
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Cache events in Redis
+            cache_success = self.redis_cache.set(f"{user_id}:calendar_events", events, prefix="calendar", ttl_seconds=ttl_seconds)
+            
+            # Update calendar metadata
+            metadata = {
+                "event_count": len(events),
+                "last_sync": datetime.utcnow().isoformat(),
+                "upcoming_count": sum(1 for event in events if self._is_upcoming_event(event)),
+                "today_count": sum(1 for event in events if self._is_today_event(event))
+            }
+            
+            metadata_success = self.redis_cache.set(f"{user_id}:calendar_metadata", metadata, prefix="calendar", ttl_seconds=ttl_seconds)
+            
+            # Learn from calendar patterns
+            if self.auto_learning_enabled and events:
+                self.long_term_memory.learn_from_event(user_id, "calendar_check", {
+                    "event_count": len(events),
+                    "upcoming_count": metadata["upcoming_count"],
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+            
+            return cache_success and metadata_success
+            
+        except Exception as e:
+            self.logger.error(f"Failed to cache calendar events: {e}")
+            return False
+
+    async def get_calendar_context_with_events(self, user_id: str, session_id: str) -> Dict[str, Any]:
+        """
+        Get calendar context with full event data.
+        
+        Args:
+            user_id: User identifier
+            session_id: Session identifier
+            
+        Returns:
+            Calendar context with events
+        """
+        try:
+            # Get cached events
+            events = self.redis_cache.get(f"{user_id}:calendar_events", prefix="calendar")
+            metadata = self.redis_cache.get(f"{user_id}:calendar_metadata", prefix="calendar")
+            
+            # Get calendar context from session
+            calendar_context = await self.session_memory.get_calendar_context(user_id, session_id)
+            
+            # Get adaptive settings for calendar
+            adaptive_settings = self.long_term_memory.get_adaptive_response_settings(user_id, {
+                "event_count": len(events) if events else 0
+            })
+            
+            return {
+                "events": events or [],
+                "metadata": metadata or {},
+                "session_context": calendar_context or {},
+                "adaptive_settings": adaptive_settings,
+                "cache_status": {
+                    "events_cached": events is not None,
+                    "metadata_cached": metadata is not None
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get calendar context with events: {e}")
+            return {
+                "events": [],
+                "metadata": {},
+                "session_context": {},
+                "adaptive_settings": {},
+                "cache_status": {"events_cached": False, "metadata_cached": False}
+            }
+        
     # =============================================================================
     # Agent Coordination
     # =============================================================================
@@ -778,6 +894,32 @@ class MemoryManager:
         except Exception as e:
             self.logger.error(f"Failed to generate behavior recommendations: {e}")
             return []
+        
+
+    def _is_upcoming_event(self, event: Dict[str, Any]) -> bool:
+        """Check if event is upcoming (starts in the future)."""
+        try:
+            start_time = event.get('start', {})
+            if 'dateTime' in start_time:
+                event_dt = datetime.fromisoformat(start_time['dateTime'].replace('Z', '+00:00'))
+                return event_dt > datetime.utcnow()
+            return False
+        except Exception:
+            return False
+
+    def _is_today_event(self, event: Dict[str, Any]) -> bool:
+        """Check if event is today."""
+        try:
+            start_time = event.get('start', {})
+            if 'dateTime' in start_time:
+                event_dt = datetime.fromisoformat(start_time['dateTime'].replace('Z', '+00:00'))
+                return event_dt.date() == datetime.utcnow().date()
+            elif 'date' in start_time:
+                event_date = datetime.strptime(start_time['date'], '%Y-%m-%d').date()
+                return event_date == datetime.utcnow().date()
+            return False
+        except Exception:
+            return False
     
     # =============================================================================
     # Utility Methods

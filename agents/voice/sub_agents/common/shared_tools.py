@@ -295,6 +295,90 @@ def get_email_context(
             "message": f"Error retrieving email context: {str(e)}",
             "error_type": type(e).__name__
         }
+    
+def update_calendar_context(
+    calendar_context: Dict[str, Any],
+    user_id: str,
+    session_id: str,
+    tool_context: ToolContext
+) -> Dict[str, Any]:
+    """
+    Tool to update calendar context in session state.
+    
+    Args:
+        calendar_context: Calendar context updates
+        user_id: User identifier
+        session_id: Session identifier
+        tool_context: ADK tool context
+        
+    Returns:
+        Result dictionary
+    """
+    try:
+        # Get memory manager instance
+        memory_manager = MemoryManager()
+        
+        # Update calendar context
+        success = memory_manager.update_calendar_context_across_services(
+            user_id, session_id, calendar_context
+        )
+        
+        # Also update tool context for immediate access
+        if success:
+            current_calendar_context = tool_context.state.get("current_calendar_context", {})
+            current_calendar_context.update(calendar_context)
+            tool_context.state["current_calendar_context"] = current_calendar_context
+        
+        return {
+            "success": success,
+            "message": "Calendar context updated successfully" if success else "Failed to update calendar context",
+            "updated_keys": list(calendar_context.keys())
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error updating calendar context: {str(e)}",
+            "error_type": type(e).__name__
+        }
+
+
+def get_calendar_context(
+    user_id: str,
+    session_id: str,
+    tool_context: ToolContext
+) -> Dict[str, Any]:
+    """
+    Tool to get current calendar context.
+    
+    Args:
+        user_id: User identifier
+        session_id: Session identifier
+        tool_context: ADK tool context
+        
+    Returns:
+        Calendar context data
+    """
+    try:
+        # Get memory manager instance
+        memory_manager = MemoryManager()
+        
+        # Get calendar context with full details
+        calendar_data = memory_manager.get_calendar_context_with_events(user_id, session_id)
+        
+        return {
+            "success": True,
+            "calendar_context": calendar_data,
+            "message": "Calendar context retrieved successfully"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "calendar_context": {},
+            "message": f"Error retrieving calendar context: {str(e)}",
+            "error_type": type(e).__name__
+        }
 
 
 # =============================================================================
@@ -822,6 +906,10 @@ __all__ = [
     # Email Context Tools
     "update_email_context",
     "get_email_context",
+
+    # Calendar Context Tools
+    "update_calendar_context",
+    "get_calendar_context",
     
     # Message Processing Tools
     "create_agent_message",

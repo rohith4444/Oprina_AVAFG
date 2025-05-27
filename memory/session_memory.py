@@ -122,6 +122,22 @@ class SessionMemoryService:
                 "unread_count": 0,
                 "sync_status": "idle"
             },
+
+            # Calendar context
+            "current_calendar_context": {
+                "last_calendar_sync": None,
+                "upcoming_events": [],
+                "cached_events": [],
+                "calendar_preferences": {
+                    "default_calendar_id": "primary",
+                    "default_event_duration": 60,
+                    "working_hours_start": 9,
+                    "working_hours_end": 17,
+                    "time_zone": "America/New_York"
+                },
+                "sync_status": "idle",
+                "calendars_list": []
+            },
             
             # Agent states for coordination
             "agent_states": {
@@ -145,6 +161,13 @@ class SessionMemoryService:
                     "status": "ready",
                     "last_generation": None,
                     "generation_count": 0
+                },
+                "calendar_agent": {
+                    "status": "ready",
+                    "calendar_authenticated": False,
+                    "last_operation": None,
+                    "operation_count": 0,
+                    "active_calendar": "primary"
                 }
             },
             
@@ -535,7 +558,44 @@ class SessionMemoryService:
             return session.state.get("current_email_context")
         return None
     
-    # =============================================================================
+    async def update_calendar_context(self, user_id: str, session_id: str, calendar_context: Dict[str, Any]) -> bool:
+        """
+        Update calendar context in session.
+        
+        Args:
+            user_id: User identifier
+            session_id: Session identifier
+            calendar_context: Calendar context updates
+            
+        Returns:
+            True if successful
+        """
+        session = await self.get_session(user_id, session_id)
+        if session:
+            current_calendar_context = session.state.get("current_calendar_context", {})
+            current_calendar_context.update(calendar_context)
+            
+            return await self.update_session_state(user_id, session_id, {
+                "current_calendar_context": current_calendar_context
+            })
+        return False
+
+    async def get_calendar_context(self, user_id: str, session_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get calendar context from session.
+        
+        Args:
+            user_id: User identifier
+            session_id: Session identifier
+            
+        Returns:
+            Calendar context or None
+        """
+        session = await self.get_session(user_id, session_id)
+        if session:
+            return session.state.get("current_calendar_context")
+        return None
+        # =============================================================================
     # User Preferences Management - FIXED ASYNC METHODS
     # =============================================================================
     

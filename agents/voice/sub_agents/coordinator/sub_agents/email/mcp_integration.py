@@ -31,7 +31,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from services.logging.logger import setup_logger
-from .mcp_bridge import get_mcp_bridge, get_gmail_tools_for_agent, test_mcp_bridge_connection
+from agents.voice.sub_agents.coordinator.sub_agents.email.mcp_bridge import get_mcp_bridge, get_gmail_tools_for_agent, test_mcp_bridge_connection
 
 # Configure logging
 logger = setup_logger("email_mcp_integration", console_output=True)

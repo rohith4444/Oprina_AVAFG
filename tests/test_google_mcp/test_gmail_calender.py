@@ -11,8 +11,8 @@ import os
 import asyncio
 from pathlib import Path
 
-# Add project root to path
-project_root = Path(__file__).parent
+# FIXED: Add project root to path correctly
+project_root = Path(__file__).parent.parent.parent  # Go up 3 levels: test_google_mcp -> tests -> project_root
 sys.path.insert(0, str(project_root))
 
 def test_mcp_tool_registration():
