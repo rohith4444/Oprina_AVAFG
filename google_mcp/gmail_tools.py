@@ -21,34 +21,90 @@ from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-import os
+import os, sys
 import base64
-from mcp.mcp_tool import Tool, register_tool
+from google_mcp.mcp_tool import Tool, register_tool
 import mimetypes
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from pathlib import Path
+from config.settings import settings
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
-CLIENT_SECRET_FILE = 'client_secret_7774023189-5ga9j3epn8nja2aumfnmf09mh10osquh.apps.googleusercontent.com.json'
-TOKEN_FILE = 'token.json'
+# Use settings instead of hardcoded values
+SCOPES = settings.GOOGLE_API_SCOPES
+CLIENT_SECRET_FILE = settings.google_client_secret_path
+TOKEN_FILE = settings.google_token_path
+
 
 def get_gmail_service():
     """
     Returns an authenticated Gmail API service instance.
+    Handles both 'web' and 'installed' OAuth credential types.
     """
     creds = None
+    
+    # Validate that client secret file exists
+    if not settings.validate_google_credentials():
+        raise FileNotFoundError(
+            f"Google client secret file not found: {CLIENT_SECRET_FILE}\n"
+            f"Please ensure you've downloaded the OAuth credentials and placed them in the credentials folder"
+        )
+    
+    # Check if token file exists
     if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    
+    # If credentials don't exist or are invalid, refresh or get new ones  
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-            creds = flow.run_local_server(port=8080)
+            # Handle both 'web' and 'installed' credential types
+            try:
+                flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+                creds = flow.run_local_server(port=8080)
+            except Exception as e:
+                # If that fails, try checking if it's a 'web' type credential
+                import json
+                with open(CLIENT_SECRET_FILE, 'r') as f:
+                    client_config = json.load(f)
+                
+                if 'web' in client_config:
+                    # Convert web credentials to installed format for local development
+                    web_config = client_config['web']
+                    installed_config = {
+                        'installed': {
+                            'client_id': web_config['client_id'],
+                            'client_secret': web_config['client_secret'],
+                            'auth_uri': web_config.get('auth_uri', 'https://accounts.google.com/o/oauth2/auth'),
+                            'token_uri': web_config.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                            'redirect_uris': ['http://localhost:8080/']
+                        }
+                    }
+                    
+                    # Create temporary installed-type config
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp_file:
+                        json.dump(installed_config, temp_file)
+                        temp_file.flush()
+                        
+                        # Use the temporary config file
+                        flow = InstalledAppFlow.from_client_secrets_file(temp_file.name, SCOPES)
+                        creds = flow.run_local_server(port=8080)
+                        
+                        # Clean up temp file
+                        os.unlink(temp_file.name)
+                else:
+                    # Re-raise original exception if not a web credential
+                    raise e
+        
+        # Ensure token directory exists and save credentials
+        os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
         with open(TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
+    
     return build('gmail', 'v1', credentials=creds)
 
 # =========================================================
@@ -191,7 +247,8 @@ class GmailSendMessageTool(Tool):
                 part = MIMEBase('application', 'octet-stream')
                 part.set_payload(att['data'])
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{att['filename']}"')
+                filename = att['filename']
+                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
                 message.attach(part)
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         try:
@@ -236,7 +293,8 @@ class GmailReplyMessageTool(Tool):
                 part = MIMEBase('application', 'octet-stream')
                 part.set_payload(att['data'])
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{att['filename']}"')
+                filename = att['filename']
+                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
                 message.attach(part)
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         try:
@@ -303,7 +361,8 @@ class GmailCreateDraftTool(Tool):
                 part = MIMEBase('application', 'octet-stream')
                 part.set_payload(att['data'])
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{att['filename']}"')
+                filename = att['filename']
+                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
                 message.attach(part)
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         try:
@@ -373,7 +432,8 @@ class GmailUpdateDraftTool(Tool):
                 part = MIMEBase('application', 'octet-stream')
                 part.set_payload(att['data'])
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{att['filename']}"')
+                filename = att['filename']
+                part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
                 message.attach(part)
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
         try:

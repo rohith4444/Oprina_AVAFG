@@ -469,6 +469,11 @@ dev_notes.md
 todo.md
 ideas.txt
 
+# Add to your existing .gitignore
+credentials/
+*.googleusercontent.com.json
+token*.json
+
 # =============================================================================
 # Example of what TO COMMIT
 # =============================================================================

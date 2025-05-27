@@ -6,8 +6,8 @@ This file provides the discovery and invocation logic for all registered MCP too
 - Allows the backend and ADK agent to list available tools and call them by name.
 - The agent uses list_tools() to discover capabilities and run_tool() to invoke tools with arguments.
 """
-from mcp.mcp_tool import TOOL_REGISTRY
-import mcp.gmail_tools  # Ensure all Gmail tools are registered
+from google_mcp.mcp_tool import TOOL_REGISTRY
+import google_mcp.gmail_tools  # Ensure all Gmail tools are registered
 
 def list_tools():
     """

@@ -7,8 +7,8 @@ for the Oprina voice-powered Gmail assistant.
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Optional
-import os
+from typing import Optional, List
+import os, glob
 
 
 class Settings(BaseSettings):
@@ -80,6 +80,40 @@ class Settings(BaseSettings):
     #     description="Gmail OAuth redirect URI"
     # )
     
+     # =============================================================================
+    # Google API Settings (ADD THIS SECTION)
+    # =============================================================================
+    
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_SECRET_FILE: str = Field(
+        default="credentials/client_secret_7774023189-5ga9j3epn8nja2aumfnmf09mh10osquh.apps.googleusercontent.com.json",
+        description="Path to Google OAuth client secret file"
+    )
+    GOOGLE_TOKEN_FILE: str = Field(
+        default="credentials/token.json",
+        description="Path to Google OAuth token file"
+    )
+    
+    # Google API Scopes
+    GOOGLE_API_SCOPES: List[str] = Field(
+        default=[
+            "https://www.googleapis.com/auth/gmail.modify",
+            "https://www.googleapis.com/auth/userinfo.profile",
+            "https://www.googleapis.com/auth/userinfo.email", 
+            "openid"
+        ],
+        description="Google API OAuth scopes"
+    )
+    
+    # Google API Features
+    GOOGLE_GMAIL_ENABLED: bool = Field(
+        default=True,
+        description="Enable Gmail API integration"
+    )
+    GOOGLE_CALENDAR_ENABLED: bool = Field(
+        default=False,  # We'll enable this when we add calendar
+        description="Enable Calendar API integration"
+    )
     # =============================================================================
     # ADK & Agent Settings
     # =============================================================================
@@ -215,6 +249,45 @@ class Settings(BaseSettings):
         default=True,
         description="Enable Redis caching"
     )
+
+    # =============================================================================
+    # Helper Methods (ADD THESE INSIDE THE CLASS)
+    # =============================================================================
+    
+    @property
+    def google_client_secret_path(self) -> str:
+        """Get absolute path to Google client secret file with auto-discovery."""
+        if os.path.isabs(self.GOOGLE_CLIENT_SECRET_FILE):
+            if os.path.exists(self.GOOGLE_CLIENT_SECRET_FILE):
+                return self.GOOGLE_CLIENT_SECRET_FILE
+        
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        explicit_path = os.path.join(project_root, self.GOOGLE_CLIENT_SECRET_FILE)
+        
+        if os.path.exists(explicit_path):
+            return explicit_path
+        
+        credentials_dir = os.path.join(project_root, "credentials")
+        if os.path.exists(credentials_dir):
+            pattern = os.path.join(credentials_dir, "client_secret*.json")
+            matches = glob.glob(pattern)
+            if matches:
+                return matches[0]
+        
+        return explicit_path
+    
+    @property  
+    def google_token_path(self) -> str:
+        """Get absolute path to Google token file."""
+        if os.path.isabs(self.GOOGLE_TOKEN_FILE):
+            return self.GOOGLE_TOKEN_FILE
+            
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(project_root, self.GOOGLE_TOKEN_FILE)
+    
+    def validate_google_credentials(self) -> bool:
+        """Validate that Google credentials file exists."""
+        return os.path.exists(self.google_client_secret_path)
     
     # =============================================================================
     # Database Connection Strings

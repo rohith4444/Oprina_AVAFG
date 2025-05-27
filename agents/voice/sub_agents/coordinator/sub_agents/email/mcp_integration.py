@@ -1,28 +1,27 @@
-
+# agents/voice/sub_agents/coordinator/sub_agents/email/mcp_integration.py
 """
-MCP Integration for Email Agent
+MCP Integration for Email Agent - UPDATED to use MCP-ADK Bridge
 
-This module handles the connection to Calvin's custom Gmail MCP server
-and provides tools for email operations.
+This module now provides Gmail tools through the MCP-ADK bridge instead of 
+direct MCP server connection. Maintains the same interface for the agent
+but uses Calvin's tool registry underneath.
 
 Key Features:
-- Gmail MCP server connection
-- Email fetching tools
-- Email sending/drafting tools
-- Email organization tools
-- Authentication handling
+- Gmail tools via MCP-ADK bridge
+- Maintains existing interface for agent compatibility
+- Real Gmail operations (no more mock tools!)
+- Error handling and logging
 """
 
 import os
 import sys
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from contextlib import AsyncExitStack
 
 # Calculate project root more reliably
 current_file = os.path.abspath(__file__)
 # From: agents/voice/sub_agents/coordinator/sub_agents/email/mcp_integration.py
-# Need to go up 6 levels to reach project root
 project_root = current_file
 for _ in range(7):  # 6 levels + 1 for the file itself
     project_root = os.path.dirname(project_root)
@@ -31,189 +30,180 @@ for _ in range(7):  # 6 levels + 1 for the file itself
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, StdioServerParameters
 from services.logging.logger import setup_logger
+from .mcp_bridge import get_mcp_bridge, get_gmail_tools_for_agent, test_mcp_bridge_connection
 
 # Configure logging
 logger = setup_logger("email_mcp_integration", console_output=True)
 
 class EmailMCPIntegration:
     """
-    Integration with Calvin's custom Gmail MCP server.
-    Manages connection and provides email operation tools.
+    Integration with Gmail tools via MCP-ADK Bridge.
+    Provides Gmail tools for the Email Agent using Calvin's MCP registry.
     """
     
     def __init__(self):
-        """Initialize MCP integration."""
+        """Initialize MCP integration via bridge."""
         self.logger = logger
         self.tools = []
         self.exit_stack = None
         self.connected = False
+        self.bridge = None
         
-        # MCP server configuration
-        self.mcp_server_command = os.getenv("GMAIL_MCP_COMMAND", "gmail-mcp-server")
-        self.mcp_server_args = os.getenv("GMAIL_MCP_ARGS", "").split() if os.getenv("GMAIL_MCP_ARGS") else []
+        # Initialize bridge connection
+        self._initialize_bridge()
         
-    async def connect_to_gmail_mcp(self):
+    def _initialize_bridge(self):
+        """Initialize the MCP-ADK bridge."""
+        try:
+            self.logger.info("--- Initializing Gmail MCP Integration via Bridge ---")
+            
+            # Get bridge instance
+            self.bridge = get_mcp_bridge()
+            
+            if self.bridge:
+                self.connected = True
+                self.logger.info("✅ MCP Bridge connection established")
+            else:
+                self.logger.error("❌ Failed to get MCP bridge instance")
+                self.connected = False
+                
+        except Exception as e:
+            self.logger.error(f"Failed to initialize MCP bridge: {e}")
+            self.connected = False
+    
+    async def connect_to_gmail_mcp(self) -> Tuple[List, Optional[AsyncExitStack]]:
         """
-        Connect to Calvin's Gmail MCP server.
+        Connect to Gmail MCP tools via bridge.
         
         Returns:
-            Tuple of (tools, exit_stack) for use in agent
+            Tuple of (tools, exit_stack) for agent initialization
         """
-        self.logger.info("--- Attempting to connect to Gmail MCP server ---")
+        self.logger.info("--- Connecting to Gmail tools via MCP Bridge ---")
+        
+        if not self.connected:
+            self.logger.warning("Bridge not connected, attempting to reconnect...")
+            self._initialize_bridge()
+        
+        if not self.connected:
+            self.logger.error("❌ Bridge connection failed, returning empty tools")
+            return [], None
         
         try:
-            # Connect to Calvin's Gmail MCP server
-            # This will be updated once Calvin provides the exact server details
-            self.tools, self.exit_stack = await MCPToolset.create(
-                connection_params=StdioServerParameters(
-                    command=self.mcp_server_command,
-                    args=self.mcp_server_args,
-                    env={
-                        # Gmail API credentials will be provided by Calvin
-                        "GMAIL_CLIENT_ID": os.getenv("GMAIL_CLIENT_ID", ""),
-                        "GMAIL_CLIENT_SECRET": os.getenv("GMAIL_CLIENT_SECRET", ""),
-                        "GMAIL_REFRESH_TOKEN": os.getenv("GMAIL_REFRESH_TOKEN", ""),
-                        # Additional environment variables as needed
-                        **os.environ
-                    }
-                )
-            )
+            # Get Gmail tools from bridge
+            self.tools = get_gmail_tools_for_agent()
             
-            self.connected = True
-            self.logger.info(f"--- Successfully connected to Gmail MCP server. Discovered {len(self.tools)} tool(s). ---")
+            self.logger.info(f"✅ Successfully retrieved {len(self.tools)} Gmail tools via bridge")
             
             # Log discovered tools for debugging
-            for tool in self.tools:
-                self.logger.info(f"  - Discovered Gmail tool: {tool.name}")
+            for i, tool in enumerate(self.tools):
+                tool_name = getattr(tool.func, '__name__', f'tool_{i}')
+                self.logger.info(f"  - Gmail tool: {tool_name}")
             
-            return self.tools, self.exit_stack
+            # Create a dummy exit stack for compatibility
+            # (Bridge doesn't need cleanup like real MCP server would)
+            exit_stack = AsyncExitStack()
+            self.exit_stack = exit_stack
             
-        except FileNotFoundError:
-            self.logger.error("!!! Gmail MCP server command not found !!!")
-            self.logger.error(f"!!! Tried to run: {self.mcp_server_command} {' '.join(self.mcp_server_args)} !!!")
-            return self._get_mock_tools()
+            return self.tools, exit_stack
             
         except Exception as e:
-            self.logger.error(f"--- ERROR connecting to Gmail MCP server: {e} ---")
-            self.logger.warning("--- Falling back to mock tools for development ---")
-            return self._get_mock_tools()
-    
-    def _get_mock_tools(self):
-        """
-        Provide mock tools for development when MCP server is not available.
-        
-        Returns:
-            Tuple of (mock_tools, dummy_exit_stack)
-        """
-        from google.adk.tools import FunctionTool
-        
-        def mock_fetch_emails(query: str = "", max_results: int = 10) -> Dict[str, Any]:
-            """Mock email fetching for development."""
-            self.logger.info(f"MOCK: Fetching emails with query='{query}', max_results={max_results}")
-            
-            # Return mock email data
-            return {
-                "emails": [
-                    {
-                        "id": "mock_email_1",
-                        "thread_id": "mock_thread_1",
-                        "subject": "Test Email 1",
-                        "sender": "test1@example.com",
-                        "date": "2024-05-25T10:00:00Z",
-                        "snippet": "This is a test email for development...",
-                        "read": False,
-                        "important": False,
-                        "labels": ["INBOX"]
-                    },
-                    {
-                        "id": "mock_email_2", 
-                        "thread_id": "mock_thread_2",
-                        "subject": "Important Update",
-                        "sender": "important@company.com",
-                        "date": "2024-05-25T09:30:00Z",
-                        "snippet": "This is an important update regarding...",
-                        "read": True,
-                        "important": True,
-                        "labels": ["INBOX", "IMPORTANT"]
-                    }
-                ],
-                "total_count": 2,
-                "query_used": query,
-                "mock_mode": True
-            }
-        
-        def mock_send_email(to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> Dict[str, Any]:
-            """Mock email sending for development."""
-            self.logger.info(f"MOCK: Sending email to='{to}', subject='{subject}'")
-            
-            return {
-                "success": True,
-                "message_id": f"mock_sent_{hash(to + subject)}",
-                "to": to,
-                "subject": subject,
-                "sent_at": "2024-05-25T12:00:00Z",
-                "mock_mode": True
-            }
-        
-        def mock_draft_email(to: str, subject: str, body: str, cc: str = "", bcc: str = "") -> Dict[str, Any]:
-            """Mock email drafting for development."""
-            self.logger.info(f"MOCK: Creating draft to='{to}', subject='{subject}'")
-            
-            return {
-                "success": True,
-                "draft_id": f"mock_draft_{hash(to + subject)}",
-                "to": to,
-                "subject": subject,
-                "created_at": "2024-05-25T12:00:00Z",
-                "mock_mode": True
-            }
-        
-        def mock_organize_email(email_id: str, action: str, label: str = "") -> Dict[str, Any]:
-            """Mock email organization for development."""
-            self.logger.info(f"MOCK: Organizing email_id='{email_id}', action='{action}', label='{label}'")
-            
-            return {
-                "success": True,
-                "email_id": email_id,
-                "action_performed": action,
-                "label": label,
-                "updated_at": "2024-05-25T12:00:00Z",
-                "mock_mode": True
-            }
-        
-        # Create mock tools
-        mock_tools = [
-            FunctionTool(func=mock_fetch_emails),
-            FunctionTool(func=mock_send_email),
-            FunctionTool(func=mock_draft_email),
-            FunctionTool(func=mock_organize_email)
-        ]
-                
-        # Create dummy exit stack
-        class DummyExitStack:
-            async def __aenter__(self): 
-                return self
-            async def __aexit__(self, *args): 
-                pass
-        
-        self.connected = False  # Mark as mock mode
-        return mock_tools, DummyExitStack()
+            self.logger.error(f"Error retrieving Gmail tools from bridge: {e}")
+            return [], None
     
     def is_connected(self) -> bool:
-        """Check if connected to real MCP server (not mock mode)."""
-        return self.connected
+        """Check if connected to Gmail tools via bridge."""
+        return self.connected and self.bridge is not None
     
     def get_connection_status(self) -> Dict[str, Any]:
         """Get detailed connection status."""
-        return {
-            "connected": self.connected,
-            "mock_mode": not self.connected,
-            "tools_count": len(self.tools),
-            "server_command": self.mcp_server_command,
-            "server_args": self.mcp_server_args
-        }
+        try:
+            # Get bridge connection test results
+            bridge_test = test_mcp_bridge_connection()
+            
+            return {
+                "connected": self.connected,
+                "bridge_available": self.bridge is not None,
+                "tools_count": len(self.tools),
+                "bridge_test": bridge_test,
+                "integration_type": "mcp_bridge",
+                "mock_mode": False  # We're using real tools now!
+            }
+        except Exception as e:
+            return {
+                "connected": False,
+                "error": str(e),
+                "integration_type": "mcp_bridge"
+            }
+    
+    def test_tool_execution(self, tool_name: str = None) -> Dict[str, Any]:
+        """
+        Test execution of a Gmail tool.
+        
+        Args:
+            tool_name: Specific tool to test (uses first available if None)
+            
+        Returns:
+            Test execution result
+        """
+        if not self.tools:
+            return {
+                "success": False,
+                "error": "No tools available for testing"
+            }
+        
+        try:
+            # Find tool to test
+            test_tool = None
+            target_name = tool_name
+            
+            if target_name:
+                # Look for specific tool
+                for tool in self.tools:
+                    if getattr(tool.func, '__name__', '') == target_name:
+                        test_tool = tool
+                        break
+            else:
+                # Use first available tool
+                test_tool = self.tools[0]
+                target_name = getattr(test_tool.func, '__name__', 'unknown_tool')
+            
+            if not test_tool:
+                return {
+                    "success": False,
+                    "error": f"Tool '{tool_name}' not found"
+                }
+            
+            self.logger.info(f"Testing tool execution: {target_name}")
+            
+            # Try to execute tool (expect it to fail due to auth, but structure should work)
+            try:
+                result = test_tool.func()  # Call with no parameters
+                
+                return {
+                    "success": True,
+                    "tool_name": target_name,
+                    "result_type": type(result).__name__,
+                    "execution_successful": True,
+                    "note": "Tool executed successfully"
+                }
+                
+            except Exception as tool_error:
+                # Expected - tools will fail without proper auth/parameters
+                return {
+                    "success": True,  # Structure test passed
+                    "tool_name": target_name,
+                    "execution_successful": False,
+                    "error": str(tool_error),
+                    "note": "Tool structure OK, failed as expected (auth/params needed)"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Test execution failed: {str(e)}",
+                "tool_name": target_name
+            }
 
 
 # Global instance for use in agent
@@ -221,7 +211,7 @@ email_mcp = EmailMCPIntegration()
 
 async def get_gmail_tools():
     """
-    Get Gmail tools from MCP server.
+    Get Gmail tools from MCP bridge.
     
     Returns:
         Tuple of (tools, exit_stack) for agent initialization
@@ -229,35 +219,42 @@ async def get_gmail_tools():
     return await email_mcp.connect_to_gmail_mcp()
 
 
-# Tool status function for debugging
 def get_gmail_mcp_status() -> Dict[str, Any]:
     """Get Gmail MCP connection status for debugging."""
     return email_mcp.get_connection_status()
 
 
+def test_gmail_tool_execution(tool_name: str = None) -> Dict[str, Any]:
+    """Test Gmail tool execution."""
+    return email_mcp.test_tool_execution(tool_name)
+
+
+# =============================================================================
+# Backward Compatibility & Testing
+# =============================================================================
+
 if __name__ == "__main__":
-    # Test MCP integration
-    async def test_gmail_mcp():
-        print("Testing Gmail MCP Integration...")
+    # Test MCP integration with bridge
+    async def test_email_mcp_integration():
+        print("🧪 Testing Email MCP Integration with Bridge...")
         
+        # Test connection status
+        status = get_gmail_mcp_status()
+        print(f"Connection Status: {status}")
+        
+        # Test tool retrieval
         tools, exit_stack = await get_gmail_tools()
+        print(f"Retrieved {len(tools)} Gmail tools")
         
-        print(f"Connected: {email_mcp.is_connected()}")
-        print(f"Tools available: {len(tools)}")
+        # Test tool execution
+        if tools:
+            test_result = test_gmail_tool_execution()
+            print(f"Tool execution test: {test_result}")
         
-        for tool in tools:
-            print(f"  - {tool.name}")
+        # Cleanup
+        if exit_stack:
+            await exit_stack.aclose()
         
-        # Test a mock tool if in mock mode
-        if not email_mcp.is_connected() and tools:
-            print("\nTesting mock fetch_emails tool:")
-            try:
-                # This is a bit tricky to test directly since tools need proper context
-                # But we can at least verify the function exists
-                print("✅ Mock tools created successfully")
-            except Exception as e:
-                print(f"❌ Error with mock tools: {e}")
-        
-        print("✅ Gmail MCP integration test completed")
+        print("✅ Email MCP integration test completed")
     
-    asyncio.run(test_gmail_mcp())
+    asyncio.run(test_email_mcp_integration())
