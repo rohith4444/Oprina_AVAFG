@@ -46,14 +46,8 @@ from agents.voice.sub_agents.coordinator.sub_agents.content.content_processing i
 
 # Import shared tools (absolute import)
 from agents.voice.sub_agents.common.shared_tools import (
-    update_session_state,
-    get_session_context,
-    log_agent_action,
-    handle_agent_error,
-    get_user_preferences,
-    learn_from_interaction,
-    measure_performance,
-    complete_performance_measurement
+    CORE_ADK_TOOLS,
+    LEARNING_ADK_TOOLS
 )
 
 # Content processing tools for the agent
@@ -554,16 +548,7 @@ Remember: You are a content specialist in a voice-first system. All processing
 should prioritize clarity, brevity, and conversational delivery while maintaining
 the user's intent and communication style.
         """,
-        tools=content_tools + [
-            update_session_state,
-            get_session_context,
-            log_agent_action,
-            handle_agent_error,
-            get_user_preferences,
-            learn_from_interaction,
-            measure_performance,
-            complete_performance_measurement
-        ]
+        tools=content_tools + CORE_ADK_TOOLS + LEARNING_ADK_TOOLS
     )
     
     print(f"--- Content Agent created with {len(agent_instance.tools)} tools ---")

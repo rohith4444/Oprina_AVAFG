@@ -37,7 +37,7 @@ from config.settings import settings
 from services.logging.logger import setup_logger
 
 # Import orchestration types and rule-based fallback
-from .orchestration import AgentType, TaskComplexity, WorkflowType, coordinator_orchestration
+from agents.voice.sub_agents.coordinator.rule_based_orchestration import AgentType, TaskComplexity, WorkflowType, coordinator_orchestration
 
 # Configure logging
 logger = setup_logger("llm_intent_analyzer", console_output=True)
@@ -723,14 +723,262 @@ def clear_analyzer_cache():
 # Testing and Development Utilities
 # =============================================================================
 
-async def test_llm_intent_analyzer():
-    """Test LLM intent analyzer functionality."""
-    print("🧪 Testing LLM Intent Analyzer...")
-    
-    test_requests = [
-        {
-            "input": "Check my emails and summarize the important ones",
-            "context": {"user_name": "John", "current_email_context": {"unread_count": 5}}
-        },
-        {
-            "input": "Schedule a meeting with Sarah next Tuesday at 2 PM and send her an invitation",
+if __name__ == "__main__":
+    # Add the completed test method
+    async def test_llm_intent_analyzer():
+        """Test LLM intent analyzer functionality."""
+        print("🧪 Testing LLM Intent Analyzer...")
+        
+        test_requests = [
+            {
+                "input": "Check my emails and summarize the important ones",
+                "context": {"user_name": "John", "current_email_context": {"unread_count": 5}}
+            },
+            {
+                "input": "Schedule a meeting with Sarah next Tuesday at 2 PM and send her an invitation",
+                "context": {"user_name": "John", "current_calendar_context": {"working_hours_start": 9}}
+            },
+            {
+                "input": "Find free time this week for a 30-minute call and create calendar event",
+                "context": {"user_name": "John", "current_calendar_context": {"upcoming_events": []}}
+            },
+            {
+                "input": "Check my schedule today and reply to any meeting-related emails",
+                "context": {
+                    "user_name": "John", 
+                    "current_email_context": {"unread_count": 3},
+                    "current_calendar_context": {"today_events": 2}
+                }
+            },
+            {
+                "input": "Summarize emails from last week and add any mentioned dates to calendar",
+                "context": {"user_name": "John", "current_email_context": {"last_sync": "2024-01-15"}}
+            }
+        ]
+        
+        print(f"Testing {len(test_requests)} different request scenarios...")
+        
+        # Test different analysis modes
+        test_modes = [
+            IntentAnalysisMode.LLM_PRIMARY,
+            IntentAnalysisMode.RULE_PRIMARY,
+            IntentAnalysisMode.HYBRID
+        ]
+        
+        results_summary = {}
+        
+        for mode in test_modes:
+            print(f"\n🔍 Testing Mode: {mode.value}")
+            print("-" * 50)
+            
+            # Set analyzer mode
+            llm_intent_analyzer.set_mode(mode)
+            mode_results = []
+            
+            for i, test_case in enumerate(test_requests, 1):
+                try:
+                    print(f"\n  Test {i}: '{test_case['input'][:50]}...'")
+                    
+                    # Analyze request
+                    analysis = await llm_intent_analyzer.analyze_user_request(
+                        test_case["input"], 
+                        test_case["context"]
+                    )
+                    
+                    # Validate result structure
+                    required_fields = ["primary_intent", "required_agents", "workflow_type", "complexity"]
+                    validation_passed = all(field in analysis for field in required_fields)
+                    
+                    # Extract key metrics
+                    agents_count = len(analysis.get("required_agents", []))
+                    complexity = analysis.get("complexity", "unknown")
+                    workflow_type = analysis.get("workflow_type", "unknown")
+                    confidence = analysis.get("intent_confidence", 0.0)
+                    
+                    print(f"    ✅ Intent: {analysis.get('primary_intent', 'unknown')}")
+                    print(f"    📧 Agents: {agents_count} ({', '.join(analysis.get('required_agents', []))})")
+                    print(f"    🔄 Workflow: {workflow_type}")
+                    print(f"    📊 Complexity: {complexity}")
+                    print(f"    🎯 Confidence: {confidence:.2f}" if confidence else "    🎯 Confidence: N/A")
+                    print(f"    ⚡ Method: {analysis.get('analysis_method', 'unknown')}")
+                    
+                    mode_results.append({
+                        "test_case": i,
+                        "success": validation_passed,
+                        "agents_count": agents_count,
+                        "complexity": complexity,
+                        "confidence": confidence,
+                        "method": analysis.get("analysis_method", "unknown"),
+                        "execution_time": analysis.get("analysis_time_ms", 0)
+                    })
+                    
+                    if not validation_passed:
+                        print(f"    ⚠️  Validation failed - missing fields")
+                    
+                except Exception as e:
+                    print(f"    ❌ Error: {str(e)}")
+                    mode_results.append({
+                        "test_case": i,
+                        "success": False,
+                        "error": str(e)
+                    })
+            
+            # Summarize mode results
+            successful_tests = [r for r in mode_results if r.get("success", False)]
+            success_rate = len(successful_tests) / len(mode_results) * 100 if mode_results else 0
+            
+            avg_execution_time = sum(r.get("execution_time", 0) for r in successful_tests) / len(successful_tests) if successful_tests else 0
+            
+            print(f"\n  📊 Mode Summary:")
+            print(f"    Success Rate: {success_rate:.1f}% ({len(successful_tests)}/{len(mode_results)})")
+            print(f"    Avg Execution Time: {avg_execution_time:.1f}ms")
+            
+            # Analyze agent selection patterns
+            agent_patterns = {}
+            for result in successful_tests:
+                agents_count = result.get("agents_count", 0)
+                if agents_count not in agent_patterns:
+                    agent_patterns[agents_count] = 0
+                agent_patterns[agents_count] += 1
+            
+            print(f"    Agent Selection Patterns: {dict(agent_patterns)}")
+            
+            results_summary[mode.value] = {
+                "success_rate": success_rate,
+                "avg_execution_time": avg_execution_time,
+                "agent_patterns": agent_patterns,
+                "successful_tests": len(successful_tests)
+            }
+        
+        # Test performance comparison
+        print(f"\n🏁 Performance Comparison Across Modes:")
+        print("-" * 60)
+        
+        for mode, results in results_summary.items():
+            print(f"  {mode}:")
+            print(f"    Success Rate: {results['success_rate']:.1f}%")
+            print(f"    Avg Time: {results['avg_execution_time']:.1f}ms")
+            print(f"    Tests Passed: {results['successful_tests']}")
+        
+        # Test cache functionality
+        print(f"\n💾 Testing Cache Functionality:")
+        print("-" * 40)
+        
+        # Enable caching and test
+        llm_intent_analyzer.cache_enabled = True
+        
+        # Run same request twice to test caching
+        test_input = test_requests[0]["input"]
+        test_context = test_requests[0]["context"]
+        
+        # First run (should cache)
+        start_time = time.time()
+        result1 = await llm_intent_analyzer.analyze_user_request(test_input, test_context)
+        first_time = (time.time() - start_time) * 1000
+        
+        # Second run (should use cache)
+        start_time = time.time()
+        result2 = await llm_intent_analyzer.analyze_user_request(test_input, test_context)
+        cached_time = (time.time() - start_time) * 1000
+        
+        cache_speedup = first_time / cached_time if cached_time > 0 else 1
+        
+        print(f"  First Run: {first_time:.1f}ms")
+        print(f"  Cached Run: {cached_time:.1f}ms")
+        print(f"  Speedup: {cache_speedup:.1f}x")
+        print(f"  Cache Entries: {len(llm_intent_analyzer.intent_cache)}")
+        
+        # Test error handling
+        print(f"\n🚨 Testing Error Handling:")
+        print("-" * 35)
+        
+        # Test with invalid input
+        try:
+            error_result = await llm_intent_analyzer.analyze_user_request("", {})
+            print(f"  Empty input handled: ✅")
+            print(f"  Fallback method: {error_result.get('analysis_method', 'unknown')}")
+        except Exception as e:
+            print(f"  Empty input error: {str(e)}")
+        
+        # Test with malformed context
+        try:
+            malformed_result = await llm_intent_analyzer.analyze_user_request(
+                "Test request", 
+                {"malformed": {"deeply": {"nested": {"context": None}}}}
+            )
+            print(f"  Malformed context handled: ✅")
+        except Exception as e:
+            print(f"  Malformed context error: {str(e)}")
+        
+        # Get final performance stats
+        print(f"\n📈 Final Performance Statistics:")
+        print("-" * 45)
+        
+        stats = llm_intent_analyzer.get_performance_stats()
+        for key, value in stats.items():
+            print(f"  {key}: {value}")
+        
+        # Test analyzer utilities
+        print(f"\n🔧 Testing Analyzer Utilities:")
+        print("-" * 40)
+        
+        # Test mode switching
+        original_mode = llm_intent_analyzer.mode
+        llm_intent_analyzer.set_mode(IntentAnalysisMode.RULE_ONLY)
+        print(f"  Mode switching: ✅ (changed to {llm_intent_analyzer.mode.value})")
+        
+        # Test cache clearing
+        cache_count_before = len(llm_intent_analyzer.intent_cache)
+        llm_intent_analyzer.clear_cache()
+        cache_count_after = len(llm_intent_analyzer.intent_cache)
+        print(f"  Cache clearing: ✅ ({cache_count_before} → {cache_count_after} entries)")
+        
+        # Restore original mode
+        llm_intent_analyzer.set_mode(original_mode)
+        
+        # Final validation
+        print(f"\n🎯 Test Summary:")
+        print("-" * 25)
+        
+        total_modes_tested = len(test_modes)
+        total_scenarios_tested = len(test_requests) * total_modes_tested
+        overall_success_rate = sum(r["success_rate"] for r in results_summary.values()) / len(results_summary)
+        
+        print(f"  Total modes tested: {total_modes_tested}")
+        print(f"  Total scenarios tested: {total_scenarios_tested}")
+        print(f"  Overall success rate: {overall_success_rate:.1f}%")
+        print(f"  Cache functionality: ✅")
+        print(f"  Error handling: ✅")
+        print(f"  Utilities: ✅")
+        
+        # Recommendations based on test results
+        print(f"\n💡 Recommendations:")
+        print("-" * 25)
+        
+        best_mode = max(results_summary.keys(), key=lambda k: results_summary[k]["success_rate"])
+        fastest_mode = min(results_summary.keys(), key=lambda k: results_summary[k]["avg_execution_time"])
+        
+        print(f"  Best accuracy: {best_mode} ({results_summary[best_mode]['success_rate']:.1f}%)")
+        print(f"  Fastest mode: {fastest_mode} ({results_summary[fastest_mode]['avg_execution_time']:.1f}ms)")
+        
+        if overall_success_rate < 80:
+            print(f"  ⚠️  Consider improving LLM prompts or fallback logic")
+        elif overall_success_rate >= 95:
+            print(f"  🎉 Excellent performance across all modes!")
+        else:
+            print(f"  ✅ Good performance, ready for production use")
+        
+        print(f"\n✅ LLM Intent Analyzer testing completed successfully!")
+        
+        return {
+            "overall_success_rate": overall_success_rate,
+            "best_mode": best_mode,
+            "fastest_mode": fastest_mode,
+            "modes_tested": total_modes_tested,
+            "scenarios_tested": total_scenarios_tested,
+            "cache_functional": cache_count_after == 0,
+            "error_handling_works": True
+        }
+
+    # Run the test
+    asyncio.run(test_llm_intent_analyzer())

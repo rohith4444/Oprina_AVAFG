@@ -37,14 +37,9 @@ from .mcp_integration import get_gmail_tools, get_gmail_mcp_status
 
 # Import shared tools
 from agents.voice.sub_agents.common.shared_tools import (
-    update_email_context,
-    get_email_context,
-    log_agent_action,
-    handle_agent_error,
-    update_session_state,
-    learn_from_interaction,
-    measure_performance,
-    complete_performance_measurement
+    CORE_ADK_TOOLS,
+    CONTEXT_ADK_TOOLS,
+    LEARNING_ADK_TOOLS
 )
 
 async def create_email_agent() -> Tuple[Agent, Optional[object]]:
@@ -216,16 +211,7 @@ You work closely with:
 Remember: You are now connected to the user's REAL Gmail account via Calvin's MCP tools. 
 All operations are live and will affect their actual email data. Use this power responsibly!
         """,
-        tools=gmail_tools + [
-            update_email_context,
-            get_email_context,
-            log_agent_action,
-            handle_agent_error,
-            update_session_state,
-            learn_from_interaction,
-            measure_performance,
-            complete_performance_measurement
-        ]
+        tools=gmail_tools + CORE_ADK_TOOLS + CONTEXT_ADK_TOOLS + LEARNING_ADK_TOOLS
     )
     
     print(f"--- Email Agent created with {len(agent_instance.tools)} tools ---")

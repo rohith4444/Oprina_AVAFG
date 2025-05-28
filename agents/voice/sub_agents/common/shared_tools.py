@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from google.adk.tools.tool_context import ToolContext
+from google.adk.tools import FunctionTool
 from memory.memory_manager import MemoryManager
 from services.logging.logger import setup_logger
 
@@ -892,6 +893,87 @@ def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> st
     return text[:max_length - len(suffix)] + suffix
 
 
+# Memory Management Tools
+update_session_state_tool = FunctionTool(func=update_session_state)
+get_session_context_tool = FunctionTool(func=get_session_context)
+update_agent_state_tool = FunctionTool(func=update_agent_state)
+store_conversation_message_tool = FunctionTool(func=store_conversation_message)
+
+# Email Context Tools
+update_email_context_tool = FunctionTool(func=update_email_context)
+get_email_context_tool = FunctionTool(func=get_email_context)
+
+# Calendar Context Tools
+update_calendar_context_tool = FunctionTool(func=update_calendar_context)
+get_calendar_context_tool = FunctionTool(func=get_calendar_context)
+
+# Message Processing Tools
+create_agent_message_tool = FunctionTool(func=create_agent_message)
+log_agent_action_tool = FunctionTool(func=log_agent_action)
+
+# Validation and Error Handling Tools
+validate_user_context_tool = FunctionTool(func=validate_user_context)
+handle_agent_error_tool = FunctionTool(func=handle_agent_error)
+
+# Performance Tools
+measure_performance_tool = FunctionTool(func=measure_performance)
+complete_performance_measurement_tool = FunctionTool(func=complete_performance_measurement)
+
+# User Preference Tools
+get_user_preferences_tool = FunctionTool(func=get_user_preferences)
+learn_from_interaction_tool = FunctionTool(func=learn_from_interaction)
+
+# =============================================================================
+# Tool Collections for Easy Import
+# =============================================================================
+
+# All shared tools collection
+SHARED_ADK_TOOLS = [
+    update_session_state_tool,
+    get_session_context_tool,
+    update_agent_state_tool,
+    store_conversation_message_tool,
+    update_email_context_tool,
+    get_email_context_tool,
+    update_calendar_context_tool,
+    get_calendar_context_tool,
+    create_agent_message_tool,
+    log_agent_action_tool,
+    validate_user_context_tool,
+    handle_agent_error_tool,
+    measure_performance_tool,
+    complete_performance_measurement_tool,
+    get_user_preferences_tool,
+    learn_from_interaction_tool
+]
+
+# Core operational tools (most commonly used)
+CORE_ADK_TOOLS = [
+    update_session_state_tool,
+    get_session_context_tool,
+    log_agent_action_tool,
+    handle_agent_error_tool,
+    measure_performance_tool,
+    complete_performance_measurement_tool
+]
+
+# Context management tools
+CONTEXT_ADK_TOOLS = [
+    update_email_context_tool,
+    get_email_context_tool,
+    update_calendar_context_tool,
+    get_calendar_context_tool,
+    update_agent_state_tool
+]
+
+# Learning and performance tools
+LEARNING_ADK_TOOLS = [
+    learn_from_interaction_tool,
+    get_user_preferences_tool,
+    measure_performance_tool,
+    complete_performance_measurement_tool
+]
+
 # =============================================================================
 # Export All Tools
 # =============================================================================
@@ -933,3 +1015,30 @@ __all__ = [
     "safe_get_nested_value",
     "truncate_string",
 ]
+
+# Add these to your existing __all__ list:
+__all__.extend([
+    # FunctionTool wrappers
+    "update_session_state_tool",
+    "get_session_context_tool",
+    "update_agent_state_tool",
+    "store_conversation_message_tool",
+    "update_email_context_tool",
+    "get_email_context_tool",
+    "update_calendar_context_tool",
+    "get_calendar_context_tool",
+    "create_agent_message_tool",
+    "log_agent_action_tool",
+    "validate_user_context_tool",
+    "handle_agent_error_tool",
+    "measure_performance_tool",
+    "complete_performance_measurement_tool",
+    "get_user_preferences_tool",
+    "learn_from_interaction_tool",
+    
+    # Tool collections
+    "SHARED_ADK_TOOLS",
+    "CORE_ADK_TOOLS", 
+    "CONTEXT_ADK_TOOLS",
+    "LEARNING_ADK_TOOLS"
+])

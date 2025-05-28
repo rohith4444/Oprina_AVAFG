@@ -36,14 +36,9 @@ from agents.voice.sub_agents.coordinator.sub_agents.calendar.mcp_integration imp
 
 # Import shared tools
 from agents.voice.sub_agents.common.shared_tools import (
-    update_calendar_context,
-    get_calendar_context,
-    log_agent_action,
-    handle_agent_error,
-    update_session_state,
-    learn_from_interaction,
-    measure_performance,
-    complete_performance_measurement
+    CORE_ADK_TOOLS,
+    CONTEXT_ADK_TOOLS,
+    LEARNING_ADK_TOOLS
 )
 
 # =============================================================================
@@ -885,16 +880,7 @@ You specialize in Calendar operations with intelligent business logic. Your core
 Remember: You provide intelligent calendar assistance, not just basic scheduling. 
 Use your specialized tools to deliver smart, contextual calendar management!
         """,
-        tools=calendar_agent_tools + calendar_mcp_tools + [
-            update_calendar_context,
-            get_calendar_context,
-            log_agent_action,
-            handle_agent_error,
-            update_session_state,
-            learn_from_interaction,
-            measure_performance,
-            complete_performance_measurement
-        ]
+        tools=calendar_agent_tools + calendar_mcp_tools + CORE_ADK_TOOLS + CONTEXT_ADK_TOOLS + LEARNING_ADK_TOOLS
     )
     
     print(f"--- Calendar Agent created with {len(agent_instance.tools)} tools ---")
