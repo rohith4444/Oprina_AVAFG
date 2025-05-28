@@ -33,7 +33,7 @@ from google.adk.models.lite_llm import LiteLlm
 from config.settings import settings
 
 # Import MCP integration (updated to use bridge)
-from .mcp_integration import get_gmail_tools, get_gmail_mcp_status
+from agents.voice.sub_agents.coordinator.sub_agents.email.mcp_integration import get_gmail_tools, get_gmail_mcp_status
 
 # Import shared tools
 from agents.voice.sub_agents.common.shared_tools import (

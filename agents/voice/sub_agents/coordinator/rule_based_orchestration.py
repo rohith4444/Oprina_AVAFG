@@ -20,7 +20,7 @@ from enum import Enum
 # Add project root to path
 current_file = os.path.abspath(__file__)
 project_root = current_file
-for _ in range(6):  # Navigate to project root
+for _ in range(5):  # Navigate to project root
     project_root = os.path.dirname(project_root)
 
 if project_root not in sys.path:

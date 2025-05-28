@@ -130,7 +130,7 @@ class Settings(BaseSettings):
         description="Model for voice agent"
     )
     COORDINATOR_MODEL: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-1.5-flash",
         description="Model for coordinator agent"
     )
     EMAIL_MODEL: str = Field(

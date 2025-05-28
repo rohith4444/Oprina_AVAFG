@@ -39,12 +39,12 @@ from google.adk.tools import FunctionTool
 from config.settings import settings
 
 # Import sub-agents
-from .sub_agents.email.agent import root_agent as email_agent_creator
-from .sub_agents.content.agent import content_agent
-from .sub_agents.calendar.agent import root_agent as calendar_agent_creator
+from agents.voice.sub_agents.coordinator.sub_agents.email.agent import root_agent as email_agent_creator
+from agents.voice.sub_agents.coordinator.sub_agents.content.agent import content_agent
+from agents.voice.sub_agents.coordinator.sub_agents.calendar.agent import root_agent as calendar_agent_creator
 
 # Import orchestration systems
-from .rule_based_orchestration import (
+from agents.voice.sub_agents.coordinator.rule_based_orchestration import (
     analyze_request as rule_analyze_request,
     delegate_to_agents as rule_delegate_to_agents,
     coordinate_contexts as rule_coordinate_contexts,
@@ -52,7 +52,7 @@ from .rule_based_orchestration import (
     validate_workflow
 )
 
-from .llm_based_orchestration import (
+from agents.voice.sub_agents.coordinator.llm_based_orchestration import (
     analyze_request_with_llm,
     get_analyzer_stats,
     set_analyzer_mode,
@@ -63,7 +63,15 @@ from .llm_based_orchestration import (
 from agents.voice.sub_agents.common.shared_tools import (
     CORE_ADK_TOOLS,
     CONTEXT_ADK_TOOLS,
-    LEARNING_ADK_TOOLS
+    LEARNING_ADK_TOOLS,
+    # Individual functions needed by our coordinator tools
+    handle_agent_error,
+    log_agent_action,
+    measure_performance,
+    complete_performance_measurement,
+    update_session_state,
+    get_session_context,
+    learn_from_interaction
 )
 # Import memory components
 from memory.memory_manager import MemoryManager
@@ -759,32 +767,6 @@ individual tasks - that's what your specialized sub-agents do!
         """,
         tools=coordinator_tools + CORE_ADK_TOOLS + CONTEXT_ADK_TOOLS + LEARNING_ADK_TOOLS
     )
-    
-    # Override the agent's generate method to use our enhanced coordination
-    original_generate = agent_instance.generate
-    
-    async def enhanced_generate(user_input: str, **kwargs):
-        """Enhanced generate method with multi-agent coordination."""
-        try:
-            # Get session context
-            context = kwargs.get("context", {})
-            
-            # Use enhanced coordinator for complex workflows
-            coordination_result = await enhanced_coordinator.coordinate_request(user_input, context)
-            
-            if coordination_result.get("success", False):
-                return coordination_result["response"]
-            else:
-                # Fallback to original agent behavior
-                return await original_generate(user_input, **kwargs)
-                
-        except Exception as e:
-            logger.error(f"Enhanced coordination failed: {e}")
-            # Fallback to original agent behavior
-            return await original_generate(user_input, **kwargs)
-    
-    # Replace the generate method
-    agent_instance.generate = enhanced_generate
     
     logger.info(f"--- Coordinator Agent created with {len(agent_instance.tools)} tools ---")
     logger.info(f"--- Sub-agents initialized: {enhanced_coordinator.agents_initialized} ---")

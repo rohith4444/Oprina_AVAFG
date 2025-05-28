@@ -47,7 +47,16 @@ from agents.voice.sub_agents.coordinator.sub_agents.content.content_processing i
 # Import shared tools (absolute import)
 from agents.voice.sub_agents.common.shared_tools import (
     CORE_ADK_TOOLS,
-    LEARNING_ADK_TOOLS
+    LEARNING_ADK_TOOLS,
+    # Individual functions needed by our coordinator tools
+    get_user_preferences,
+    handle_agent_error,
+    log_agent_action,
+    measure_performance,
+    complete_performance_measurement,
+    learn_from_interaction,
+    update_session_state,
+    get_session_context
 )
 
 # Content processing tools for the agent
