@@ -1,46 +1,33 @@
+# agents/voice/sub_agents/common/__init__.py
 """
-Common Components for Oprina Agents
-
-Shared utilities and message types for agent communication.
+Common utilities for Oprina agents.
+Simple helpers and constants - no complex abstractions.
 """
 
-# Import core message types
-from .message_types import (
-    MessageType,
-    AgentMessage,
-    VoiceInput,
-    EmailContext,
-    TaskResult,
-    create_voice_command_message,
-    create_email_operation_message,
-    validate_agent_message,
+# Import session keys for easy access
+from .session_keys import *
+
+# Import utilities
+from .utils import (
+    format_timestamp,
+    safe_get_nested_value,
+    truncate_string,
+    extract_user_info_from_session
 )
 
-# Import essential tools
-from .shared_tools import (
-    update_session_state,
-    update_agent_state,
-    log_agent_action,
-    handle_agent_error,
-)
-
-# Export the essentials
 __all__ = [
-    # Core message types
-    "MessageType",
-    "AgentMessage", 
-    "VoiceInput",
-    "EmailContext",
-    "TaskResult",
+    # Session keys (all constants from session_keys.py)
+    "USER_ID", "USER_NAME", "USER_EMAIL", "USER_GMAIL_CONNECTED",
+    "USER_CALENDAR_CONNECTED", "USER_PREFERENCES", "USER_LAST_ACTIVITY",
+    "EMAIL_CURRENT", "EMAIL_LAST_FETCH", "EMAIL_UNREAD_COUNT", "EMAIL_LAST_SENT",
+    "CALENDAR_CURRENT", "CALENDAR_LAST_FETCH", "CALENDAR_UPCOMING_COUNT",
+    "CONVERSATION_ACTIVE", "CURRENT_TASK", "LAST_AGENT_USED",
+    "APP_VERSION", "APP_FEATURES",
+    "TEMP_PROCESSING", "TEMP_CURRENT_OPERATION", "TEMP_WORKFLOW_STEP",
     
-    # Message helpers
-    "create_voice_command_message",
-    "create_email_operation_message", 
-    "validate_agent_message",
-    
-    # Essential tools
-    "update_session_state",
-    "update_agent_state",
-    "log_agent_action",
-    "handle_agent_error",
+    # Utilities
+    "format_timestamp",
+    "safe_get_nested_value", 
+    "truncate_string",
+    "extract_user_info_from_session"
 ]
