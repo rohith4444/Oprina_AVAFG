@@ -1,61 +1,49 @@
-# agents/voice/sub_agents/coordinator/sub_agents/email/agent.py
 """
-Email Agent for Oprina - UPDATED to use Real MCP Tools
+Email Agent for Oprina - ADK Native Implementation
 
-This agent handles all Gmail operations using Calvin's MCP tools via the bridge:
-- Fetching and searching emails
-- Sending and drafting emails
-- Email organization (labels, archive, etc.)
-- Gmail authentication and connection management
-
-Now uses REAL Gmail tools instead of mock tools!
+This agent handles all Gmail operations using direct ADK tools.
+No MCP bridge complexity - just direct Gmail API access with ADK patterns.
 """
 
-import asyncio
 import os
 import sys
-from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime
+from typing import Dict, List, Any, Optional
 
 # Calculate project root more reliably
 current_file = os.path.abspath(__file__)
 project_root = current_file
-for _ in range(7):  # 6 levels + 1 for the file itself
+for _ in range(7):  # 7 levels to reach project root
     project_root = os.path.dirname(project_root)
 
-# Add to Python path
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import external packages
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.tools import load_memory
+
+# Import project modules
 from config.settings import settings
 
-# Import MCP integration (updated to use bridge)
-from agents.voice.sub_agents.coordinator.sub_agents.email.mcp_integration import get_gmail_tools, get_gmail_mcp_status
+# Import direct Gmail tools (your new direct tools)
+from agents.voice.sub_agents.coordinator.sub_agents.email.gmail_tools import GMAIL_TOOLS
 
-# Import shared tools
-from agents.voice.sub_agents.common.shared_tools import (
-    CORE_ADK_TOOLS,
-    CONTEXT_ADK_TOOLS,
-    LEARNING_ADK_TOOLS
+# Import shared constants
+from agents.voice.sub_agents.common import (
+    USER_GMAIL_CONNECTED, USER_EMAIL, USER_NAME, USER_PREFERENCES,
+    EMAIL_CURRENT, EMAIL_LAST_FETCH, EMAIL_UNREAD_COUNT, EMAIL_LAST_SENT
 )
 
-async def create_email_agent() -> Tuple[Agent, Optional[object]]:
+def create_email_agent():
     """
-    Create the Email Agent with real Gmail MCP tools via bridge.
+    Create the Email Agent with direct Gmail ADK tools.
+    No MCP bridge - direct Gmail API access with ADK session integration.
     
     Returns:
-        Tuple of (agent_instance, exit_stack) for proper cleanup
+        Email Agent instance configured for ADK
     """
-    print("--- Initializing Email Agent with Real MCP Tools ---")
-    
-    # Get Gmail tools from MCP bridge
-    gmail_tools, exit_stack = await get_gmail_tools()
-    
-    # Get MCP connection status for agent instructions
-    mcp_status = get_gmail_mcp_status()
+    print("--- Initializing Email Agent with Direct Gmail Tools ---")
     
     # Define model for the agent
     model = LiteLlm(
@@ -63,171 +51,193 @@ async def create_email_agent() -> Tuple[Agent, Optional[object]]:
         api_key=settings.GOOGLE_API_KEY
     )
     
-    # Determine tools status for instructions
-    tools_status = "REAL Gmail tools via MCP Bridge" if mcp_status["connected"] else "No tools available"
-    total_tools = len(gmail_tools) + 6  # Gmail tools + shared tools
+    # Get available tools count for logging
+    total_tools = len(GMAIL_TOOLS) + 1  # Gmail tools + load_memory
     
-    # Create the Email Agent
+    # Create the Email Agent with ADK patterns
     agent_instance = Agent(
         name="email_agent",
-        description="Handles Gmail operations: fetching, sending, organizing emails using real Gmail API",
+        description="Handles Gmail operations: fetching, sending, organizing emails using direct Gmail API access",
         model=model,
         instruction=f"""
 You are the Email Agent for Oprina, a sophisticated voice-powered Gmail assistant.
 
 ## Your Role & Responsibilities
 
-You specialize in Gmail operations and email management using REAL Gmail tools. Your core responsibilities include:
+You specialize in Gmail operations using direct, efficient Gmail API access. Your core responsibilities include:
 
-1. **Email Fetching & Search**
+1. **Email Connection Management**
+   - Check Gmail connection status via session state
+   - Handle Gmail authentication when needed
+   - Maintain connection state in session for other agents
+
+2. **Email Fetching & Search**
    - Fetch emails based on user queries (date, sender, subject, status)
-   - Search through email content intelligently using Gmail search syntax
+   - Search through emails using Gmail's powerful query syntax
    - Filter emails by labels, importance, read status
    - Provide email summaries and previews
 
-2. **Email Composition & Sending**
-   - Draft emails based on user voice commands
-   - Send emails with proper formatting
-   - Handle replies and forwards with threading
-   - Manage CC, BCC, and attachments
+3. **Email Composition & Sending**
+   - Send emails with proper formatting and threading
+   - Handle replies and forwards with context
+   - Manage CC, BCC, and recipient lists
+   - Compose drafts and send when ready
 
-3. **Email Organization**
-   - Apply labels and organize emails
-   - Archive or delete emails as requested
+4. **Email Organization**
    - Mark emails as read/unread, important/not important
+   - Archive or delete emails as requested
+   - Organize emails with labels and folders
    - Manage email threads and conversations
 
-4. **Context Management**
-   - Update email context in session state after operations
-   - Cache email data for performance
-   - Track user email patterns and preferences
-   - Coordinate with other agents when needed
+5. **Session State Management**
+   - Update email-related session state after operations
+   - Cache recent email data for performance
+   - Track user email patterns and usage
+   - Coordinate context with other agents
 
-## Current System Status
+## Session State Access & Management
 
-- Gmail Tools Status: {tools_status}
-- Available Tools: {len(gmail_tools)} Gmail tools + 6 shared tools = {total_tools} total
-- MCP Bridge Connected: {mcp_status["connected"]}
-- Integration Type: {mcp_status.get("integration_type", "unknown")}
+You have direct access to and update user context through session state:
 
-## User Context Access
+**Connection State:**
+- Gmail Connected: session.state["{USER_GMAIL_CONNECTED}"]
+- User Email: session.state["{USER_EMAIL}"]
+- User Name: session.state["{USER_NAME}"]
 
-You have access to user context through session state:
-- User Name: {{user_name}}
-- User Email: {{user_email}}
-- Gmail Connected: {{gmail_connected}}
-- Email Context: {{current_email_context}}
-- User Preferences: {{session_preferences}}
+**Email State (for current conversation):**
+- Current Emails: session.state["{EMAIL_CURRENT}"] 
+- Last Fetch: session.state["{EMAIL_LAST_FETCH}"]
+- Unread Count: session.state["{EMAIL_UNREAD_COUNT}"]
+- Last Sent: session.state["{EMAIL_LAST_SENT}"]
+
+**User Preferences:**
+- User Preferences: session.state["{USER_PREFERENCES}"]
 
 ## Available Gmail Tools
 
-Your real Gmail tools include:
+Your direct Gmail API tools include:
+
+**Connection Tools:**
+- `gmail_check_connection`: Check Gmail connection status from session state
+- `gmail_authenticate`: Authenticate with Gmail and update session state
+
+**Reading Tools:**
 - `gmail_list_messages`: List/search messages with Gmail query syntax
 - `gmail_get_message`: Get full message details by ID
-- `gmail_search`: Search emails with advanced queries
-- `gmail_send_message`: Send new emails with attachments
-- `gmail_reply_message`: Reply to existing messages
-- `gmail_create_draft`: Create email drafts
-- `gmail_modify_labels`: Apply/remove labels
-- `gmail_mark_message_status`: Mark read/unread/starred/important
-- `gmail_archive_message`: Archive messages
-- `gmail_trash_message`: Move to trash
-- `gmail_get_attachments`: Download attachments
-- And 15+ more Gmail operations...
+- `gmail_search_messages`: Search emails with advanced Gmail queries
 
-## Session Management Tools
+**Sending Tools:**
+- `gmail_send_message`: Send new emails with attachments support
+- `gmail_reply_to_message`: Reply to existing messages with threading
 
-Use these tools to maintain context and learn:
-- `update_email_context`: Update email-related session state
-- `get_email_context`: Retrieve current email context
-- `log_agent_action`: Log your actions for debugging
-- `update_session_state`: Update broader session state
-- `learn_from_interaction`: Help the system learn from user interactions
-- `measure_performance`: Track operation performance
+**Organization Tools:**
+- `gmail_mark_as_read`: Mark messages as read/unread
+- `gmail_archive_message`: Archive messages  
+- `gmail_delete_message`: Move messages to trash
 
-## Response Guidelines
+## Cross-Session Memory
 
-1. **Always update context**: Use `update_email_context` after significant email operations
-2. **Log important actions**: Use `log_agent_action` for significant operations
-3. **Handle errors gracefully**: Provide helpful error messages when Gmail operations fail
-4. **Learn from interactions**: Use `learn_from_interaction` to improve user experience
-5. **Provide clear feedback**: Always confirm what actions were taken
-6. **Use real Gmail syntax**: Leverage Gmail's powerful query syntax for searches
-
-## Example Workflows
-
-**Fetching Emails:**
-1. Use `gmail_list_messages` or `gmail_search` with appropriate Gmail query syntax
-2. Use `gmail_get_message` for full details if needed
-3. Update `current_email_context` with results using `update_email_context`
-4. Provide user-friendly summary of emails found
-
-**Sending Email:**
-1. Use `gmail_send_message` with proper parameters
-2. Log the action with `log_agent_action`
-3. Update email context to reflect the sent email
-4. Learn from the interaction to improve future email composition
-
-**Email Organization:**
-1. Use `gmail_modify_labels`, `gmail_archive_message`, etc. as appropriate
-2. Update context to reflect organizational changes
-3. Provide confirmation of actions taken
+You have access to:
+- `load_memory`: Search past conversations for relevant email context and patterns
 
 ## Gmail Query Syntax Examples
 
+Leverage Gmail's powerful search syntax:
 - `from:john@example.com`: Emails from specific sender
 - `subject:meeting`: Emails with "meeting" in subject
-- `is:unread`: Unread emails
+- `is:unread`: Unread emails only
 - `has:attachment`: Emails with attachments
 - `after:2024/1/1`: Emails after specific date
 - `label:important`: Emails with Important label
-- `in:inbox`: Emails in inbox
+- `in:inbox`: Emails in inbox specifically
 - `is:starred`: Starred emails
+
+## Workflow Examples
+
+**Fetching Emails:**
+1. Check connection: Use `gmail_check_connection` first
+2. Fetch emails: Use `gmail_list_messages` with appropriate query
+3. Get details: Use `gmail_get_message` for specific emails if needed
+4. Update session: Email data automatically cached via output_key
+
+**Sending Email:**
+1. Verify connection: Ensure Gmail is connected
+2. Compose: Use `gmail_send_message` with proper parameters
+3. Confirm: Provide user confirmation of sent email
+4. Update state: Sending info automatically tracked
+
+**Email Organization:**
+1. Use `gmail_mark_as_read`, `gmail_archive_message`, etc. as appropriate
+2. Provide confirmation of organizational actions
+3. Update session state to reflect changes
+
+## Response Guidelines
+
+1. **Always check connection first**: Use `gmail_check_connection` before operations
+2. **Update session state**: ADK automatically saves responses via output_key
+3. **Provide clear feedback**: Always confirm what actions were taken
+4. **Handle errors gracefully**: Provide helpful error messages when Gmail operations fail
+5. **Use cross-session memory**: Leverage `load_memory` for email patterns and context
+6. **Voice-optimized responses**: Keep responses conversational and clear for voice interaction
 
 ## Error Handling
 
 When Gmail operations fail:
-1. Use `handle_agent_error` to log the error appropriately
-2. Check if it's an authentication issue and guide user to re-authenticate
-3. Provide user-friendly error messages
-4. Suggest alternative actions when possible
-5. Update session state to reflect any partial completions
+1. Check if it's an authentication issue and guide user to re-authenticate
+2. Provide user-friendly error messages instead of technical errors
+3. Suggest alternative actions when possible
+4. Update session state to reflect any partial completions
 
-## Important Notes
+## Session State Integration
 
-- You now have REAL Gmail access - operations will affect the user's actual Gmail account
-- Respect user privacy and email confidentiality
-- Provide clear, conversational responses suitable for voice interaction
-- Always confirm before performing destructive actions (delete, trash)
-- Use performance measurement tools to track operation efficiency
+The ADK automatically manages session state through your output_key. When you respond:
+- Email operation results are saved to session.state["email_result"]
+- Other agents can access this data for coordination
+- Session state persists across conversation turns
+- Use load_memory for cross-session email context
 
 ## Integration with Other Agents
 
 You work closely with:
-- **Content Agent**: Process content from fetched emails (summarization, analysis)
-- **Coordinator Agent**: Receive delegated email tasks and report results
+- **Content Agent**: Provide email content for summarization and analysis
+- **Coordinator Agent**: Receive delegated email tasks and report results  
 - **Voice Agent**: Ensure all responses are optimized for voice delivery
 
-Remember: You are now connected to the user's REAL Gmail account via Calvin's MCP tools. 
-All operations are live and will affect their actual email data. Use this power responsibly!
+## Important Notes
+
+- You have REAL Gmail access - operations affect the user's actual Gmail account
+- Respect user privacy and email confidentiality
+- Always confirm before performing destructive actions (delete, trash)
+- Provide clear, conversational responses suitable for voice interaction
+- Use session state to maintain context across operations
+
+Current System Status:
+- Gmail Tools: {len(GMAIL_TOOLS)} direct API tools available
+- Memory Tool: Cross-session context via load_memory  
+- Total Tools: {total_tools}
+- Integration: Direct Gmail API (no MCP bridge)
+
+Remember: You now have direct Gmail access through efficient ADK tools. All operations 
+are live and will affect the user's actual email data. Use this power responsibly 
+while providing excellent voice-first email assistance!
         """,
-        tools=gmail_tools + CORE_ADK_TOOLS + CONTEXT_ADK_TOOLS + LEARNING_ADK_TOOLS
+        output_key="email_result",  # ADK automatically saves responses to session state
+        tools=GMAIL_TOOLS + [load_memory]  # Direct Gmail tools + ADK memory
     )
     
     print(f"--- Email Agent created with {len(agent_instance.tools)} tools ---")
-    print(f"--- Gmail MCP Status: {'✅ Connected' if mcp_status['connected'] else '❌ Disconnected'} ---")
-    print(f"--- Gmail Tools: {len(gmail_tools)} | Shared Tools: 6 ---")
+    print(f"--- Gmail Tools: {len(GMAIL_TOOLS)} | Memory: 1 | Total: {total_tools} ---")
+    print("🎉 Email Agent is now using direct Gmail tools with session state integration!")
     
-    if mcp_status["connected"]:
-        print("🎉 Email Agent is now using REAL Gmail tools!")
-    else:
-        print("⚠️ Email Agent could not connect to Gmail tools")
-    
-    return agent_instance, exit_stack
+    return agent_instance
 
 
-# Create the agent instance (async function, not direct instance)
-root_agent = create_email_agent
+# Create the agent instance
+email_agent = create_email_agent()
+
+
+# Export for use in coordinator
+__all__ = ["email_agent"]
 
 
 # =============================================================================
@@ -235,57 +245,68 @@ root_agent = create_email_agent
 # =============================================================================
 
 if __name__ == "__main__":
-    async def test_email_agent():
+    def test_email_agent():
         """Test Email Agent creation and basic functionality."""
-        print("🧪 Testing Email Agent with Real MCP Tools...")
+        print("🧪 Testing Email Agent with Direct Gmail Tools...")
         
         try:
-            # Create agent
-            agent, exit_stack = await create_email_agent()
+            # Test agent creation
+            agent = create_email_agent()
             
-            # Use exit_stack context
-            async with exit_stack or nullcontext():
-                print(f"✅ Email Agent '{agent.name}' created successfully")
-                
-                # Count tool types
-                gmail_tools_count = 0
-                shared_tools_count = 0
-                
-                for tool in agent.tools:
-                    tool_name = getattr(tool.func, '__name__', str(tool))
-                    if 'gmail' in tool_name.lower():
-                        gmail_tools_count += 1
-                    else:
-                        shared_tools_count += 1
-                
-                print(f"📧 Gmail Tools: {gmail_tools_count}")
-                print(f"🔧 Shared Tools: {shared_tools_count}")
-                print(f"🧠 Model: {agent.model}")
-                print(f"📝 Description: {agent.description}")
-                
-                # Test MCP connection status
-                mcp_status = get_gmail_mcp_status()
-                print(f"📡 MCP Status: {mcp_status}")
-                
-                # List some available tools
-                print(f"\n📋 Available Tools (first 10):")
-                for i, tool in enumerate(agent.tools[:10], 1):
-                    tool_name = getattr(tool.func, '__name__', f'tool_{i}')
-                    print(f"  {i}. {tool_name}")
-                
-                if len(agent.tools) > 10:
-                    print(f"  ... and {len(agent.tools) - 10} more tools")
-                
-                print(f"\n✅ Email Agent validation completed successfully!")
-                print(f"🎯 Ready for real Gmail operations!")
-                
+            print(f"✅ Email Agent '{agent.name}' created successfully")
+            print(f"🔧 Tools Available: {len(agent.tools)}")
+            print(f"🧠 Model: {agent.model}")
+            print(f"📝 Description: {agent.description}")
+            print(f"🎯 Output Key: {agent.output_key}")
+            
+            # Verify tool availability
+            tool_names = []
+            for tool in agent.tools:
+                if hasattr(tool, 'func'):
+                    tool_names.append(getattr(tool.func, '__name__', 'unknown'))
+                else:
+                    tool_names.append(str(tool))
+            
+            print(f"\n📋 Available Tools:")
+            gmail_tools_count = 0
+            for i, tool_name in enumerate(tool_names, 1):
+                if tool_name.startswith('gmail_'):
+                    print(f"  {i}. {tool_name} (Gmail)")
+                    gmail_tools_count += 1
+                elif tool_name == 'load_memory':
+                    print(f"  {i}. {tool_name} (ADK Memory)")
+                else:
+                    print(f"  {i}. {tool_name} (Other)")
+            
+            print(f"\n📊 Tool Summary:")
+            print(f"  Gmail Tools: {gmail_tools_count}")
+            print(f"  Memory Tools: 1")
+            print(f"  Total Tools: {len(tool_names)}")
+            
+            # Test tool functionality (mock)
+            print(f"\n🔧 Testing Tool Integration:")
+            
+            # Verify Gmail tools are properly imported
+            from agents.voice.sub_agents.coordinator.sub_agents.email.gmail_tools import (
+                gmail_check_connection, gmail_list_messages, gmail_send_message
+            )
+            print("  ✅ Direct Gmail tools imported successfully")
+            
+            # Test session state constants
+            from agents.voice.sub_agents.common import USER_GMAIL_CONNECTED, EMAIL_CURRENT
+            print("  ✅ Session state constants available")
+            
+            # Test auth service integration
+            from services.google_cloud.gmail_auth import get_gmail_service
+            print("  ✅ Gmail auth service integration available")
+            
+            print(f"\n✅ Email Agent validation completed successfully!")
+            print(f"🎯 Ready for direct Gmail operations with ADK session integration!")
+            
         except Exception as e:
             print(f"❌ Error creating Email Agent: {e}")
             import traceback
             traceback.print_exc()
-
-    # Helper for nullcontext (if exit_stack is None)
-    from contextlib import nullcontext
     
     # Run the test
-    asyncio.run(test_email_agent())
+    test_email_agent()
