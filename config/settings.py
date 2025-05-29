@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     
     # Google API Configuration
     GOOGLE_API_KEY: str = Field(..., description="Google API key for Gemini models")
+
+    # ADD THIS:
+    GOOGLE_GENAI_USE_VERTEXAI: bool = Field(
+        default=False,
+        description="Force Google AI Studio instead of Vertex AI for Gemini models"
+    )
     
     # =============================================================================
     # Google API Settings
@@ -132,32 +138,32 @@ class Settings(BaseSettings):
     
     # ADK Model Configuration
     ADK_MODEL: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-1.5-flash",  # ✅ Changed to stable model
         description="Primary model for ADK agents"
     )
-    
+
     # Alternative models for specific agents
     VOICE_MODEL: str = Field(
-        default="gemini-2.5-flash-exp-native-audio-thinking-dialog",
+        default="gemini-1.5-flash",  # ✅ Changed to stable model
         description="Model for voice agent"
     )
     COORDINATOR_MODEL: str = Field(
-        default="gemini-1.5-flash",
+        default="gemini-1.5-flash",  # ✅ Already correct
         description="Model for coordinator agent"
     )
     EMAIL_MODEL: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-1.5-flash",  # ✅ Changed to stable model
         description="Model for email agent"
     )
     CONTENT_MODEL: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-1.5-flash",  # ✅ Changed to stable model
         description="Model for content agent"
     )
     CALENDAR_MODEL: str = Field(
-        default="gemini-2.5-flash-preview-05-20",
+        default="gemini-1.5-flash",  # ✅ Changed to stable model
         description="Model for calendar agent"
     )
-    
+
     # =============================================================================
     # Application Settings
     # =============================================================================
@@ -425,6 +431,10 @@ class Settings(BaseSettings):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+        # Force Google AI Studio for LiteLLM
+        os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = str(self.GOOGLE_GENAI_USE_VERTEXAI).lower()
+        
         self._validate_configuration()
     
     def _validate_configuration(self):

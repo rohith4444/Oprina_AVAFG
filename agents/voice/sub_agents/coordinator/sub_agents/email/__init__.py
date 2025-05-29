@@ -1,14 +1,12 @@
-
 """
 Email Agent Package
-
-This package contains the Email Agent responsible for Gmail operations:
-- Fetching emails
-- Sending and drafting emails  
-- Email organization (labels, archive, etc.)
-- Gmail authentication and connection management
 """
+from .agent import email_agent, create_email_runner
 
-from .agent import root_agent as email_agent_creator
+# For backward compatibility
+async def email_agent_creator():
+    """Legacy wrapper"""
+    agent, create_runner = email_agent, create_email_runner
+    return agent, None  # No exit stack needed with ADK
 
-__all__ = ["email_agent_creator"]
+__all__ = ["email_agent", "create_email_runner", "email_agent_creator"]

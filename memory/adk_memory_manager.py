@@ -299,7 +299,7 @@ class OprinaMemoryManager:
             
             # Execute agent through runner (this provides tool_context automatically)
             events = []
-            async for event in runner.run(
+            async for event in runner.run_async(
                 user_id=user_id,
                 session_id=session_id,
                 new_message=user_content

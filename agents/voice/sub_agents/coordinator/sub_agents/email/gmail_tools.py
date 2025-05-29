@@ -82,7 +82,7 @@ def gmail_authenticate(tool_context=None) -> str:
 # Gmail Email Reading Tools
 # =============================================================================
 
-def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=None) -> str:
+def gmail_list_messages(query: str , max_results: int , tool_context=None) -> str:
     """List Gmail messages with optional search query."""
     try:
         # Check Gmail connection
@@ -185,7 +185,7 @@ Content:
         return f"Error retrieving email: {str(e)}"
 
 
-def gmail_search_messages(search_query: str, max_results: int = 10, tool_context=None) -> str:
+def gmail_search_messages(search_query: str, max_results: int , tool_context=None) -> str:
     """Search Gmail messages using Gmail search syntax."""
     try:
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
@@ -202,7 +202,7 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
 # Gmail Sending Tools
 # =============================================================================
 
-def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str = "", tool_context=None) -> str:
+def gmail_send_message(to: str, subject: str, body: str, cc: str , bcc: str , tool_context=None) -> str:
     """Send a Gmail message."""
     try:
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
