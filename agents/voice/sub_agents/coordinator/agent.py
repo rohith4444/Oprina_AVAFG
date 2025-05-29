@@ -52,7 +52,7 @@ from agents.voice.sub_agents.coordinator.rule_based_orchestration import (
     validate_workflow
 )
 
-from agents.voice.sub_agents.coordinator.llm_based_orchestration import (
+from agents.voice.sub_agents.coordinator.llm_adk import (
     analyze_request_with_llm,
     get_analyzer_stats,
     set_analyzer_mode,

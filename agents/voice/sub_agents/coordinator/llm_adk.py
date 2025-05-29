@@ -30,7 +30,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # CORRECTED: Import LiteLLM functions directly
-from litellm import acompletion, completion
+from google.adk.models.lite_llm import LiteLlm
 from config.settings import settings
 from services.logging.logger import setup_logger
 
@@ -55,26 +55,28 @@ class LLMIntentAnalyzer:
     Advanced LLM-based intent analyzer with rule-based fallback.
     Uses LiteLLM's direct function API for reliable model calls.
     """
-    
     def __init__(self, mode: IntentAnalysisMode = IntentAnalysisMode.LLM_PRIMARY):
         """Initialize LLM intent analyzer."""
         self.logger = logger
         self.mode = mode
         self.logger.info(f"Initializing LLM Intent Analyzer (Mode: {mode.value})")
         
-        # CORRECTED: No longer need to initialize a model instance
-        # LiteLLM functions handle the model internally
+        # Use ADK's LiteLlm wrapper
         self.model_name = settings.COORDINATOR_MODEL
         self.api_key = settings.GOOGLE_API_KEY
         
-        # Test LiteLLM availability
+        # Initialize ADK LiteLlm model
         try:
-            # Simple test to verify LiteLLM is available
+            self.llm_model = LiteLlm(
+                model=self.model_name,
+                api_key=self.api_key
+            )
             self.llm_available = True
-            self.logger.info("LiteLLM functions available for direct use")
+            self.logger.info("ADK LiteLlm model initialized successfully")
         except Exception as e:
-            self.logger.error(f"LiteLLM not available: {e}")
+            self.logger.error(f"ADK LiteLlm initialization failed: {e}")
             self.llm_available = False
+            self.llm_model = None
         
         # Performance tracking
         self.analysis_stats = {
@@ -306,41 +308,23 @@ class LLMIntentAnalyzer:
     # =============================================================================
     
     async def _perform_llm_analysis(self, user_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Perform the core LLM-based intent analysis - CORRECTED VERSION."""
+        """Perform the core LLM-based intent analysis using ADK LiteLlm."""
         start_time = time.time()
         
         try:
-            if not self.llm_available:
-                raise ValueError("LiteLLM functions not available")
+            if not self.llm_available or not self.llm_model:
+                raise ValueError("ADK LiteLlm model not available")
             
             # Build comprehensive prompt
             analysis_prompt = self._build_analysis_prompt(user_input, context)
             
-            # CORRECTED: Use LiteLLM's acompletion function directly
-            self.logger.debug("Sending request to LiteLLM acompletion")
+            self.logger.debug("Sending request to ADK LiteLlm")
             
-            # Prepare messages in OpenAI format
-            messages = [
-                {"role": "user", "content": analysis_prompt}
-            ]
-            
-            # Call LiteLLM acompletion function
-            response = await acompletion(
-                model=self.model_name,
-                messages=messages,
-                api_key=self.api_key,
-                max_tokens=1000,  # Reasonable limit for analysis
-                temperature=0.1   # Low temperature for consistent analysis
-            )
-            
-            # Extract response text
-            if response and "choices" in response and response["choices"]:
-                response_text = response["choices"][0]["message"]["content"]
-            else:
-                raise ValueError("Invalid response format from LiteLLM")
+            # Use ADK's LiteLlm generate method
+            response = await self.llm_model.generate(analysis_prompt)
             
             # Parse LLM response
-            parsed_result = self._parse_llm_response(response_text)
+            parsed_result = self._parse_llm_response(response)
             
             # Add LLM-specific metadata
             execution_time = (time.time() - start_time) * 1000
@@ -348,15 +332,14 @@ class LLMIntentAnalyzer:
             
             parsed_result["llm_execution_time_ms"] = execution_time
             parsed_result["llm_model"] = self.model_name
-            parsed_result["llm_method"] = "acompletion"
-            parsed_result["llm_usage"] = response.get("usage", {})
+            parsed_result["llm_method"] = "adk_litellm"
             
             return parsed_result
             
         except Exception as e:
             self.logger.error(f"LLM analysis execution failed: {e}")
             raise
-    
+        
     async def _get_llm_enhancement(self, user_input: str, context: Dict[str, Any], rule_result: Dict[str, Any]) -> Dict[str, Any]:
         """Get LLM enhancement for rule-based analysis - CORRECTED VERSION."""
         try:
@@ -388,22 +371,12 @@ Provide enhancement suggestions in JSON format:
 Respond only with valid JSON.
             """
             
-            # Use LiteLLM acompletion for enhancement
-            messages = [{"role": "user", "content": enhancement_prompt}]
-            
-            response = await acompletion(
-                model=self.model_name,
-                messages=messages,
-                api_key=self.api_key,
-                max_tokens=500,
-                temperature=0.2
-            )
-            
-            if response and "choices" in response and response["choices"]:
-                response_text = response["choices"][0]["message"]["content"]
-                return self._parse_llm_response(response_text)
-            else:
-                return {"confidence_score": 0.5}  # Minimal enhancement
+            # Use ADK LiteLlm for enhancement
+            if not self.llm_model:
+                return {"confidence_score": 0.5}
+
+            response = await self.llm_model.generate(enhancement_prompt)
+            return self._parse_llm_response(response)
                 
         except Exception as e:
             self.logger.warning(f"LLM enhancement failed: {e}")

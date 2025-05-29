@@ -17,6 +17,12 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime, timedelta
 from enum import Enum
 
+# Add these new imports
+from google.adk.agents.invocation_context import InvocationContext
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+from google.adk.events import Event
+
 # Add project root to path
 current_file = os.path.abspath(__file__)
 project_root = current_file
@@ -938,20 +944,32 @@ class CoordinatorOrchestration:
         
         return agent_input
     
-    async def _execute_agent_action(self, agent: Any, agent_input: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_agent_action(self, agent: Any, agent_input: str, invocation_context: InvocationContext) -> Dict[str, Any]:
         """Execute action on specific agent."""
         try:
             start_time = datetime.utcnow()
             
-            # Execute agent (assuming agent has async generate method)
-            if hasattr(agent, 'generate'):
-                response = await agent.generate(agent_input)
-            elif hasattr(agent, 'run'):
-                response = await agent.run(agent_input)
-            else:
-                # Fallback: try calling agent directly
-                response = await agent(agent_input)
-            
+            # Execute ADK agent using run_async method
+            try:
+                # Create ADK Content object from string input
+                content = types.Content(role="user", parts=[types.Part(text=agent_input)])
+                
+                # Set the user content in context for this agent call
+                invocation_context.user_content = content
+                
+                # Execute agent and collect events
+                final_response = ""
+                async for event in agent.run_async(invocation_context):
+                    # Process each event to build the final response
+                    if event.content and event.content.parts:
+                        for part in event.content.parts:
+                            if part.text:
+                                final_response += part.text
+                
+                response = final_response
+                
+            except Exception as e:
+                raise ValueError(f"ADK agent execution failed: {str(e)}")
             end_time = datetime.utcnow()
             execution_time = (end_time - start_time).total_seconds() * 1000
             
