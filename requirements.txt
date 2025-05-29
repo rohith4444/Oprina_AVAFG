@@ -1,22 +1,23 @@
 # =============================================================================
-# Oprina Requirements - ADK Memory Migration
-# Library names only (no version constraints)
+# Oprina Requirements - Clean ADK Setup
 # =============================================================================
 
-# ADK (Agent Development Kit) Dependencies
+# Core ADK (Agent Development Kit)
 google-adk
-google-cloud-aiplatform
-asyncpg
 
-# LLM and AI Dependencies
+# Google AI/Cloud (minimal set to avoid conflicts)
 google-generativeai
-litellm
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
+google-api-python-client
+
+# LLM
+litellm
 
 # Database and Storage
 supabase
+asyncpg
 psycopg2-binary
 
 # Web Framework and API

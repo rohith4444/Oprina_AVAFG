@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import sys, os , asyncio
 
@@ -9,26 +8,65 @@ sys.path.insert(0, str(project_root))
 #!/usr/bin/env python3
 """Direct test of Email Agent without coordinator dependencies"""
 
- 
+# Force Google AI Studio usage and configure LiteLLM
+os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "False"
+os.environ["LITELLM_MODEL"] = "gemini-1.5-flash"
+os.environ["LITELLM_PROVIDER"] = "google"
+os.environ["LITELLM_API_KEY"] = os.environ.get("GOOGLE_API_KEY", "")
+os.environ["LITELLM_USE_VERTEXAI"] = "False"
+os.environ["LITELLM_API_BASE"] = "https://generativelanguage.googleapis.com/v1beta"
+os.environ["LITELLM_API_VERSION"] = "v1beta"
+os.environ["LITELLM_API_TYPE"] = "google"
+os.environ["LITELLM_VERBOSE"] = "True"  # Add verbose logging
+os.environ["LITELLM_DEBUG"] = "True"    # Add debug logging
+os.environ["LITELLM_CACHE"] = "False"   # Disable caching
+os.environ["LITELLM_MAX_RETRIES"] = "0" # Disable retries
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""  # Clear any existing credentials
+os.environ["GOOGLE_CLOUD_PROJECT"] = ""  # Clear any existing project
+os.environ["GOOGLE_CLOUD_LOCATION"] = ""  # Clear any existing location
+
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import os
-os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "False"
-
-# Add this at the very top of your test_email_agent.py:
-import os
 print(f"🔍 GOOGLE_GENAI_USE_VERTEXAI: {os.environ.get('GOOGLE_GENAI_USE_VERTEXAI', 'NOT SET')}")
+print(f"🔍 LITELLM_MODEL: {os.environ.get('LITELLM_MODEL', 'NOT SET')}")
+print(f"🔍 LITELLM_PROVIDER: {os.environ.get('LITELLM_PROVIDER', 'NOT SET')}")
+print(f"🔍 LITELLM_USE_VERTEXAI: {os.environ.get('LITELLM_USE_VERTEXAI', 'NOT SET')}")
+print(f"🔍 LITELLM_API_BASE: {os.environ.get('LITELLM_API_BASE', 'NOT SET')}")
+print(f"🔍 LITELLM_API_TYPE: {os.environ.get('LITELLM_API_TYPE', 'NOT SET')}")
 
 # Also check your settings:
 from config.settings import settings
 print(f"🔍 Settings GOOGLE_GENAI_USE_VERTEXAI: {settings.GOOGLE_GENAI_USE_VERTEXAI}")
+
+print("🔍 Testing ADK imports...")
+try:
+    from google.adk.agents import Agent
+    print("✅ Agent import successful")
+except Exception as e:
+    print(f"❌ Agent import failed: {e}")
+
+try:
+    from google.adk.models.lite_llm import LiteLlm
+    print("✅ LiteLlm import successful")
+except Exception as e:
+    print(f"❌ LiteLlm import failed: {e}")
+
+try:
+    from google.adk.tools import FunctionTool
+    print("✅ FunctionTool import successful")
+except Exception as e:
+    print(f"❌ FunctionTool import failed: {e}")
+
 
 async def test_email_agent_direct():
     """Test email agent directly without coordinator imports"""
     print("🧪 Testing Email Agent Directly...")
     
     try:
+
+        
         # Import Gmail tools directly
         from agents.voice.sub_agents.coordinator.sub_agents.email.gmail_tools import GMAIL_TOOLS
         print(f"✅ Gmail tools imported: {len(GMAIL_TOOLS)} tools")

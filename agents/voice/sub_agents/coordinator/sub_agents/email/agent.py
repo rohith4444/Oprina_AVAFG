@@ -50,9 +50,10 @@ def create_email_agent() -> Tuple[Agent, callable]:
     
     # Define model for the agent
     model = LiteLlm(
-        model=settings.EMAIL_MODEL,
-        api_key=settings.GOOGLE_API_KEY
-    )
+    model=settings.EMAIL_MODEL,
+    api_key=settings.GOOGLE_API_KEY,
+    provider="google"  # <-- Add this line
+)
     
     # Get available tools count for logging
     total_tools = len(GMAIL_TOOLS) + 1  # Gmail tools + load_memory
