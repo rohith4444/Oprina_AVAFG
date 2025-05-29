@@ -1,8 +1,8 @@
 """
-Direct Content Tools for ADK - Replaces Complex Content Processing
+Direct Content Tools for ADK - Complete ADK Integration
 
-Simple ADK-compatible tools for content processing operations.
-No MCP bridge complexity - just direct function tools following Gmail/Calendar pattern.
+Simple ADK-compatible tools for content processing operations with proper
+tool_context validation, session state management, and comprehensive logging.
 """
 
 import os
@@ -22,10 +22,19 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from google.adk.tools import FunctionTool
-from agents.voice.sub_agents.common import (
-    USER_PREFERENCES, USER_EMAIL, USER_NAME
-)
 from services.logging.logger import setup_logger
+
+# Import ADK utility functions
+from agents.voice.sub_agents.common.utils import (
+    validate_tool_context, update_agent_activity, get_user_preferences,
+    update_user_preferences, log_tool_execution
+)
+
+# Import session state constants
+from agents.voice.sub_agents.common import (
+    USER_PREFERENCES, USER_EMAIL, USER_NAME, CONTENT_LAST_SUMMARY,
+    CONTENT_LAST_ANALYSIS, CONTENT_PROCESSING_STATUS
+)
 
 logger = setup_logger("content_tools", console_output=True)
 
@@ -39,13 +48,23 @@ def summarize_email_content(
     detail_level: str = "moderate", 
     tool_context=None
 ) -> str:
-    """Summarize email content with specified detail level."""
+    """Summarize email content with specified detail level and ADK integration."""
+    if not validate_tool_context(tool_context, "summarize_email_content"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "summarize_email_content", "summarize", True, 
+                         f"Content length: {len(content)}, Detail: {detail_level}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "summarizing_content")
+        
         if not content or not content.strip():
             return "No content provided to summarize"
         
         # Get user preferences from session
-        user_prefs = tool_context.session.state.get(USER_PREFERENCES, {}) if tool_context else {}
+        user_prefs = get_user_preferences(tool_context, {})
         preferred_detail = user_prefs.get("summary_detail", detail_level)
         
         # Clean the email content
@@ -58,20 +77,28 @@ def summarize_email_content(
         if preferred_detail == "brief":
             # Brief: Key points only (50-100 chars)
             summary = _extract_key_points(content_clean, max_length=100)
-            return f"Brief summary: {summary}"
-            
+            result = f"Brief summary: {summary}"
         elif preferred_detail == "detailed":
             # Detailed: Comprehensive summary (200-400 chars)
             summary = _extract_detailed_summary(content_clean, max_length=400)
-            return f"Detailed summary: {summary}"
-            
+            result = f"Detailed summary: {summary}"
         else:
             # Moderate: Balanced summary (100-250 chars)
             summary = _extract_moderate_summary(content_clean, max_length=250)
-            return f"Summary: {summary}"
+            result = f"Summary: {summary}"
+        
+        # Update session state
+        tool_context.session.state["content:last_summary"] = result
+        tool_context.session.state["content:last_summary_at"] = datetime.utcnow().isoformat()
+        tool_context.session.state["content:last_summary_length"] = len(content)
+        tool_context.session.state["content:last_summary_detail"] = preferred_detail
+        
+        log_tool_execution(tool_context, "summarize_email_content", "summarize", True, "Summary completed")
+        return result
             
     except Exception as e:
         logger.error(f"Error summarizing email content: {e}")
+        log_tool_execution(tool_context, "summarize_email_content", "summarize", False, str(e))
         return f"Error creating summary: {str(e)}"
 
 
@@ -80,8 +107,18 @@ def summarize_email_list(
     max_emails: int = 5,
     tool_context=None
 ) -> str:
-    """Summarize a list of emails for quick overview."""
+    """Summarize a list of emails for quick overview with ADK integration."""
+    if not validate_tool_context(tool_context, "summarize_email_list"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "summarize_email_list", "summarize_list", True, 
+                         f"Max emails: {max_emails}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "summarizing_email_list")
+        
         if not emails or not emails.strip():
             return "No emails provided to summarize"
         
@@ -104,10 +141,18 @@ def summarize_email_list(
         for i, summary in enumerate(email_summaries, 1):
             result += f"{i}. {summary[:60]}...\n"
         
+        # Update session state
+        tool_context.session.state["content:last_list_summary"] = result
+        tool_context.session.state["content:last_list_summary_count"] = len(email_summaries)
+        tool_context.session.state["content:last_list_summary_at"] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "summarize_email_list", "summarize_list", True, 
+                         f"Summarized {len(email_summaries)} emails")
         return result
         
     except Exception as e:
         logger.error(f"Error summarizing email list: {e}")
+        log_tool_execution(tool_context, "summarize_email_list", "summarize_list", False, str(e))
         return f"Error summarizing emails: {str(e)}"
 
 
@@ -121,14 +166,24 @@ def generate_email_reply(
     style: str = "professional",
     tool_context=None
 ) -> str:
-    """Generate email reply based on original email and user intent."""
+    """Generate email reply based on original email and user intent with ADK integration."""
+    if not validate_tool_context(tool_context, "generate_email_reply"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "generate_email_reply", "generate_reply", True, 
+                         f"Style: {style}, Intent length: {len(reply_intent)}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "generating_reply")
+        
         if not reply_intent or not reply_intent.strip():
             return "Please provide what you want to communicate in the reply"
         
-        # Get user info from session
-        user_prefs = tool_context.session.state.get(USER_PREFERENCES, {}) if tool_context else {}
-        user_name = tool_context.session.state.get(USER_NAME, "") if tool_context else ""
+        # Get user info and preferences from session
+        user_prefs = get_user_preferences(tool_context, {})
+        user_name = tool_context.session.state.get("user:name", "")
         
         preferred_style = user_prefs.get("reply_style", style)
         
@@ -165,10 +220,19 @@ def generate_email_reply(
             else:
                 reply += "Best regards"
         
+        # Update session state
+        tool_context.session.state["content:last_reply_generated"] = reply
+        tool_context.session.state["content:last_reply_style"] = preferred_style
+        tool_context.session.state["content:last_reply_at"] = datetime.utcnow().isoformat()
+        tool_context.session.state["content:last_reply_sender"] = sender_info
+        
+        log_tool_execution(tool_context, "generate_email_reply", "generate_reply", True, 
+                         f"Reply generated in {preferred_style} style")
         return reply
         
     except Exception as e:
         logger.error(f"Error generating email reply: {e}")
+        log_tool_execution(tool_context, "generate_email_reply", "generate_reply", False, str(e))
         return f"Error generating reply: {str(e)}"
 
 
@@ -176,8 +240,18 @@ def suggest_reply_templates(
     email_content: str,
     tool_context=None
 ) -> str:
-    """Suggest appropriate reply templates based on email content."""
+    """Suggest appropriate reply templates based on email content with ADK integration."""
+    if not validate_tool_context(tool_context, "suggest_reply_templates"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "suggest_reply_templates", "suggest_templates", True, 
+                         f"Content length: {len(email_content)}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "suggesting_templates")
+        
         if not email_content:
             return "No email content provided for template suggestions"
         
@@ -212,10 +286,18 @@ def suggest_reply_templates(
         for i, suggestion in enumerate(suggestions, 1):
             result += f"{i}. {suggestion}\n"
         
+        # Update session state
+        tool_context.session.state["content:last_templates_suggested"] = suggestions
+        tool_context.session.state["content:last_templates_count"] = len(suggestions)
+        tool_context.session.state["content:last_templates_at"] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "suggest_reply_templates", "suggest_templates", True, 
+                         f"Generated {len(suggestions)} templates")
         return result
         
     except Exception as e:
         logger.error(f"Error suggesting reply templates: {e}")
+        log_tool_execution(tool_context, "suggest_reply_templates", "suggest_templates", False, str(e))
         return f"Error generating suggestions: {str(e)}"
 
 
@@ -224,8 +306,18 @@ def suggest_reply_templates(
 # =============================================================================
 
 def analyze_email_sentiment(content: str, tool_context=None) -> str:
-    """Analyze email sentiment and tone."""
+    """Analyze email sentiment and tone with ADK integration."""
+    if not validate_tool_context(tool_context, "analyze_email_sentiment"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "analyze_email_sentiment", "analyze_sentiment", True, 
+                         f"Content length: {len(content)}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "analyzing_sentiment")
+        
         if not content or not content.strip():
             return "No content provided for sentiment analysis"
         
@@ -234,11 +326,16 @@ def analyze_email_sentiment(content: str, tool_context=None) -> str:
         
         # Analyze different sentiment indicators
         analysis_parts = []
+        analysis_data = {}
         
         # Urgency detection
         urgent_words = ["urgent", "asap", "immediately", "emergency", "critical", "deadline"]
-        if any(word in content_lower for word in urgent_words):
+        urgency_detected = any(word in content_lower for word in urgent_words)
+        if urgency_detected:
             analysis_parts.append("⚡ Urgent tone detected")
+            analysis_data["urgency"] = True
+        else:
+            analysis_data["urgency"] = False
         
         # Positive sentiment
         positive_words = ["thank", "great", "excellent", "pleased", "happy", "congratulations", "wonderful"]
@@ -251,10 +348,13 @@ def analyze_email_sentiment(content: str, tool_context=None) -> str:
         # Determine overall sentiment
         if positive_count > negative_count:
             analysis_parts.append("😊 Positive sentiment")
+            analysis_data["sentiment"] = "positive"
         elif negative_count > positive_count:
             analysis_parts.append("😟 Concerned/negative sentiment")
+            analysis_data["sentiment"] = "negative"
         else:
             analysis_parts.append("😐 Neutral sentiment")
+            analysis_data["sentiment"] = "neutral"
         
         # Formality level
         formal_indicators = ["dear", "sincerely", "regards", "respectfully", "kindly"]
@@ -265,21 +365,44 @@ def analyze_email_sentiment(content: str, tool_context=None) -> str:
         
         if formal_count > casual_count:
             analysis_parts.append("🎩 Formal tone")
+            analysis_data["formality"] = "formal"
         elif casual_count > formal_count:
             analysis_parts.append("👋 Casual tone")
+            analysis_data["formality"] = "casual"
         else:
             analysis_parts.append("💼 Professional tone")
+            analysis_data["formality"] = "professional"
         
-        return " | ".join(analysis_parts)
+        result = " | ".join(analysis_parts)
+        
+        # Update session state
+        tool_context.session.state["content:last_analysis"] = result
+        tool_context.session.state["content:last_analysis_data"] = analysis_data
+        tool_context.session.state["content:last_analysis_at"] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "analyze_email_sentiment", "analyze_sentiment", True, 
+                         f"Analysis completed: {analysis_data['sentiment']}")
+        return result
         
     except Exception as e:
         logger.error(f"Error analyzing email sentiment: {e}")
+        log_tool_execution(tool_context, "analyze_email_sentiment", "analyze_sentiment", False, str(e))
         return f"Error analyzing sentiment: {str(e)}"
 
 
 def extract_action_items(content: str, tool_context=None) -> str:
-    """Extract action items and tasks from email content."""
+    """Extract action items and tasks from email content with ADK integration."""
+    if not validate_tool_context(tool_context, "extract_action_items"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "extract_action_items", "extract_actions", True, 
+                         f"Content length: {len(content)}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "extracting_actions")
+        
         if not content or not content.strip():
             return "No content provided for action item extraction"
         
@@ -308,16 +431,24 @@ def extract_action_items(content: str, tool_context=None) -> str:
         action_items = list(dict.fromkeys(action_items))[:5]
         
         if not action_items:
-            return "No clear action items found in this email"
+            result = "No clear action items found in this email"
+        else:
+            result = "Action items identified:\n"
+            for i, item in enumerate(action_items, 1):
+                result += f"{i}. {item[:60]}...\n" if len(item) > 60 else f"{i}. {item}\n"
         
-        result = "Action items identified:\n"
-        for i, item in enumerate(action_items, 1):
-            result += f"{i}. {item[:60]}...\n" if len(item) > 60 else f"{i}. {item}\n"
+        # Update session state
+        tool_context.session.state["content:last_action_items"] = action_items
+        tool_context.session.state["content:last_action_items_count"] = len(action_items)
+        tool_context.session.state["content:last_action_items_at"] = datetime.utcnow().isoformat()
         
+        log_tool_execution(tool_context, "extract_action_items", "extract_actions", True, 
+                         f"Extracted {len(action_items)} action items")
         return result
         
     except Exception as e:
         logger.error(f"Error extracting action items: {e}")
+        log_tool_execution(tool_context, "extract_action_items", "extract_actions", False, str(e))
         return f"Error extracting action items: {str(e)}"
 
 
@@ -326,8 +457,18 @@ def extract_action_items(content: str, tool_context=None) -> str:
 # =============================================================================
 
 def optimize_for_voice(content: str, max_length: int = 200, tool_context=None) -> str:
-    """Optimize content for voice delivery."""
+    """Optimize content for voice delivery with ADK integration."""
+    if not validate_tool_context(tool_context, "optimize_for_voice"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "optimize_for_voice", "optimize", True, 
+                         f"Content length: {len(content)}, Max length: {max_length}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "optimizing_voice")
+        
         if not content or not content.strip():
             return "No content provided for voice optimization"
         
@@ -373,16 +514,37 @@ def optimize_for_voice(content: str, max_length: int = 200, tool_context=None) -
             else:
                 voice_content = truncated + "..."
         
-        return voice_content.strip()
+        result = voice_content.strip()
+        
+        # Update session state
+        tool_context.session.state["content:last_voice_optimization"] = result
+        tool_context.session.state["content:last_voice_optimization_at"] = datetime.utcnow().isoformat()
+        tool_context.session.state["content:last_voice_original_length"] = len(content)
+        tool_context.session.state["content:last_voice_optimized_length"] = len(result)
+        
+        log_tool_execution(tool_context, "optimize_for_voice", "optimize", True, 
+                         f"Optimized from {len(content)} to {len(result)} characters")
+        return result
         
     except Exception as e:
         logger.error(f"Error optimizing content for voice: {e}")
+        log_tool_execution(tool_context, "optimize_for_voice", "optimize", False, str(e))
         return content[:max_length] if len(content) > max_length else content
 
 
 def create_voice_summary(content: str, tool_context=None) -> str:
-    """Create a summary specifically optimized for voice delivery."""
+    """Create a summary specifically optimized for voice delivery with ADK integration."""
+    if not validate_tool_context(tool_context, "create_voice_summary"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "create_voice_summary", "voice_summary", True, 
+                         f"Content length: {len(content)}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "content_agent", "creating_voice_summary")
+        
         if not content:
             return "No content to create voice summary"
         
@@ -396,10 +558,17 @@ def create_voice_summary(content: str, tool_context=None) -> str:
         # Optimize for voice
         voice_summary = optimize_for_voice(summary, max_length=150, tool_context=tool_context)
         
+        # Update session state
+        tool_context.session.state["content:last_voice_summary"] = voice_summary
+        tool_context.session.state["content:last_voice_summary_at"] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "create_voice_summary", "voice_summary", True, 
+                         "Voice summary created")
         return voice_summary
         
     except Exception as e:
         logger.error(f"Error creating voice summary: {e}")
+        log_tool_execution(tool_context, "create_voice_summary", "voice_summary", False, str(e))
         return f"Error creating voice summary: {str(e)}"
 
 
@@ -570,26 +739,28 @@ __all__ = [
 # =============================================================================
 
 if __name__ == "__main__":
-    print("🧪 Testing Direct Content Tools...")
+    print("🧪 Testing Direct Content Tools with ADK Integration...")
     
     # Mock tool context for testing
     class MockSession:
         def __init__(self):
             self.state = {
-                USER_PREFERENCES: {
+                "user:preferences": {
                     "summary_detail": "moderate",
                     "reply_style": "professional"
                 },
-                USER_NAME: "Test User"
+                "user:name": "Test User",
+                "user:email": "test@example.com"
             }
     
     class MockToolContext:
         def __init__(self):
             self.session = MockSession()
+            self.invocation_id = "test_invocation_123"
     
     mock_context = MockToolContext()
     
-    # Test content summarization
+    # Test content summarization with ADK integration
     test_email = """
     Hi John,
     
@@ -602,19 +773,69 @@ if __name__ == "__main__":
     Sarah
     """
     
+    print("📧 Testing summarize_email_content with ADK integration...")
     summary_result = summarize_email_content(test_email, "brief", mock_context)
-    print(f"Summary test: {summary_result}")
+    print(f"Summary result: {summary_result}")
     
-    # Test reply generation
+    # Check session state updates
+    last_summary = mock_context.session.state.get("content:last_summary", "")
+    print(f"Session state updated: {bool(last_summary)}")
+    
+    print("\n💬 Testing generate_email_reply with ADK integration...")
     reply_result = generate_email_reply(test_email, "I'll send the budget by Thursday", "professional", mock_context)
-    print(f"Reply test: {reply_result[:100]}...")
+    print(f"Reply result: {reply_result[:100]}...")
     
-    # Test sentiment analysis
+    # Check session state updates
+    last_reply = mock_context.session.state.get("content:last_reply_generated", "")
+    print(f"Session state updated: {bool(last_reply)}")
+    
+    print("\n🔍 Testing analyze_email_sentiment with ADK integration...")
     sentiment_result = analyze_email_sentiment(test_email, mock_context)
-    print(f"Sentiment test: {sentiment_result}")
+    print(f"Sentiment result: {sentiment_result}")
     
-    # Test voice optimization
+    # Check session state updates
+    last_analysis = mock_context.session.state.get("content:last_analysis", "")
+    print(f"Session state updated: {bool(last_analysis)}")
+    
+    print("\n🗣️ Testing optimize_for_voice with ADK integration...")
     voice_result = optimize_for_voice(test_email, 150, mock_context)
-    print(f"Voice optimization test: {voice_result}")
+    print(f"Voice optimization result: {voice_result}")
     
-    print("✅ Direct Content tools created successfully!")
+    # Check session state updates
+    last_voice_opt = mock_context.session.state.get("content:last_voice_optimization", "")
+    print(f"Session state updated: {bool(last_voice_opt)}")
+    
+    print("\n📝 Testing extract_action_items with ADK integration...")
+    action_result = extract_action_items(test_email, mock_context)
+    print(f"Action items result: {action_result}")
+    
+    # Check session state updates
+    last_actions = mock_context.session.state.get("content:last_action_items", [])
+    print(f"Session state updated: {bool(last_actions)}")
+    
+    print("\n🎙️ Testing create_voice_summary with ADK integration...")
+    voice_summary_result = create_voice_summary(test_email, mock_context)
+    print(f"Voice summary result: {voice_summary_result}")
+    
+    # Check session state updates
+    last_voice_summary = mock_context.session.state.get("content:last_voice_summary", "")
+    print(f"Session state updated: {bool(last_voice_summary)}")
+    
+    # Test validation with no context
+    print("\n❌ Testing validation with no context...")
+    no_context_result = summarize_email_content("test content", "brief", None)
+    print(f"No context result: {no_context_result}")
+    
+    # Display final session state
+    print("\n📊 Final Session State Summary:")
+    content_keys = [key for key in mock_context.session.state.keys() if key.startswith("content:")]
+    for key in content_keys:
+        value = mock_context.session.state[key]
+        if isinstance(value, str) and len(value) > 50:
+            print(f"  {key}: {value[:50]}...")
+        else:
+            print(f"  {key}: {value}")
+    
+    print("\n✅ Direct Content tools with comprehensive ADK integration completed!")
+    print(f"🔧 Total tools created: {len(CONTENT_TOOLS)}")
+    print("🎯 Ready for content agent integration with proper session state management!")

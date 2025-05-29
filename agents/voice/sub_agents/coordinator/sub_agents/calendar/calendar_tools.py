@@ -1,8 +1,8 @@
 """
-Direct Calendar Tools for ADK - Replaces MCP Integration
+Direct Calendar Tools for ADK - Complete ADK Integration
 
-Simple ADK-compatible tools that use Google Calendar API directly through existing auth services.
-No MCP bridge complexity - just direct function tools.
+Simple ADK-compatible tools that use Google Calendar API directly through existing auth services
+with proper tool_context validation, session state management, and comprehensive logging.
 """
 
 import os
@@ -21,10 +21,19 @@ if project_root not in sys.path:
 
 from google.adk.tools import FunctionTool
 from services.google_cloud.calendar_auth import get_calendar_service, check_calendar_connection
-from agents.voice.sub_agents.common import (
-    USER_CALENDAR_CONNECTED
-)
 from services.logging.logger import setup_logger
+
+# Import ADK utility functions
+from agents.voice.sub_agents.common.utils import (
+    validate_tool_context, update_agent_activity, get_user_preferences,
+    update_service_connection_status, get_service_connection_status, log_tool_execution
+)
+
+# Import session state constants
+from agents.voice.sub_agents.common import (
+    USER_CALENDAR_CONNECTED, USER_NAME, USER_PREFERENCES,
+    CALENDAR_CURRENT, CALENDAR_LAST_FETCH, CALENDAR_UPCOMING_COUNT, CALENDAR_LAST_EVENT_CREATED
+)
 
 logger = setup_logger("calendar_tools", console_output=True)
 
@@ -34,33 +43,65 @@ logger = setup_logger("calendar_tools", console_output=True)
 # =============================================================================
 
 def calendar_check_connection(tool_context=None) -> str:
-    """Check Calendar connection status."""
+    """Check Calendar connection status with comprehensive ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_check_connection"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context or not hasattr(tool_context, 'session'):
-            return "Unable to check Calendar connection - no session context"
+        # Log operation
+        log_tool_execution(tool_context, "calendar_check_connection", "status_check", True, "Checking Calendar connection")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "checking_connection")
         
         # Check session state first
-        calendar_connected = tool_context.session.state.get(USER_CALENDAR_CONNECTED, False)
+        calendar_connected = tool_context.session.state.get("user:calendar_connected", False)
         
         if calendar_connected:
             # Verify actual connection
             connection_status = check_calendar_connection()
             if connection_status.get("connected", False):
                 calendar_count = connection_status.get("calendar_count", 0)
+                
+                # Update session state
+                update_service_connection_status(
+                    tool_context, "calendar", True, "",
+                    {"last_check": datetime.utcnow().isoformat(), "calendar_count": calendar_count}
+                )
+                
                 return f"Calendar connected with access to {calendar_count} calendars"
             else:
-                return f"Calendar connection issue: {connection_status.get('error', 'Unknown error')}"
+                error_msg = connection_status.get('error', 'Unknown error')
+                log_tool_execution(tool_context, "calendar_check_connection", "status_check", False, error_msg)
+                
+                # Update session state with error
+                update_service_connection_status(
+                    tool_context, "calendar", False, "",
+                    {"last_error": error_msg, "last_check": datetime.utcnow().isoformat()}
+                )
+                
+                return f"Calendar connection issue: {error_msg}"
         else:
             return "Calendar not connected. Please authenticate with Google Calendar first."
             
     except Exception as e:
         logger.error(f"Error checking Calendar connection: {e}")
+        log_tool_execution(tool_context, "calendar_check_connection", "status_check", False, str(e))
         return f"Error checking Calendar connection: {str(e)}"
 
 
 def calendar_authenticate(tool_context=None) -> str:
-    """Authenticate with Google Calendar."""
+    """Authenticate with Calendar and update session state."""
+    if not validate_tool_context(tool_context, "calendar_authenticate"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "calendar_authenticate", "authenticate", True, "Starting Calendar authentication")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "authenticating")
+        
         # Test Calendar service creation
         service = get_calendar_service()
         
@@ -74,12 +115,25 @@ def calendar_authenticate(tool_context=None) -> str:
                 'Primary Calendar'
             )
             
+            # Update session state with successful authentication
+            update_service_connection_status(
+                tool_context, "calendar", True, "",
+                {
+                    "authenticated_at": datetime.utcnow().isoformat(),
+                    "calendar_count": len(calendars),
+                    "primary_calendar": primary_calendar
+                }
+            )
+            
+            log_tool_execution(tool_context, "calendar_authenticate", "authenticate", True, f"Authenticated with {len(calendars)} calendars")
             return f"Calendar authentication successful. Primary calendar: {primary_calendar}"
         else:
+            log_tool_execution(tool_context, "calendar_authenticate", "authenticate", False, "Service creation failed")
             return "Calendar authentication failed. Please check your credentials."
             
     except Exception as e:
         logger.error(f"Calendar authentication error: {e}")
+        log_tool_execution(tool_context, "calendar_authenticate", "authenticate", False, str(e))
         return f"Calendar authentication failed: {str(e)}"
 
 
@@ -93,13 +147,24 @@ def calendar_list_events(
     calendar_id: str = "primary",
     tool_context=None
 ) -> str:
-    """List upcoming calendar events."""
+    """List upcoming calendar events with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_list_events"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_list_events", "list_events", True, 
+                         f"Days ahead: {days_ahead}, Max results: {max_results}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "listing_events")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_list_events", "list_events", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Calculate time range
@@ -120,10 +185,18 @@ def calendar_list_events(
         events = events_result.get('items', [])
         
         if not events:
-            return f"No events found in the next {days_ahead} days"
+            response = f"No events found in the next {days_ahead} days"
+            
+            # Update session state even for empty results
+            tool_context.session.state["calendar:last_fetch"] = datetime.utcnow().isoformat()
+            tool_context.session.state["calendar:upcoming_count"] = 0
+            tool_context.session.state["calendar:current_events"] = []
+            
+            return response
         
         # Format events
         response_lines = [f"Upcoming events (next {days_ahead} days):"]
+        event_summaries = []
         
         for i, event in enumerate(events[:max_results], 1):
             summary = event.get('summary', 'No title')
@@ -139,25 +212,55 @@ def calendar_list_events(
             location = event.get('location', '')
             location_text = f" | Location: {location}" if location else ""
             
+            event_info = {
+                "id": event.get('id'),
+                "summary": summary,
+                "start": start_formatted,
+                "location": location
+            }
+            event_summaries.append(event_info)
+            
             response_lines.append(f"{i}. {summary} - {start_formatted}{location_text}")
         
         if len(events) > max_results:
             response_lines.append(f"... and {len(events) - max_results} more events")
         
+        # Update session state with results
+        tool_context.session.state["calendar:last_fetch"] = datetime.utcnow().isoformat()
+        tool_context.session.state["calendar:upcoming_count"] = len(event_summaries)
+        tool_context.session.state["calendar:current_events"] = event_summaries
+        tool_context.session.state["calendar:last_query_days"] = days_ahead
+        
+        log_tool_execution(tool_context, "calendar_list_events", "list_events", True, 
+                         f"Retrieved {len(event_summaries)} events")
+        
         return "\n".join(response_lines)
         
     except Exception as e:
         logger.error(f"Error listing calendar events: {e}")
+        log_tool_execution(tool_context, "calendar_list_events", "list_events", False, str(e))
         return f"Error retrieving calendar events: {str(e)}"
 
 
 def calendar_get_today_events(tool_context=None) -> str:
-    """Get today's calendar events."""
+    """Get today's calendar events with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_get_today_events"):
+        return "Error: No valid tool context provided"
+    
+    # Update agent activity
+    update_agent_activity(tool_context, "calendar_agent", "getting_today_events")
+    
     return calendar_list_events(days_ahead=1, tool_context=tool_context)
 
 
 def calendar_get_week_events(tool_context=None) -> str:
-    """Get this week's calendar events."""
+    """Get this week's calendar events with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_get_week_events"):
+        return "Error: No valid tool context provided"
+    
+    # Update agent activity
+    update_agent_activity(tool_context, "calendar_agent", "getting_week_events")
+    
     return calendar_list_events(days_ahead=7, tool_context=tool_context)
 
 
@@ -174,13 +277,24 @@ def calendar_create_event(
     calendar_id: str = "primary",
     tool_context=None
 ) -> str:
-    """Create a new calendar event."""
+    """Create a new calendar event with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_create_event"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_create_event", "create_event", True, 
+                         f"Summary: '{summary}', Start: {start_time}, End: {end_time}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "creating_event")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_create_event", "create_event", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Parse times
@@ -227,21 +341,46 @@ def calendar_create_event(
         start_formatted = start_dt.strftime('%Y-%m-%d %I:%M %p')
         end_formatted = end_dt.strftime('%I:%M %p')
         
+        # Update session state
+        tool_context.session.state["calendar:last_event_created"] = {
+            "id": event.get('id'),
+            "summary": summary,
+            "start": start_formatted,
+            "end": end_formatted,
+            "location": location,
+            "description": description
+        }
+        tool_context.session.state["calendar:last_event_created_at"] = datetime.utcnow().isoformat()
+        tool_context.session.state["calendar:last_created_event_id"] = event.get('id')
+        
+        log_tool_execution(tool_context, "calendar_create_event", "create_event", True, "Event created successfully")
         return f"Event '{summary}' created successfully on {start_formatted} to {end_formatted}"
         
     except Exception as e:
         logger.error(f"Error creating calendar event: {e}")
+        log_tool_execution(tool_context, "calendar_create_event", "create_event", False, str(e))
         return f"Error creating event: {str(e)}"
 
 
 def calendar_create_quick_event(event_text: str, tool_context=None) -> str:
-    """Create an event using quick text (like 'Meeting tomorrow 2pm')."""
+    """Create an event using quick text with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_create_quick_event"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_create_quick_event", "quick_create", True, 
+                         f"Event text: '{event_text}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "creating_quick_event")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_create_quick_event", "quick_create", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Use Google Calendar's quick add feature
@@ -259,10 +398,21 @@ def calendar_create_quick_event(event_text: str, tool_context=None) -> str:
         else:
             start_formatted = f"{start} (All day)"
         
+        # Update session state
+        tool_context.session.state["calendar:last_quick_event"] = {
+            "id": event.get('id'),
+            "summary": summary,
+            "start": start_formatted,
+            "original_text": event_text
+        }
+        tool_context.session.state["calendar:last_quick_event_at"] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "calendar_create_quick_event", "quick_create", True, "Quick event created")
         return f"Quick event '{summary}' created for {start_formatted}"
         
     except Exception as e:
         logger.error(f"Error creating quick event: {e}")
+        log_tool_execution(tool_context, "calendar_create_quick_event", "quick_create", False, str(e))
         return f"Error creating quick event: {str(e)}"
 
 
@@ -280,13 +430,24 @@ def calendar_update_event(
     calendar_id: str = "primary",
     tool_context=None
 ) -> str:
-    """Update an existing calendar event."""
+    """Update an existing calendar event with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_update_event"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_update_event", "update_event", True, 
+                         f"Event ID: {event_id}, Summary: '{summary}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "updating_event")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_update_event", "update_event", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Get existing event
@@ -329,21 +490,55 @@ def calendar_update_event(
             body=event
         ).execute()
         
+        # Update session state
+        # Update session state
+        updated_fields = []
+        if summary:
+            updated_fields.append('summary')
+        if description:
+            updated_fields.append('description')
+        if location:
+            updated_fields.append('location')
+        if start_time:
+            updated_fields.append('start_time')
+        if end_time:
+            updated_fields.append('end_time')
+
+        tool_context.session.state["calendar:last_updated_event"] = {
+            "id": event_id,
+            "summary": updated_event.get('summary', 'Event'),
+            "updated_fields": updated_fields
+        }
+        
+        tool_context.session.state["calendar:last_event_updated_at"] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "calendar_update_event", "update_event", True, "Event updated successfully")
         return f"Event '{updated_event.get('summary', 'Event')}' updated successfully"
         
     except Exception as e:
         logger.error(f"Error updating calendar event: {e}")
+        log_tool_execution(tool_context, "calendar_update_event", "update_event", False, str(e))
         return f"Error updating event: {str(e)}"
 
 
 def calendar_delete_event(event_id: str, calendar_id: str = "primary", tool_context=None) -> str:
-    """Delete a calendar event."""
+    """Delete a calendar event with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_delete_event"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_delete_event", "delete_event", True, f"Event ID: {event_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "deleting_event")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_delete_event", "delete_event", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Get event details before deletion
@@ -356,10 +551,19 @@ def calendar_delete_event(event_id: str, calendar_id: str = "primary", tool_cont
         # Delete the event
         service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
         
+        # Update session state
+        tool_context.session.state["calendar:last_deleted_event"] = {
+            "id": event_id,
+            "summary": event_summary,
+            "deleted_at": datetime.utcnow().isoformat()
+        }
+        
+        log_tool_execution(tool_context, "calendar_delete_event", "delete_event", True, f"Event '{event_summary}' deleted")
         return f"Event '{event_summary}' deleted successfully"
         
     except Exception as e:
         logger.error(f"Error deleting calendar event: {e}")
+        log_tool_execution(tool_context, "calendar_delete_event", "delete_event", False, str(e))
         return f"Error deleting event: {str(e)}"
 
 
@@ -375,13 +579,24 @@ def calendar_find_free_time(
     calendar_id: str = "primary",
     tool_context=None
 ) -> str:
-    """Find free time slots in the calendar."""
+    """Find free time slots in the calendar with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_find_free_time"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_find_free_time", "find_free_time", True, 
+                         f"Duration: {duration_minutes}min, Days: {days_ahead}, Hours: {working_hours_start}-{working_hours_end}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "finding_free_time")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_find_free_time", "find_free_time", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Calculate time range
@@ -449,31 +664,57 @@ def calendar_find_free_time(
                 break
         
         if not free_slots:
-            return f"No {duration_minutes}-minute free slots found in the next {days_ahead} days during working hours"
+            result = f"No {duration_minutes}-minute free slots found in the next {days_ahead} days during working hours"
+        else:
+            # Format response
+            response_lines = [f"Available {duration_minutes}-minute time slots:"]
+            for i, slot in enumerate(free_slots[:5], 1):
+                response_lines.append(f"{i}. {slot['date']} from {slot['start']} to {slot['end']}")
+            
+            if len(free_slots) > 5:
+                response_lines.append(f"... and {len(free_slots) - 5} more available slots")
+            
+            result = "\n".join(response_lines)
         
-        # Format response
-        response_lines = [f"Available {duration_minutes}-minute time slots:"]
-        for i, slot in enumerate(free_slots[:5], 1):
-            response_lines.append(f"{i}. {slot['date']} from {slot['start']} to {slot['end']}")
+        # Update session state
+        tool_context.session.state["calendar:last_free_time_search"] = {
+            "duration_minutes": duration_minutes,
+            "days_ahead": days_ahead,
+            "working_hours": f"{working_hours_start}-{working_hours_end}",
+            "slots_found": len(free_slots),
+            "search_at": datetime.utcnow().isoformat()
+        }
+        tool_context.session.state["calendar:last_free_slots"] = free_slots[:10]  # Store up to 10 slots
         
-        if len(free_slots) > 5:
-            response_lines.append(f"... and {len(free_slots) - 5} more available slots")
-        
-        return "\n".join(response_lines)
+        log_tool_execution(tool_context, "calendar_find_free_time", "find_free_time", True, 
+                         f"Found {len(free_slots)} free slots")
+        return result
         
     except Exception as e:
         logger.error(f"Error finding free time: {e}")
+        log_tool_execution(tool_context, "calendar_find_free_time", "find_free_time", False, str(e))
         return f"Error finding free time: {str(e)}"
 
 
 def calendar_check_availability(date: str, start_time: str, end_time: str, tool_context=None) -> str:
-    """Check if a specific time slot is available."""
+    """Check if a specific time slot is available with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_check_availability"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_check_availability", "check_availability", True, 
+                         f"Date: {date}, Time: {start_time}-{end_time}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "checking_availability")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_check_availability", "check_availability", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Parse the requested time
@@ -504,13 +745,29 @@ def calendar_check_availability(date: str, start_time: str, end_time: str, tool_
         freebusy_result = service.freebusy().query(body=body).execute()
         busy_times = freebusy_result.get('calendars', {}).get('primary', {}).get('busy', [])
         
-        if busy_times:
-            return f"Time slot from {start_time} to {end_time} on {date} is NOT available (conflicts found)"
+        is_available = len(busy_times) == 0
+        
+        # Update session state
+        tool_context.session.state["calendar:last_availability_check"] = {
+            "date": date,
+            "start_time": start_time,
+            "end_time": end_time,
+            "available": is_available,
+            "checked_at": datetime.utcnow().isoformat()
+        }
+        
+        if is_available:
+            result = f"Time slot from {start_time} to {end_time} on {date} is AVAILABLE"
         else:
-            return f"Time slot from {start_time} to {end_time} on {date} is AVAILABLE"
+            result = f"Time slot from {start_time} to {end_time} on {date} is NOT available (conflicts found)"
+        
+        log_tool_execution(tool_context, "calendar_check_availability", "check_availability", True, 
+                         f"Availability: {is_available}")
+        return result
         
     except Exception as e:
         logger.error(f"Error checking availability: {e}")
+        log_tool_execution(tool_context, "calendar_check_availability", "check_availability", False, str(e))
         return f"Error checking availability: {str(e)}"
 
 
@@ -519,25 +776,51 @@ def calendar_check_availability(date: str, start_time: str, end_time: str, tool_
 # =============================================================================
 
 def calendar_get_current_time(tool_context=None) -> str:
-    """Get current date and time."""
+    """Get current date and time with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_get_current_time"):
+        return "Error: No valid tool context provided"
+    
     try:
+        # Log operation
+        log_tool_execution(tool_context, "calendar_get_current_time", "get_time", True, "Getting current time")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "getting_current_time")
+        
         now = datetime.now()
         
-        return f"Current time: {now.strftime('%A, %B %d, %Y at %I:%M %p')}"
+        # Update session state
+        tool_context.session.state["calendar:last_time_request"] = now.isoformat()
+        
+        result = f"Current time: {now.strftime('%A, %B %d, %Y at %I:%M %p')}"
+        
+        log_tool_execution(tool_context, "calendar_get_current_time", "get_time", True, "Current time provided")
+        return result
         
     except Exception as e:
         logger.error(f"Error getting current time: {e}")
+        log_tool_execution(tool_context, "calendar_get_current_time", "get_time", False, str(e))
         return f"Error getting current time: {str(e)}"
 
 
 def calendar_list_calendars(tool_context=None) -> str:
-    """List all available calendars."""
+    """List all available calendars with ADK integration."""
+    if not validate_tool_context(tool_context, "calendar_list_calendars"):
+        return "Error: No valid tool context provided"
+    
     try:
-        if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
+        # Log operation
+        log_tool_execution(tool_context, "calendar_list_calendars", "list_calendars", True, "Listing calendars")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "calendar_agent", "listing_calendars")
+        
+        if not tool_context.session.state.get("user:calendar_connected", False):
             return "Calendar not connected. Please authenticate first."
         
         service = get_calendar_service()
         if not service:
+            log_tool_execution(tool_context, "calendar_list_calendars", "list_calendars", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
         
         # Get calendar list
@@ -548,17 +831,35 @@ def calendar_list_calendars(tool_context=None) -> str:
             return "No calendars found"
         
         response_lines = [f"Available calendars ({len(calendars)}):"]
+        calendar_summaries = []
+        
         for i, cal in enumerate(calendars, 1):
             summary = cal.get('summary', 'Unnamed Calendar')
             primary = " (Primary)" if cal.get('primary') else ""
             access_role = cal.get('accessRole', 'reader')
             
+            calendar_info = {
+                "id": cal.get('id'),
+                "summary": summary,
+                "primary": cal.get('primary', False),
+                "access_role": access_role
+            }
+            calendar_summaries.append(calendar_info)
+            
             response_lines.append(f"{i}. {summary}{primary} - {access_role}")
         
+        # Update session state
+        tool_context.session.state["calendar:available_calendars"] = calendar_summaries
+        tool_context.session.state["calendar:calendars_list_at"] = datetime.utcnow().isoformat()
+        tool_context.session.state["calendar:calendars_count"] = len(calendars)
+        
+        log_tool_execution(tool_context, "calendar_list_calendars", "list_calendars", True, 
+                         f"Listed {len(calendars)} calendars")
         return "\n".join(response_lines)
         
     except Exception as e:
         logger.error(f"Error listing calendars: {e}")
+        log_tool_execution(tool_context, "calendar_list_calendars", "list_calendars", False, str(e))
         return f"Error listing calendars: {str(e)}"
 
 
@@ -659,25 +960,95 @@ __all__ = [
 # =============================================================================
 
 if __name__ == "__main__":
-    print("🧪 Testing Direct Calendar Tools...")
+    print("🧪 Testing Direct Calendar Tools with ADK Integration...")
     
     # Mock tool context for testing
     class MockSession:
         def __init__(self):
-            self.state = {USER_CALENDAR_CONNECTED: False}
+            self.state = {
+                "user:calendar_connected": True,
+                "user:preferences": {
+                    "working_hours_start": 9,
+                    "working_hours_end": 17,
+                    "default_event_duration": 60
+                },
+                "user:name": "Test User"
+            }
     
     class MockToolContext:
         def __init__(self):
             self.session = MockSession()
+            self.invocation_id = "test_invocation_123"
     
     mock_context = MockToolContext()
     
-    # Test connection check
-    result = calendar_check_connection(mock_context)
-    print(f"Connection check: {result}")
+    # Test calendar connection check with ADK integration
+    print("📅 Testing calendar_check_connection with ADK integration...")
+    connection_result = calendar_check_connection(mock_context)
+    print(f"Connection result: {connection_result}")
     
-    # Test current time
+    # Check session state updates
+    last_check = mock_context.session.state.get("calendar:last_check", "")
+    print(f"Session state updated: {bool(last_check)}")
+    
+    print("\n🕐 Testing calendar_get_current_time with ADK integration...")
     time_result = calendar_get_current_time(mock_context)
-    print(f"Current time: {time_result}")
+    print(f"Current time result: {time_result}")
     
-    print("✅ Direct Calendar tools created successfully!")
+    # Check session state updates
+    last_time_request = mock_context.session.state.get("calendar:last_time_request", "")
+    print(f"Session state updated: {bool(last_time_request)}")
+    
+    print("\n📋 Testing calendar_list_events with ADK integration...")
+    # This will likely fail without real auth, but we can test the validation
+    events_result = calendar_list_events(days_ahead=7, max_results=5, tool_context=mock_context)
+    print(f"Events result: {events_result}")
+    
+    # Check session state updates
+    last_fetch = mock_context.session.state.get("calendar:last_fetch", "")
+    print(f"Session state updated: {bool(last_fetch)}")
+    
+    print("\n📅 Testing calendar_create_event with ADK integration...")
+    # This will likely fail without real auth, but we can test the validation
+    create_result = calendar_create_event(
+        summary="Test Meeting",
+        start_time="2024-06-15 14:00",
+        end_time="2024-06-15 15:00",
+        description="Test meeting description",
+        location="Conference Room A",
+        tool_context=mock_context
+    )
+    print(f"Create event result: {create_result}")
+    
+    print("\n🔍 Testing calendar_find_free_time with ADK integration...")
+    free_time_result = calendar_find_free_time(
+        duration_minutes=60,
+        days_ahead=7,
+        working_hours_start=9,
+        working_hours_end=17,
+        tool_context=mock_context
+    )
+    print(f"Free time result: {free_time_result}")
+    
+    # Check session state updates
+    last_free_search = mock_context.session.state.get("calendar:last_free_time_search", {})
+    print(f"Session state updated: {bool(last_free_search)}")
+    
+    # Test validation with no context
+    print("\n❌ Testing validation with no context...")
+    no_context_result = calendar_check_connection(None)
+    print(f"No context result: {no_context_result}")
+    
+    # Display final session state
+    print("\n📊 Final Session State Summary:")
+    calendar_keys = [key for key in mock_context.session.state.keys() if key.startswith("calendar:")]
+    for key in calendar_keys:
+        value = mock_context.session.state[key]
+        if isinstance(value, str) and len(value) > 50:
+            print(f"  {key}: {value[:50]}...")
+        else:
+            print(f"  {key}: {value}")
+    
+    print("\n✅ Direct Calendar tools with comprehensive ADK integration completed!")
+    print(f"🔧 Total tools created: {len(CALENDAR_TOOLS)}")
+    print("🎯 Ready for calendar agent integration with proper session state management!")

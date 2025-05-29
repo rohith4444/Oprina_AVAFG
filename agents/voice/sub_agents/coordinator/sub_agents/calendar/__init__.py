@@ -9,6 +9,6 @@ This package contains the Calendar Agent responsible for Google Calendar operati
 - Calendar authentication and connection management
 """
 
-from .agent import root_agent as calendar_agent_creator
 
-__all__ = ["calendar_agent_creator"]
+
+__all__ = ["calendar_agent", "create_calendar_agent"]
