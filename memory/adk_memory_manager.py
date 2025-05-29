@@ -1,13 +1,16 @@
 """
-ADK Memory Manager - Simplified Memory Facade for Oprina
+ADK Memory Manager - Complete Implementation
 
-This module provides a lightweight facade around ADK's native memory services,
-replacing all custom memory implementations with ADK-compliant patterns.
-
-Key Features:
+This module provides a complete ADK-native memory facade that connects:
 - ADK SessionService (conversation state & history)
 - ADK MemoryService (cross-session knowledge)
-- ChatHistoryService integration (UI conversation lists)
+- ADK Runner (agent execution with session context)
+- ChatHistoryService (UI conversation lists)
+
+Key Features:
+- Proper ADK session lifecycle management
+- Cross-session memory with load_memory tool
+- Tool context injection for session state access
 - Configurable service types (inmemory for dev, database/rag for production)
 """
 
@@ -15,7 +18,7 @@ import os
 import sys
 import asyncio
 import time
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
@@ -34,9 +37,11 @@ from config.settings import settings
 # ADK Imports
 try:
     from google.adk.sessions import DatabaseSessionService, InMemorySessionService
+    from google.adk.memory import InMemoryMemoryService, VertexAiRagMemoryService
+    from google.adk.runners import Runner
     from google.adk.sessions.state import State
     from google.adk.events import Event, EventActions
-    from google.adk.memory import InMemoryMemoryService, VertexAiRagMemoryService
+    from google.genai.types import Content, Part
     ADK_AVAILABLE = True
 except ImportError as e:
     ADK_AVAILABLE = False
@@ -51,22 +56,19 @@ logger = setup_logger("adk_memory_manager", console_output=True)
 
 class OprinaMemoryManager:
     """
-    Simplified memory manager using ADK's native memory services.
+    Complete ADK Memory Manager that provides proper session and memory services.
     
-    Replaces:
-    - redis_cache.py (replaced by ADK session state)
-    - session_memory.py (replaced by ADK SessionService)
-    - long_term_memory.py (replaced by ADK MemoryService)
-    - memory_manager.py (replaced by this facade)
-    
-    Keeps:
-    - chat_history.py (for UI conversation sidebar)
+    This replaces all custom memory implementations with ADK-native patterns:
+    - DatabaseSessionService for persistent conversation state
+    - VertexAiRagMemoryService for cross-session knowledge
+    - ChatHistoryService for UI conversation lists
+    - Proper Runner integration for agent execution
     """
     
     def __init__(self):
         """Initialize ADK memory manager with configured services."""
         self.logger = logger
-        self.logger.info("Initializing ADK Memory Manager...")
+        self.logger.info("Initializing Complete ADK Memory Manager...")
         
         # Check ADK availability
         if not ADK_AVAILABLE:
@@ -86,7 +88,7 @@ class OprinaMemoryManager:
         # Initialize all services
         self._initialize_services()
         
-        self.logger.info("ADK Memory Manager initialized successfully")
+        self.logger.info("Complete ADK Memory Manager initialized successfully")
     
     def _initialize_services(self):
         """Initialize ADK session and memory services based on configuration."""
@@ -164,12 +166,44 @@ class OprinaMemoryManager:
             self._chat_history = None
     
     # =============================================================================
+    # ADK Runner Integration (Core Feature)
+    # =============================================================================
+    
+    def create_runner(self, agent) -> Runner:
+        """
+        Create ADK Runner for agent with proper session and memory service integration.
+        This is the key method that connects agents to ADK services.
+        
+        Args:
+            agent: ADK Agent instance (LlmAgent, etc.)
+            
+        Returns:
+            Configured ADK Runner with session and memory services
+        """
+        try:
+            self.logger.info(f"Creating ADK Runner for agent: {agent.name}")
+            
+            runner = Runner(
+                agent=agent,
+                app_name=self.app_name,
+                session_service=self._session_service,
+                memory_service=self._memory_service
+            )
+            
+            self.logger.info(f"✅ ADK Runner created for {agent.name}")
+            return runner
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create Runner for {agent.name}: {e}")
+            raise
+    
+    # =============================================================================
     # Session Management (ADK Native)
     # =============================================================================
     
     async def create_session(self, user_id: str, initial_state: Optional[Dict[str, Any]] = None) -> str:
         """
-        Create a new ADK session.
+        Create a new ADK session with proper state initialization.
         
         Args:
             user_id: User identifier
@@ -207,16 +241,16 @@ class OprinaMemoryManager:
             self.logger.error(f"Failed to create session: {e}")
             raise
     
-    async def get_session(self, user_id: str, session_id: str) -> Optional[State]:
+    async def get_session(self, user_id: str, session_id: str):
         """
-        Get ADK session state.
+        Get ADK session by ID.
         
         Args:
             user_id: User identifier
             session_id: Session identifier
             
         Returns:
-            Session state or None
+            Session object or None
         """
         try:
             session = await self._session_service.get_session(
@@ -236,45 +270,74 @@ class OprinaMemoryManager:
             self.logger.error(f"Failed to get session {session_id}: {e}")
             return None
     
-    async def update_session_state(self, user_id: str, session_id: str, state_updates: Dict[str, Any]) -> bool:
+    async def run_agent(
+        self, 
+        agent, 
+        user_id: str, 
+        session_id: str, 
+        user_message: str
+    ) -> List[Dict[str, Any]]:
         """
-        Update session state using ADK's proper state update mechanism.
+        Run agent with proper ADK Runner and session context.
+        This is the main method for executing agents with session state.
         
         Args:
+            agent: ADK Agent instance
             user_id: User identifier
             session_id: Session identifier
-            state_updates: State updates to apply
+            user_message: User's message text
             
         Returns:
-            True if successful
+            List of events from agent execution
         """
         try:
-            # Get current session
-            session = await self.get_session(user_id, session_id)
-            if not session:
-                self.logger.warning(f"Cannot update non-existent session {session_id}")
-                return False
+            # Create runner for this agent
+            runner = self.create_runner(agent)
             
-            # Create EventActions with state_delta for proper ADK state update
-            actions = EventActions(state_delta=state_updates)
+            # Prepare user content
+            user_content = Content(parts=[Part(text=user_message)])
             
-            # Create system event
-            event = Event(
-                invocation_id=f"state_update_{int(time.time())}",
-                author="system",
-                actions=actions,
-                timestamp=time.time()
-            )
+            # Execute agent through runner (this provides tool_context automatically)
+            events = []
+            async for event in runner.run(
+                user_id=user_id,
+                session_id=session_id,
+                new_message=user_content
+            ):
+                # Store UI message in chat history
+                if self._chat_history:
+                    try:
+                        await self.store_ui_message(
+                            user_id, session_id, 
+                            "agent_response" if event.author == "agent" else event.author,
+                            str(event.content) if event.content else "",
+                            {"event_type": type(event).__name__}
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"Failed to store UI message: {e}")
+                
+                # Convert event to dict for return
+                event_dict = {
+                    "author": event.author,
+                    "content": str(event.content) if event.content else "",
+                    "timestamp": getattr(event, 'timestamp', time.time()),
+                    "is_final": event.is_final_response() if hasattr(event, 'is_final_response') else False
+                }
+                events.append(event_dict)
+                
+                self.logger.debug(f"Agent event: {event.author} - {type(event).__name__}")
             
-            # Apply state update through ADK
-            await self._session_service.append_event(session, event)
-            
-            self.logger.debug(f"Updated session {session_id} state")
-            return True
+            self.logger.info(f"Agent {agent.name} completed execution with {len(events)} events")
+            return events
             
         except Exception as e:
-            self.logger.error(f"Failed to update session state: {e}")
-            return False
+            self.logger.error(f"Failed to run agent {agent.name}: {e}")
+            return [{
+                "author": "system",
+                "content": f"Error running agent: {str(e)}",
+                "timestamp": time.time(),
+                "is_final": True
+            }]
     
     async def list_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
         """
@@ -316,7 +379,7 @@ class OprinaMemoryManager:
     
     async def delete_session(self, user_id: str, session_id: str) -> bool:
         """
-        Delete an ADK session.
+        Delete an ADK session and optionally archive to memory.
         
         Args:
             user_id: User identifier
@@ -381,37 +444,6 @@ class OprinaMemoryManager:
         except Exception as e:
             self.logger.error(f"Failed to add session to memory: {e}")
             return False
-    
-    async def search_memory(self, user_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """
-        Search cross-session memory for relevant information.
-        
-        Args:
-            user_id: User identifier
-            query: Search query
-            limit: Maximum results to return
-            
-        Returns:
-            List of relevant memory entries
-        """
-        try:
-            if not settings.ENABLE_CROSS_SESSION_MEMORY:
-                self.logger.debug("Cross-session memory disabled")
-                return []
-            
-            # Use ADK memory service for semantic search
-            results = await self._memory_service.search_memory(
-                query=query,
-                user_id=user_id,
-                limit=limit
-            )
-            
-            self.logger.debug(f"Memory search for '{query}' returned {len(results)} results")
-            return results
-            
-        except Exception as e:
-            self.logger.error(f"Failed to search memory: {e}")
-            return []
     
     # =============================================================================
     # Chat History Integration (UI Support)
@@ -586,7 +618,7 @@ class OprinaMemoryManager:
             # Check chat history service
             health["checks"]["chat_history_available"] = self._chat_history is not None
             
-            # Test basic operations
+            # Test basic operations if possible
             if self._session_service:
                 try:
                     # Test session creation/deletion
@@ -691,9 +723,9 @@ async def adk_memory_context(user_id: str):
 # Testing and Development Utilities
 # =============================================================================
 
-async def test_adk_memory_manager():
-    """Test ADK memory manager functionality."""
-    logger.info("🧪 Testing ADK Memory Manager...")
+async def test_complete_adk_memory_manager():
+    """Test complete ADK memory manager functionality."""
+    logger.info("🧪 Testing Complete ADK Memory Manager...")
     
     try:
         # Initialize manager
@@ -718,12 +750,19 @@ async def test_adk_memory_manager():
         session = await manager.get_session(test_user_id, session_id)
         logger.info(f"✅ Retrieved session: {session is not None}")
         
-        # Update session state
-        update_success = await manager.update_session_state(test_user_id, session_id, {
-            "user:last_activity": datetime.utcnow().isoformat(),
-            "test_update": "updated"
-        })
-        logger.info(f"✅ Updated session: {update_success}")
+        # Test Runner creation
+        from google.adk.agents import LlmAgent
+        from google.adk.models.lite_llm import LiteLlm
+        
+        test_agent = LlmAgent(
+            name="test_agent",
+            model=LiteLlm(model="gemini-2.0-flash", api_key="test"),
+            instruction="Test agent",
+            output_key="test_result"
+        )
+        
+        runner = manager.create_runner(test_agent)
+        logger.info(f"✅ Created Runner: {runner is not None}")
         
         # Store UI message
         if manager._chat_history:
@@ -740,9 +779,6 @@ async def test_adk_memory_manager():
         if settings.ENABLE_CROSS_SESSION_MEMORY:
             memory_added = await manager.add_session_to_memory(test_user_id, session_id)
             logger.info(f"✅ Added to memory: {memory_added}")
-            
-            search_results = await manager.search_memory(test_user_id, "test", limit=3)
-            logger.info(f"✅ Memory search: {len(search_results)} results")
         
         # Get service info
         service_info = manager.get_service_info()
@@ -752,11 +788,11 @@ async def test_adk_memory_manager():
         await manager.delete_session(test_user_id, session_id)
         logger.info("✅ Cleaned up test session")
         
-        logger.info("🎉 ADK Memory Manager test completed successfully!")
+        logger.info("🎉 Complete ADK Memory Manager test completed successfully!")
         return True
         
     except Exception as e:
-        logger.error(f"❌ ADK Memory Manager test failed: {e}")
+        logger.error(f"❌ Complete ADK Memory Manager test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -764,4 +800,4 @@ async def test_adk_memory_manager():
 
 if __name__ == "__main__":
     # Run test
-    asyncio.run(test_adk_memory_manager())
+    asyncio.run(test_complete_adk_memory_manager())

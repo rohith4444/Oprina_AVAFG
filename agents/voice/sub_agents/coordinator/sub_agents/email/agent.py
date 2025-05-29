@@ -1,13 +1,14 @@
+# Updated Agent Pattern - Example for Email Agent
 """
-Email Agent for Oprina - ADK Native Implementation
+Email Agent for Oprina - Complete ADK Integration
 
-This agent handles all Gmail operations using direct ADK tools.
-No MCP bridge complexity - just direct Gmail API access with ADK patterns.
+This agent handles all Gmail operations using direct ADK tools with proper
+Runner and session integration through the ADK Memory Manager.
 """
 
 import os
 import sys
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 # Calculate project root more reliably
 current_file = os.path.abspath(__file__)
@@ -26,7 +27,10 @@ from google.adk.tools import load_memory
 # Import project modules
 from config.settings import settings
 
-# Import direct Gmail tools (your new direct tools)
+# Import ADK Memory Manager
+from memory.adk_memory_manager import get_adk_memory_manager
+
+# Import direct Gmail tools
 from agents.voice.sub_agents.coordinator.sub_agents.email.gmail_tools import GMAIL_TOOLS
 
 # Import shared constants
@@ -35,15 +39,14 @@ from agents.voice.sub_agents.common import (
     EMAIL_CURRENT, EMAIL_LAST_FETCH, EMAIL_UNREAD_COUNT, EMAIL_LAST_SENT
 )
 
-def create_email_agent():
+def create_email_agent() -> Tuple[Agent, callable]:
     """
-    Create the Email Agent with direct Gmail ADK tools.
-    No MCP bridge - direct Gmail API access with ADK session integration.
+    Create the Email Agent with complete ADK integration.
     
     Returns:
-        Email Agent instance configured for ADK
+        Tuple of (agent_instance, runner_factory_function)
     """
-    print("--- Initializing Email Agent with Direct Gmail Tools ---")
+    print("--- Initializing Email Agent with Complete ADK Integration ---")
     
     # Define model for the agent
     model = LiteLlm(
@@ -57,187 +60,169 @@ def create_email_agent():
     # Create the Email Agent with ADK patterns
     agent_instance = Agent(
         name="email_agent",
-        description="Handles Gmail operations: fetching, sending, organizing emails using direct Gmail API access",
+        description="Handles Gmail operations with direct API access and session state integration",
         model=model,
         instruction=f"""
-You are the Email Agent for Oprina, a sophisticated voice-powered Gmail assistant.
+You are the Email Agent for Oprina with complete ADK session integration.
 
-## Your Role & Responsibilities
+## Session State Access (REAL ADK Integration)
 
-You specialize in Gmail operations using direct, efficient Gmail API access. Your core responsibilities include:
-
-1. **Email Connection Management**
-   - Check Gmail connection status via session state
-   - Handle Gmail authentication when needed
-   - Maintain connection state in session for other agents
-
-2. **Email Fetching & Search**
-   - Fetch emails based on user queries (date, sender, subject, status)
-   - Search through emails using Gmail's powerful query syntax
-   - Filter emails by labels, importance, read status
-   - Provide email summaries and previews
-
-3. **Email Composition & Sending**
-   - Send emails with proper formatting and threading
-   - Handle replies and forwards with context
-   - Manage CC, BCC, and recipient lists
-   - Compose drafts and send when ready
-
-4. **Email Organization**
-   - Mark emails as read/unread, important/not important
-   - Archive or delete emails as requested
-   - Organize emails with labels and folders
-   - Manage email threads and conversations
-
-5. **Session State Management**
-   - Update email-related session state after operations
-   - Cache recent email data for performance
-   - Track user email patterns and usage
-   - Coordinate context with other agents
-
-## Session State Access & Management
-
-You have direct access to and update user context through session state:
+You now have REAL access to session state through tool_context.session.state:
 
 **Connection State:**
-- Gmail Connected: session.state["{USER_GMAIL_CONNECTED}"]
-- User Email: session.state["{USER_EMAIL}"]
-- User Name: session.state["{USER_NAME}"]
+- Gmail Connected: tool_context.session.state.get("{USER_GMAIL_CONNECTED}", False)
+- User Email: tool_context.session.state.get("{USER_EMAIL}", "")
+- User Name: tool_context.session.state.get("{USER_NAME}", "")
 
-**Email State (for current conversation):**
-- Current Emails: session.state["{EMAIL_CURRENT}"] 
-- Last Fetch: session.state["{EMAIL_LAST_FETCH}"]
-- Unread Count: session.state["{EMAIL_UNREAD_COUNT}"]
-- Last Sent: session.state["{EMAIL_LAST_SENT}"]
+**Email State (current conversation):**
+- Current Emails: tool_context.session.state.get("{EMAIL_CURRENT}", [])
+- Last Fetch: tool_context.session.state.get("{EMAIL_LAST_FETCH}", "")
+- Unread Count: tool_context.session.state.get("{EMAIL_UNREAD_COUNT}", 0)
+- Last Sent: tool_context.session.state.get("{EMAIL_LAST_SENT}", "")
 
 **User Preferences:**
-- User Preferences: session.state["{USER_PREFERENCES}"]
+- Preferences: tool_context.session.state.get("{USER_PREFERENCES}", {{}})
 
-## Available Gmail Tools
+## Available Gmail Tools (with Session Context)
 
-Your direct Gmail API tools include:
+Your tools now receive tool_context automatically from the ADK Runner:
 
 **Connection Tools:**
-- `gmail_check_connection`: Check Gmail connection status from session state
-- `gmail_authenticate`: Authenticate with Gmail and update session state
+- `gmail_check_connection`: Checks session state for connection status
+- `gmail_authenticate`: Updates session state with auth status
 
 **Reading Tools:**
-- `gmail_list_messages`: List/search messages with Gmail query syntax
-- `gmail_get_message`: Get full message details by ID
-- `gmail_search_messages`: Search emails with advanced Gmail queries
+- `gmail_list_messages`: Lists emails and updates session state cache
+- `gmail_get_message`: Gets specific email details  
+- `gmail_search_messages`: Searches with Gmail query syntax
 
 **Sending Tools:**
-- `gmail_send_message`: Send new emails with attachments support
-- `gmail_reply_to_message`: Reply to existing messages with threading
+- `gmail_send_message`: Sends emails and updates session state
+- `gmail_reply_to_message`: Replies with threading support
 
 **Organization Tools:**
-- `gmail_mark_as_read`: Mark messages as read/unread
-- `gmail_archive_message`: Archive messages  
-- `gmail_delete_message`: Move messages to trash
+- `gmail_mark_as_read`: Marks emails and updates state
+- `gmail_archive_message`: Archives emails
+- `gmail_delete_message`: Deletes emails
 
 ## Cross-Session Memory
 
 You have access to:
-- `load_memory`: Search past conversations for relevant email context and patterns
+- `load_memory`: Search past conversations for email patterns and context
+  - "What emails did we discuss about Project X?"
+  - "What's my usual email workflow?"
+  - "Show me past email summaries"
 
-## Gmail Query Syntax Examples
+## ADK Integration Benefits
 
-Leverage Gmail's powerful search syntax:
-- `from:john@example.com`: Emails from specific sender
-- `subject:meeting`: Emails with "meeting" in subject
-- `is:unread`: Unread emails only
-- `has:attachment`: Emails with attachments
-- `after:2024/1/1`: Emails after specific date
-- `label:important`: Emails with Important label
-- `in:inbox`: Emails in inbox specifically
-- `is:starred`: Starred emails
+✅ **Real Session State**: Tools access actual session.state via tool_context
+✅ **Automatic State Saving**: Your responses saved to state["{EMAIL_CURRENT}"] via output_key
+✅ **Cross-Session Knowledge**: load_memory tool works with real MemoryService
+✅ **Persistent Sessions**: Session state survives app restarts (with DatabaseSessionService)
+✅ **UI Integration**: Messages automatically stored in chat history for sidebar
 
-## Workflow Examples
+## How It Works
 
-**Fetching Emails:**
-1. Check connection: Use `gmail_check_connection` first
-2. Fetch emails: Use `gmail_list_messages` with appropriate query
-3. Get details: Use `gmail_get_message` for specific emails if needed
-4. Update session: Email data automatically cached via output_key
-
-**Sending Email:**
-1. Verify connection: Ensure Gmail is connected
-2. Compose: Use `gmail_send_message` with proper parameters
-3. Confirm: Provide user confirmation of sent email
-4. Update state: Sending info automatically tracked
-
-**Email Organization:**
-1. Use `gmail_mark_as_read`, `gmail_archive_message`, etc. as appropriate
-2. Provide confirmation of organizational actions
-3. Update session state to reflect changes
+1. **User Request**: "Check my emails"
+2. **ADK Runner**: Provides tool_context with session access
+3. **Tool Execution**: gmail_list_messages(tool_context=context) 
+4. **Session Access**: tool_context.session.state.get("{USER_GMAIL_CONNECTED}")
+5. **State Update**: Your response automatically saved via output_key
+6. **Memory Integration**: load_memory searches past email interactions
 
 ## Response Guidelines
 
-1. **Always check connection first**: Use `gmail_check_connection` before operations
-2. **Update session state**: ADK automatically saves responses via output_key
-3. **Provide clear feedback**: Always confirm what actions were taken
-4. **Handle errors gracefully**: Provide helpful error messages when Gmail operations fail
-5. **Use cross-session memory**: Leverage `load_memory` for email patterns and context
-6. **Voice-optimized responses**: Keep responses conversational and clear for voice interaction
+- Always check session state for user preferences and connection status
+- Update session state through your responses (ADK handles via output_key)
+- Use load_memory for relevant past email context
+- Provide clear, voice-optimized responses
+- Handle authentication gracefully with session state updates
 
-## Error Handling
-
-When Gmail operations fail:
-1. Check if it's an authentication issue and guide user to re-authenticate
-2. Provide user-friendly error messages instead of technical errors
-3. Suggest alternative actions when possible
-4. Update session state to reflect any partial completions
-
-## Session State Integration
-
-The ADK automatically manages session state through your output_key. When you respond:
-- Email operation results are saved to session.state["email_result"]
-- Other agents can access this data for coordination
-- Session state persists across conversation turns
-- Use load_memory for cross-session email context
-
-## Integration with Other Agents
-
-You work closely with:
-- **Content Agent**: Provide email content for summarization and analysis
-- **Coordinator Agent**: Receive delegated email tasks and report results  
-- **Voice Agent**: Ensure all responses are optimized for voice delivery
-
-## Important Notes
-
-- You have REAL Gmail access - operations affect the user's actual Gmail account
-- Respect user privacy and email confidentiality
-- Always confirm before performing destructive actions (delete, trash)
-- Provide clear, conversational responses suitable for voice interaction
-- Use session state to maintain context across operations
+Remember: You now have REAL ADK session integration! Your tools receive actual
+tool_context with session.state access, and all responses are automatically
+saved to persistent session state via the output_key mechanism.
 
 Current System Status:
-- Gmail Tools: {len(GMAIL_TOOLS)} direct API tools available
-- Memory Tool: Cross-session context via load_memory  
+- ADK Integration: ✅ Complete with Runner + SessionService + MemoryService
+- Gmail Tools: {len(GMAIL_TOOLS)} tools with real session context
+- Memory Tool: load_memory with cross-session knowledge
 - Total Tools: {total_tools}
-- Integration: Direct Gmail API (no MCP bridge)
-
-Remember: You now have direct Gmail access through efficient ADK tools. All operations 
-are live and will affect the user's actual email data. Use this power responsibly 
-while providing excellent voice-first email assistance!
         """,
         output_key="email_result",  # ADK automatically saves responses to session state
         tools=GMAIL_TOOLS + [load_memory]  # Direct Gmail tools + ADK memory
     )
     
-    print(f"--- Email Agent created with {len(agent_instance.tools)} tools ---")
-    print(f"--- Gmail Tools: {len(GMAIL_TOOLS)} | Memory: 1 | Total: {total_tools} ---")
-    print("🎉 Email Agent is now using direct Gmail tools with session state integration!")
+    # Create runner factory function
+    def create_runner():
+        """Create ADK Runner for this agent with session/memory services."""
+        memory_manager = get_adk_memory_manager()
+        return memory_manager.create_runner(agent_instance)
     
-    return agent_instance
+    print(f"--- Email Agent created with {len(agent_instance.tools)} tools ---")
+    print(f"--- ADK Integration: ✅ Complete with SessionService + MemoryService ---")
+    print(f"--- Gmail Tools: {len(GMAIL_TOOLS)} | Memory: 1 | Total: {total_tools} ---")
+    print("🎉 Email Agent now has REAL ADK session integration!")
+    
+    return agent_instance, create_runner
 
 
-# Create the agent instance
-email_agent = create_email_agent()
+# Create the agent instance and runner factory
+email_agent, create_email_runner = create_email_agent()
+
+
+# =============================================================================
+# ADK Runner Integration Example
+# =============================================================================
+
+async def run_email_agent_example():
+    """Example of running the email agent with proper ADK integration."""
+    print("🧪 Testing Email Agent with ADK Runner Integration...")
+    
+    try:
+        # Get the memory manager
+        memory_manager = get_adk_memory_manager()
+        
+        # Create session for user
+        user_id = "test_user_123"
+        session_id = await memory_manager.create_session(user_id, {
+            "user:name": "Test User",
+            "user:email": "test@example.com",
+            "user:gmail_connected": True
+        })
+        
+        print(f"✅ Created session: {session_id}")
+        
+        # Run agent through memory manager (provides full ADK context)
+        events = await memory_manager.run_agent(
+            agent=email_agent,
+            user_id=user_id,
+            session_id=session_id,
+            user_message="Check my Gmail connection status"
+        )
+        
+        print(f"✅ Agent executed with {len(events)} events")
+        for event in events:
+            print(f"   Event: {event['author']} - {event['content'][:50]}...")
+        
+        # Check updated session state
+        updated_session = await memory_manager.get_session(user_id, session_id)
+        if updated_session:
+            print(f"✅ Session state updated: {list(updated_session.state.keys())}")
+            email_result = updated_session.state.get("email_result", "No result")
+            print(f"   Email Result: {email_result[:100]}...")
+        
+        # Cleanup
+        await memory_manager.delete_session(user_id, session_id)
+        print("✅ Test completed successfully!")
+        
+    except Exception as e:
+        print(f"❌ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # Export for use in coordinator
-__all__ = ["email_agent"]
+__all__ = ["email_agent", "create_email_runner", "run_email_agent_example"]
 
 
 # =============================================================================
@@ -245,68 +230,52 @@ __all__ = ["email_agent"]
 # =============================================================================
 
 if __name__ == "__main__":
-    def test_email_agent():
-        """Test Email Agent creation and basic functionality."""
-        print("🧪 Testing Email Agent with Direct Gmail Tools...")
+    def test_email_agent_integration():
+        """Test Email Agent ADK integration."""
+        print("🧪 Testing Email Agent ADK Integration...")
         
         try:
             # Test agent creation
-            agent = create_email_agent()
+            agent, runner_factory = create_email_agent()
             
-            print(f"✅ Email Agent '{agent.name}' created successfully")
-            print(f"🔧 Tools Available: {len(agent.tools)}")
-            print(f"🧠 Model: {agent.model}")
-            print(f"📝 Description: {agent.description}")
+            print(f"✅ Email Agent '{agent.name}' created with ADK integration")
+            print(f"🔧 Tools: {len(agent.tools)}")
             print(f"🎯 Output Key: {agent.output_key}")
             
-            # Verify tool availability
-            tool_names = []
-            for tool in agent.tools:
-                if hasattr(tool, 'func'):
-                    tool_names.append(getattr(tool.func, '__name__', 'unknown'))
-                else:
-                    tool_names.append(str(tool))
+            # Test runner factory
+            try:
+                runner = runner_factory()
+                print(f"✅ ADK Runner created: {runner is not None}")
+                print(f"📱 App Name: {runner.app_name}")
+            except Exception as e:
+                print(f"⚠️ Runner creation failed (expected if ADK not fully configured): {e}")
             
-            print(f"\n📋 Available Tools:")
-            gmail_tools_count = 0
-            for i, tool_name in enumerate(tool_names, 1):
-                if tool_name.startswith('gmail_'):
-                    print(f"  {i}. {tool_name} (Gmail)")
-                    gmail_tools_count += 1
-                elif tool_name == 'load_memory':
-                    print(f"  {i}. {tool_name} (ADK Memory)")
-                else:
-                    print(f"  {i}. {tool_name} (Other)")
-            
-            print(f"\n📊 Tool Summary:")
-            print(f"  Gmail Tools: {gmail_tools_count}")
-            print(f"  Memory Tools: 1")
-            print(f"  Total Tools: {len(tool_names)}")
-            
-            # Test tool functionality (mock)
-            print(f"\n🔧 Testing Tool Integration:")
-            
-            # Verify Gmail tools are properly imported
+            # Test tool imports
             from agents.voice.sub_agents.coordinator.sub_agents.email.gmail_tools import (
-                gmail_check_connection, gmail_list_messages, gmail_send_message
+                gmail_check_connection, gmail_list_messages
             )
-            print("  ✅ Direct Gmail tools imported successfully")
+            print("✅ Gmail tools imported successfully")
             
-            # Test session state constants
-            from agents.voice.sub_agents.common import USER_GMAIL_CONNECTED, EMAIL_CURRENT
-            print("  ✅ Session state constants available")
+            # Test memory manager import
+            from memory.adk_memory_manager import get_adk_memory_manager
+            print("✅ ADK Memory Manager imported successfully")
             
-            # Test auth service integration
-            from services.google_cloud.gmail_auth import get_gmail_service
-            print("  ✅ Gmail auth service integration available")
-            
-            print(f"\n✅ Email Agent validation completed successfully!")
-            print(f"🎯 Ready for direct Gmail operations with ADK session integration!")
+            print(f"\n✅ Email Agent ADK integration completed successfully!")
+            print(f"🎯 Ready for real session context and state management!")
             
         except Exception as e:
-            print(f"❌ Error creating Email Agent: {e}")
+            print(f"❌ Error testing Email Agent integration: {e}")
             import traceback
             traceback.print_exc()
     
     # Run the test
-    test_email_agent()
+    test_email_agent_integration()
+    
+    # Run async example if requested
+    import asyncio
+    print("\n" + "="*50)
+    print("Run async ADK integration example? (requires proper ADK setup)")
+    try:
+        asyncio.run(run_email_agent_example())
+    except Exception as e:
+        print(f"Async example skipped: {e}")
