@@ -1,6 +1,6 @@
 """
 Session state key constants for consistent access across all agents.
-Defines the standard session.state structure for Oprina.
+Defines the standard session.state structure for Oprina with complete ADK integration.
 """
 
 # User persistent data (survives across sessions)
@@ -12,17 +12,28 @@ USER_CALENDAR_CONNECTED = "user:calendar_connected"
 USER_PREFERENCES = "user:preferences"
 USER_LAST_ACTIVITY = "user:last_activity"
 
-# Email state (current conversation)
-EMAIL_CURRENT = "email:current_emails"
+# Email state (current conversation) - ADD THESE
+EMAIL_CURRENT = "email:current_emails"  # ✅ You have this
 EMAIL_LAST_FETCH = "email:last_fetch"
 EMAIL_UNREAD_COUNT = "email:unread_count"
 EMAIL_LAST_SENT = "email:last_sent"
+# ADD THESE NEW ONES:
+EMAIL_CURRENT_RESULTS = "email:current_results"
+EMAIL_LAST_QUERY = "email:last_query"
+EMAIL_RESULTS_COUNT = "email:results_count"
+EMAIL_LAST_SENT_TO = "email:last_sent_to"
+EMAIL_CONNECTION_STATUS = "email:connection_status"
 
-# Calendar state (current conversation)
-CALENDAR_CURRENT = "calendar:current_events"
+# Calendar state (current conversation) - ADD THESE
+CALENDAR_CURRENT = "calendar:current_events"  # ✅ You have this
 CALENDAR_LAST_FETCH = "calendar:last_fetch"
 CALENDAR_UPCOMING_COUNT = "calendar:upcoming_count"
 CALENDAR_LAST_EVENT_CREATED = "calendar:last_event_created"
+
+# ADD THESE NEW CONTENT STATE KEYS:
+CONTENT_LAST_SUMMARY = "content:last_summary"
+CONTENT_LAST_ANALYSIS = "content:last_analysis"
+CONTENT_PROCESSING_STATUS = "content:processing_status"
 
 # Conversation state (current session only)
 CONVERSATION_ACTIVE = "conversation_active"
@@ -33,8 +44,22 @@ CURRENT_WORKFLOW = "current_workflow"
 # App global state
 APP_VERSION = "app:version"
 APP_FEATURES = "app:features"
+# ADD THIS:
+APP_NAME = "app:name"
 
-# Temporary state (not persistent)
+# Temporary state (not persistent) - ADD THESE
 TEMP_PROCESSING = "temp:processing"
 TEMP_CURRENT_OPERATION = "temp:current_operation"
 TEMP_WORKFLOW_STEP = "temp:workflow_step"
+# ADD THESE NEW ONES:
+TEMP_ERROR_STATE = "temp:error_state"
+
+# ADK State Prefix Documentation
+"""
+ADK State Prefix Guide:
+- user: - User-specific data, persistent across sessions
+- app: - Application-wide data, shared across all users
+- temp: - Temporary data, never persisted
+- (no prefix) - Session-specific data, persists with session
+- service: - Service-specific data (email:, calendar:, content:)
+"""
