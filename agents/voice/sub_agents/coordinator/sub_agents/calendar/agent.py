@@ -335,7 +335,7 @@ if __name__ == "__main__":
             print("  ✅ Direct Calendar tools imported successfully")
             
             # Test session state constants
-            from agents.voice.sub_agents.common import USER_CALENDAR_CONNECTED, CALENDAR_CURRENT
+            from agents.common.session_keys import USER_CALENDAR_CONNECTED, CALENDAR_CURRENT
             print("  ✅ Session state constants available")
             
             # Test auth service integration

@@ -389,7 +389,7 @@ async def test_voice_tools():
         # Test 7: Utility imports
         print("🛠️ Testing utility imports...")
         try:
-            from agents.voice.sub_agents.common.utils import (
+            from agents.common.session_keys import (
                 validate_tool_context, update_agent_activity
             )
             

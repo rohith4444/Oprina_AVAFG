@@ -382,7 +382,7 @@ if __name__ == "__main__":
             print("  ✅ Direct content tools imported successfully")
             
             # Test session state constants
-            from agents.voice.sub_agents.common import USER_PREFERENCES, CONTENT_LAST_SUMMARY
+            from agents.common.session_keys import USER_PREFERENCES, CONTENT_LAST_SUMMARY
             print("  ✅ Session state constants available")
             
             print(f"\n✅ Content Agent ADK integration completed successfully!")
