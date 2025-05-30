@@ -154,3 +154,17 @@ AGENT_STATUS_READY = "ready"
 AGENT_STATUS_BUSY = "busy"
 AGENT_STATUS_ERROR = "error"
 AGENT_STATUS_UNAVAILABLE = "unavailable"
+
+# =============================================================================
+# Voice State (current conversation)
+# =============================================================================
+VOICE_LAST_TRANSCRIPT = "voice:last_transcript"
+VOICE_LAST_CONFIDENCE = "voice:last_confidence"
+VOICE_LAST_STT_AT = "voice:last_stt_at"
+VOICE_LAST_TTS_TEXT = "voice:last_tts_text"
+VOICE_LAST_TTS_VOICE = "voice:last_tts_voice"
+VOICE_LAST_TTS_AT = "voice:last_tts_at"
+VOICE_LAST_AUDIO_SIZE = "voice:last_audio_size"
+VOICE_QUALITY_CHECK_AT = "voice:quality_check_at"
+VOICE_PREFERENCES_UPDATED_AT = "voice:preferences_updated_at"
+VOICE_ACTIVE_PREFERENCES = "voice:active_preferences"

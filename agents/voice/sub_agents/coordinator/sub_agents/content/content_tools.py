@@ -25,13 +25,13 @@ from google.adk.tools import FunctionTool
 from services.logging.logger import setup_logger
 
 # Import ADK utility functions
-from agents.voice.sub_agents.common.utils import (
+from agents.common.utils import (
     validate_tool_context, update_agent_activity, get_user_preferences,
     update_user_preferences, log_tool_execution
 )
 
 # Import session state constants
-from agents.voice.sub_agents.common import (
+from agents.common.session_keys import (
     USER_PREFERENCES, USER_EMAIL, USER_NAME, CONTENT_LAST_SUMMARY,
     CONTENT_LAST_ANALYSIS, CONTENT_PROCESSING_STATUS
 )

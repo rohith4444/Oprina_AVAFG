@@ -29,7 +29,7 @@ from config.settings import settings
 from agents.voice.sub_agents.coordinator.sub_agents.content.content_tools import CONTENT_TOOLS
 
 # Import shared constants for documentation
-from agents.voice.sub_agents.common import (
+from agents.common.session_keys import (
     USER_PREFERENCES, USER_NAME, USER_EMAIL, CONTENT_LAST_SUMMARY,
     CONTENT_LAST_ANALYSIS, CONTENT_PROCESSING_STATUS
 )

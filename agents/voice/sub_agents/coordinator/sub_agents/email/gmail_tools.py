@@ -24,13 +24,13 @@ from services.google_cloud.gmail_auth import get_gmail_service, check_gmail_conn
 from services.logging.logger import setup_logger
 
 # Import ADK utility functions
-from agents.voice.sub_agents.common.utils import (
+from agents.common.utils import (
     validate_tool_context, update_agent_activity, get_service_connection_status,
     update_service_connection_status, log_tool_execution
 )
 
 # Import session state constants
-from agents.voice.sub_agents.common import (
+from agents.common.session_keys import (
     USER_GMAIL_CONNECTED, USER_EMAIL, USER_NAME, EMAIL_CURRENT_RESULTS,
     EMAIL_LAST_FETCH, EMAIL_LAST_QUERY, EMAIL_RESULTS_COUNT, EMAIL_LAST_SENT_TO,
     EMAIL_LAST_SENT, EMAIL_CONNECTION_STATUS

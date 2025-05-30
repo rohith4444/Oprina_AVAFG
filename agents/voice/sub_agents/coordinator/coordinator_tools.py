@@ -22,14 +22,14 @@ if project_root not in sys.path:
 from google.adk.tools import FunctionTool
 from services.logging.logger import setup_logger
 
-# Import existing utility functions (your existing ones are perfect!)
-from agents.voice.sub_agents.common.utils import (
+# Import existing utility functions 
+from agents.common.utils import (
     validate_tool_context, update_agent_activity, get_user_preferences,
     get_service_connection_status, get_session_summary, log_tool_execution
 )
 
 # Import coordination session keys
-from agents.voice.sub_agents.common.session_keys import (
+from agents.common.session_keys import (
     COORDINATION_ACTIVE, COORDINATION_WORKFLOW_TYPE, COORDINATION_CURRENT_STEP,
     COORDINATION_REQUIRED_AGENTS, COORDINATION_COMPLETED_AGENTS,
     COORDINATION_LAST_DELEGATED_AGENT, COORDINATION_DELEGATION_HISTORY,

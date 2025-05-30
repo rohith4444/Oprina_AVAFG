@@ -30,7 +30,7 @@ from config.settings import settings
 from agents.voice.sub_agents.coordinator.sub_agents.calendar.calendar_tools import CALENDAR_TOOLS
 
 # Import shared constants
-from agents.voice.sub_agents.common import (
+from agents.common.session_keys import (
     USER_CALENDAR_CONNECTED, USER_NAME, USER_PREFERENCES,
     CALENDAR_CURRENT, CALENDAR_LAST_FETCH, CALENDAR_UPCOMING_COUNT, CALENDAR_LAST_EVENT_CREATED
 )

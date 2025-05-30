@@ -29,7 +29,7 @@ from config.settings import settings
 from agents.voice.sub_agents.coordinator.sub_agents.email.gmail_tools import GMAIL_TOOLS
 
 # Import shared constants for documentation
-from agents.voice.sub_agents.common import (
+from agents.common.session_keys import (
     USER_GMAIL_CONNECTED, USER_EMAIL, USER_NAME, USER_PREFERENCES,
     EMAIL_CURRENT_RESULTS, EMAIL_LAST_FETCH, EMAIL_UNREAD_COUNT, EMAIL_LAST_SENT
 )

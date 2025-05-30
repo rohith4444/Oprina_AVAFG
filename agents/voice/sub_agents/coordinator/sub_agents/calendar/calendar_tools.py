@@ -24,13 +24,13 @@ from services.google_cloud.calendar_auth import get_calendar_service, check_cale
 from services.logging.logger import setup_logger
 
 # Import ADK utility functions
-from agents.voice.sub_agents.common.utils import (
+from agents.common.utils import (
     validate_tool_context, update_agent_activity, get_user_preferences,
     update_service_connection_status, get_service_connection_status, log_tool_execution
 )
 
 # Import session state constants
-from agents.voice.sub_agents.common import (
+from agents.common.session_keys import (
     USER_CALENDAR_CONNECTED, USER_NAME, USER_PREFERENCES,
     CALENDAR_CURRENT, CALENDAR_LAST_FETCH, CALENDAR_UPCOMING_COUNT, CALENDAR_LAST_EVENT_CREATED
 )

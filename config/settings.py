@@ -87,6 +87,27 @@ class Settings(BaseSettings):
         description="Force Google AI Studio instead of Vertex AI for Gemini models"
     )
     
+    # ✅ NEW: Google Cloud Configuration
+    GOOGLE_CLOUD_PROJECT_ID: str = Field(..., description="Google Cloud Project ID")
+
+    # ✅ NEW: Speech-to-Text Settings
+    STT_LANGUAGE_CODE: str = Field(default="en-US", description="Speech recognition language")
+    STT_MODEL: str = Field(default="latest_long", description="STT model type")
+    STT_USE_ENHANCED: bool = Field(default=True, description="Use enhanced STT model")
+    STT_ENABLE_AUTOMATIC_PUNCTUATION: bool = Field(default=True, description="Auto punctuation")
+    STT_SAMPLE_RATE: int = Field(default=16000, description="Audio sample rate")
+
+    # ✅ NEW: Text-to-Speech Settings
+    TTS_LANGUAGE_CODE: str = Field(default="en-US", description="TTS language")
+    TTS_VOICE_NAME: str = Field(default="en-US-Neural2-F", description="TTS voice name")
+    TTS_VOICE_GENDER: str = Field(default="FEMALE", description="Voice gender")
+    TTS_AUDIO_ENCODING: str = Field(default="MP3", description="Audio output format")
+    TTS_SPEAKING_RATE: float = Field(default=1.0, description="Speech rate")
+    TTS_PITCH: float = Field(default=0.0, description="Voice pitch")
+
+    AUDIO_SAMPLE_RATE: int = Field(default=16000, description="Audio processing sample rate")
+    AUDIO_CHANNELS: int = Field(default=1, description="Audio channels (1=mono, 2=stereo)")
+    PROCESSING_TIMEOUT: int = Field(default=30, description="Audio processing timeout in seconds")
     # =============================================================================
     # Google API Settings
     # =============================================================================
@@ -144,7 +165,7 @@ class Settings(BaseSettings):
 
     # Alternative models for specific agents
     VOICE_MODEL: str = Field(
-        default="gemini-1.5-flash",  # ✅ Changed to stable model
+        default="gemini-2.5-flash-preview-05-20",  # ✅ Changed to stable model
         description="Model for voice agent"
     )
     COORDINATOR_MODEL: str = Field(
@@ -286,6 +307,11 @@ class Settings(BaseSettings):
         description="Enable session persistence across app restarts"
     )
     
+    VOICE_ENABLED: bool = Field(default=True, description="Enable voice processing")
+    VOICE_MAX_AUDIO_DURATION: int = Field(default=60, description="Max audio duration in seconds")
+
+    AVATAR_ENABLED: bool = Field(default=True, description="Enable avatar animation")
+    AVATAR_LIP_SYNC: bool = Field(default=True, description="Enable avatar lip-sync")
     # =============================================================================
     # Helper Methods and Properties
     # =============================================================================
@@ -311,6 +337,12 @@ class Settings(BaseSettings):
                 return matches[0]
         
         return explicit_path
+    
+    @property
+    def google_cloud_credentials_path(self) -> str:
+        """Get Google Cloud service account key path"""
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(project_root, "credentials", "google_cloud_service_account.json")
     
     @property  
     def google_token_path(self) -> str:

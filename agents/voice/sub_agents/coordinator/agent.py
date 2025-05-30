@@ -35,7 +35,7 @@ from agents.voice.sub_agents.coordinator.sub_agents.calendar.agent import create
 from agents.voice.sub_agents.coordinator.coordinator_tools import COORDINATION_TOOLS
 
 # Import shared constants for documentation
-from agents.voice.sub_agents.common import (
+from agents.common import (
     USER_NAME, USER_PREFERENCES, USER_GMAIL_CONNECTED, USER_CALENDAR_CONNECTED,
     COORDINATION_ACTIVE, COORDINATION_WORKFLOW_TYPE, COORDINATION_CURRENT_STEP,
     WORKFLOW_EMAIL_ONLY, WORKFLOW_CALENDAR_ONLY, WORKFLOW_EMAIL_CONTENT,
