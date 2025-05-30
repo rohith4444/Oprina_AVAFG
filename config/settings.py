@@ -312,6 +312,9 @@ class Settings(BaseSettings):
 
     AVATAR_ENABLED: bool = Field(default=True, description="Enable avatar animation")
     AVATAR_LIP_SYNC: bool = Field(default=True, description="Enable avatar lip-sync")
+
+    SPEECH_TO_TEXT_ENABLED: bool = Field(default=True, description="Enable Google STT")
+    TEXT_TO_SPEECH_ENABLED: bool = Field(default=True, description="Enable Google TTS")
     # =============================================================================
     # Helper Methods and Properties
     # =============================================================================

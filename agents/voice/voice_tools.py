@@ -29,6 +29,17 @@ from agents.common.session_keys import (
 
 logger = setup_logger("voice_tools")
 
+def _run_async_safely(coro):
+    """Safely run async function from sync context"""
+    try:
+        return asyncio.run(coro)
+    except RuntimeError:
+        # Already in event loop - use thread executor
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+
 
 def process_audio_input(audio_data: bytes, tool_context=None) -> str:
     """Process audio input using Google Cloud Speech-to-Text"""
@@ -47,7 +58,7 @@ def process_audio_input(audio_data: bytes, tool_context=None) -> str:
         speech_services = get_speech_services()
         
         # Convert speech to text
-        result = asyncio.run(speech_services.speech_to_text(audio_data))
+        result = _run_async_safely(speech_services.speech_to_text(audio_data))
         
         if result["success"]:
             transcript = result["transcript"]
@@ -97,17 +108,17 @@ def generate_audio_output(text: str, voice_settings: Dict = None, tool_context=N
         speech_services = get_speech_services()
         
         # Convert text to speech
-        result = asyncio.run(speech_services.text_to_speech(text, final_voice_settings))
+        result = _run_async_safely(speech_services.text_to_speech(text, final_voice_settings))
         
         if result["success"]:
             audio_content = result["audio_content"]
             
             # Update session state
-            tool_context.session.state["voice:last_tts_text"] = text
-            tool_context.session.state["voice:last_tts_voice"] = result["voice_name"]
-            tool_context.session.state["voice:last_tts_at"] = datetime.utcnow().isoformat()
-            tool_context.session.state["voice:last_audio_size"] = len(audio_content)
-            
+            tool_context.session.state[VOICE_LAST_TTS_TEXT] = text
+            tool_context.session.state[VOICE_LAST_TTS_VOICE] = result["voice_name"]
+            tool_context.session.state[VOICE_LAST_TTS_AT] = format_timestamp()
+            tool_context.session.state[VOICE_LAST_AUDIO_SIZE] = len(audio_content)
+
             log_tool_execution(tool_context, "generate_audio_output", "text_to_speech", True,
                              f"Generated {len(audio_content)} bytes of audio")
             
@@ -156,9 +167,9 @@ def check_audio_quality(audio_data: bytes, tool_context=None) -> str:
             recommendations = "Audio file too large - consider compression"
         
         # Update session state
-        tool_context.session.state["voice:last_quality_check"] = quality_analysis
-        tool_context.session.state["voice:last_quality_score"] = quality_score
-        tool_context.session.state["voice:quality_check_at"] = datetime.utcnow().isoformat()
+        tool_context.session.state[VOICE_LAST_QUALITY_CHECK] = quality_analysis
+        tool_context.session.state[VOICE_LAST_QUALITY_SCORE] = quality_score
+        tool_context.session.state[VOICE_QUALITY_CHECK_AT] = format_timestamp()
         
         result = f"Audio Quality: {quality_score}. {recommendations}"
         
@@ -199,8 +210,8 @@ def update_voice_preferences(preferences: Dict[str, Any], tool_context=None) -> 
         
         if success:
             # Update session state
-            tool_context.session.state["voice:preferences_updated_at"] = datetime.utcnow().isoformat()
-            tool_context.session.state["voice:active_preferences"] = voice_settings
+            tool_context.session.state[VOICE_PREFERENCES_UPDATED_AT] = format_timestamp()
+            tool_context.session.state[VOICE_ACTIVE_PREFERENCES] = voice_settings
             
             log_tool_execution(tool_context, "update_voice_preferences", "update_prefs", True,
                              "Preferences updated successfully")
