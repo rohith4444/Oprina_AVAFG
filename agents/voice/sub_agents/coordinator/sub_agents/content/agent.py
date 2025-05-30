@@ -311,7 +311,7 @@ Current System Status:
 
 
 # Create the agent instance
-content_agent = create_content_agent()
+agent_name = None
 
 
 # Export for use in coordinator

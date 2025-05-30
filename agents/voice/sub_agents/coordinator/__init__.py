@@ -13,10 +13,10 @@ descriptions and context.
 """
 
 # Import the main coordinator agent
-from agents.voice.sub_agents.coordinator.agent import coordinator_agent, create_coordinator_agent
+from .agent import coordinator_agent, create_coordinator_agent
 
 # Import coordination tools for direct access if needed
-from agents.voice.sub_agents.coordinator.coordinator_tools import (
+from .coordinator_tools import (
     analyze_coordination_context,
     get_workflow_status,
     coordinate_agent_results,
@@ -24,55 +24,39 @@ from agents.voice.sub_agents.coordinator.coordinator_tools import (
 )
 
 # Import sub-agents for reference (though ADK handles delegation automatically)
-from agents.voice.sub_agents.coordinator.sub_agents.email import email_agent
-from agents.voice.sub_agents.coordinator.sub_agents.content import content_agent
-from agents.voice.sub_agents.coordinator.sub_agents.calendar import calendar_agent
+from .sub_agents.email import create_email_agent
+from .sub_agents.content import create_content_agent
+from .sub_agents.calendar import create_calendar_agent
+
+# Import workflow type constants from common
+from ..common import (
+    WORKFLOW_EMAIL_ONLY, WORKFLOW_CALENDAR_ONLY, WORKFLOW_CONTENT_ONLY,
+    WORKFLOW_EMAIL_CONTENT, WORKFLOW_CALENDAR_CONTENT,
+    WORKFLOW_EMAIL_CALENDAR, WORKFLOW_ALL_AGENTS
+)
 
 # Export main components
 __all__ = [
     # Main coordinator agent
-    "coordinator_agent",
-    "create_coordinator_agent",
+    "coordinator_agent", "create_coordinator_agent",
     
     # Coordination tools (for direct use if needed)
-    "analyze_coordination_context",
-    "get_workflow_status", 
-    "coordinate_agent_results",
-    "COORDINATION_TOOLS",
+    "analyze_coordination_context", "get_workflow_status", 
+    "coordinate_agent_results", "COORDINATION_TOOLS",
     
     # Sub-agents (for reference, ADK handles delegation)
-    "email_agent",
-    "content_agent", 
-    "calendar_agent"
+    "email_agent", "content_agent", "calendar_agent",
+    
+    # Workflow type constants
+    "WORKFLOW_EMAIL_ONLY", "WORKFLOW_CALENDAR_ONLY", "WORKFLOW_CONTENT_ONLY",
+    "WORKFLOW_EMAIL_CONTENT", "WORKFLOW_CALENDAR_CONTENT",
+    "WORKFLOW_EMAIL_CALENDAR", "WORKFLOW_ALL_AGENTS"
 ]
 
 # Package metadata
 __version__ = "2.0.0"
 __description__ = "ADK-native coordinator agent with automatic delegation"
 
-# Coordination workflow types (imported from session_keys for consistency)
-from agents.voice.sub_agents.common.session_keys import (
-    WORKFLOW_EMAIL_ONLY,
-    WORKFLOW_CALENDAR_ONLY,
-    WORKFLOW_CONTENT_ONLY,
-    WORKFLOW_EMAIL_CONTENT,
-    WORKFLOW_CALENDAR_CONTENT,
-    WORKFLOW_EMAIL_CALENDAR,
-    WORKFLOW_ALL_AGENTS
-)
-
-# Export workflow types
-__all__.extend([
-    "WORKFLOW_EMAIL_ONLY",
-    "WORKFLOW_CALENDAR_ONLY", 
-    "WORKFLOW_CONTENT_ONLY",
-    "WORKFLOW_EMAIL_CONTENT",
-    "WORKFLOW_CALENDAR_CONTENT",
-    "WORKFLOW_EMAIL_CALENDAR",
-    "WORKFLOW_ALL_AGENTS"
-])
-
-# Package information for debugging
 def get_package_info():
     """Get package information for debugging and monitoring."""
     return {
@@ -81,9 +65,9 @@ def get_package_info():
         "description": __description__,
         "main_agent": coordinator_agent.name if coordinator_agent else "Not loaded",
         "sub_agents": [
-            email_agent.name if email_agent else "email_agent not loaded",
-            content_agent.name if content_agent else "content_agent not loaded", 
-            calendar_agent.name if calendar_agent else "calendar_agent not loaded"
+            create_email_agent.name if create_email_agent else "email_agent not loaded",
+            create_content_agent.name if create_content_agent else "content_agent not loaded", 
+            create_calendar_agent.name if create_calendar_agent else "calendar_agent not loaded"
         ],
         "coordination_tools": len(COORDINATION_TOOLS),
         "workflow_types": [

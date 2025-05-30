@@ -301,7 +301,7 @@ Current System Status:
 
 
 # Create the agent instance
-email_agent = create_email_agent()
+agent_name = None
 
 
 # =============================================================================

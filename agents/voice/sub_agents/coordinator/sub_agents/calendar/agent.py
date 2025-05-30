@@ -275,7 +275,7 @@ and availability management!
 
 
 # Create the agent instance
-calendar_agent = create_calendar_agent()
+agent_name = None
 
 
 # Export for use in coordinator

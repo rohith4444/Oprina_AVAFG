@@ -27,9 +27,9 @@ from config.settings import settings
 from services.logging.logger import setup_logger
 
 # Import sub-agents
-from agents.voice.sub_agents.coordinator.sub_agents.email.agent import email_agent
-from agents.voice.sub_agents.coordinator.sub_agents.content.agent import content_agent
-from agents.voice.sub_agents.coordinator.sub_agents.calendar.agent import calendar_agent
+from agents.voice.sub_agents.coordinator.sub_agents.email.agent import create_email_agent
+from agents.voice.sub_agents.coordinator.sub_agents.content.agent import create_content_agent
+from agents.voice.sub_agents.coordinator.sub_agents.calendar.agent import create_calendar_agent
 
 # Import coordination tools
 from agents.voice.sub_agents.coordinator.coordinator_tools import COORDINATION_TOOLS
@@ -65,6 +65,10 @@ def create_coordinator_agent():
     coordination_tools_count = len(COORDINATION_TOOLS)
     memory_tools_count = 1  # load_memory
     total_tools = coordination_tools_count + memory_tools_count
+
+    email_sub_agent = create_email_agent()
+    content_sub_agent = create_content_agent()
+    calendar_sub_agent = create_calendar_agent()
     
     # Create the Coordinator Agent with ADK auto-delegation
     agent_instance = LlmAgent(
@@ -73,7 +77,7 @@ def create_coordinator_agent():
         model=model,
         
         # ✅ ADK AUTO-DELEGATION: Sub-agents for automatic routing
-        sub_agents=[email_agent, content_agent, calendar_agent],
+        sub_agents=[email_sub_agent, content_sub_agent, calendar_sub_agent],
         
         instruction=f"""
 You are the Coordinator Agent for Oprina, a sophisticated voice-powered Gmail and Calendar assistant.
@@ -248,7 +252,7 @@ Your job is to create beautiful symphonies of coordinated assistance.
 
 Current System Status:
 - ADK Integration: Complete with automatic delegation
-- Sub-Agents: {len([email_agent, content_agent, calendar_agent])} specialized agents ready
+- Sub-Agents: {len([email_sub_agent, content_sub_agent, calendar_sub_agent])} specialized agents ready
 - Coordination Tools: {coordination_tools_count} workflow management tools
 - Memory Tool: load_memory with cross-session coordination knowledge  
 - Total Tools: {total_tools}
@@ -271,8 +275,17 @@ exceptional coordinated experiences for voice-first Gmail and Calendar assistanc
     return agent_instance
 
 
-# Create the agent instance
-coordinator_agent = create_coordinator_agent()
+_coordinator_instance = None
+
+def get_coordinator_agent():
+    """Get singleton coordinator agent instance."""
+    global _coordinator_instance
+    if _coordinator_instance is None:
+        _coordinator_instance = create_coordinator_agent()
+    return _coordinator_instance
+
+# Export this instead of direct instance
+coordinator_agent = get_coordinator_agent
 
 
 # Export for use in voice agent
