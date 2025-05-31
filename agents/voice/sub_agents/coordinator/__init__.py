@@ -13,7 +13,7 @@ descriptions and context.
 """
 
 # Import the main coordinator agent
-from .agent import coordinator_agent, create_coordinator_agent
+from .agent import coordinator_agent, create_coordinator_agent, get_coordinator_agent
 
 # Import coordination tools for direct access if needed
 from .coordinator_tools import (
@@ -29,16 +29,18 @@ from .sub_agents.content import create_content_agent
 from .sub_agents.calendar import create_calendar_agent
 
 # Import workflow type constants from common
-from ..common import (
+from agents.common.session_keys import (
     WORKFLOW_EMAIL_ONLY, WORKFLOW_CALENDAR_ONLY, WORKFLOW_CONTENT_ONLY,
     WORKFLOW_EMAIL_CONTENT, WORKFLOW_CALENDAR_CONTENT,
     WORKFLOW_EMAIL_CALENDAR, WORKFLOW_ALL_AGENTS
 )
 
+ 
+
 # Export main components
 __all__ = [
     # Main coordinator agent
-    "coordinator_agent", "create_coordinator_agent",
+    "get_coordinator_agent", "create_coordinator_agent",
     
     # Coordination tools (for direct use if needed)
     "analyze_coordination_context", "get_workflow_status", 
