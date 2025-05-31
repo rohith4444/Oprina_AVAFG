@@ -94,7 +94,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+
 
 # PyBuilder
 .pybuilder/
@@ -375,8 +375,6 @@ session_data/
 # =============================================================================
 
 # Generated docs
-docs/_build/
-docs/build/
 site/
 
 # =============================================================================

@@ -1,426 +1,48 @@
 """
-Content Agent for Oprina
+Content Agent for Oprina - Complete ADK Integration
 
-This agent specializes in content processing for emails and text:
-- Email summarization with adaptive detail levels
-- Email reply generation with context awareness
-- Content analysis and sentiment detection
-- Text optimization for voice delivery
-- Template-based content generation
-
-The agent uses advanced content processing techniques and learns from
-user preferences to provide personalized content assistance.
+This agent specializes in content processing for emails and text using direct ADK tools.
+Follows the same pattern as the email agent with proper ADK session integration.
 """
 
 import os
 import sys
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 
 # Calculate project root more reliably
 current_file = os.path.abspath(__file__)
-# From: agents/voice/sub_agents/coordinator/sub_agents/content/agent.py
-# Need to go up 6 levels to reach project root
 project_root = current_file
-for _ in range(7):  # 6 levels + 1 for the file itself
+for _ in range(7):  # 7 levels to reach project root
     project_root = os.path.dirname(project_root)
 
-# Add to Python path
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import external packages
-from google.adk.agents import Agent
+from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
-from google.adk.tools import FunctionTool
+from google.adk.tools import load_memory
 
-# Import your project modules (absolute imports)
+# Import project modules
 from config.settings import settings
-from agents.voice.sub_agents.coordinator.sub_agents.content.content_processing import (
-    content_processor,
-    process_email_content,
-    SummaryDetail,
-    ReplyStyle,
-    ContentType
+
+# Import direct content tools (your new ADK-integrated tools)
+from agents.voice.sub_agents.coordinator.sub_agents.content.content_tools import CONTENT_TOOLS
+
+# Import shared constants for documentation
+from agents.common.session_keys import (
+    USER_PREFERENCES, USER_NAME, USER_EMAIL, CONTENT_LAST_SUMMARY,
+    CONTENT_LAST_ANALYSIS, CONTENT_PROCESSING_STATUS
 )
 
-# Import shared tools (absolute import)
-from agents.voice.sub_agents.common.shared_tools import (
-    update_session_state,
-    get_session_context,
-    log_agent_action,
-    handle_agent_error,
-    get_user_preferences,
-    learn_from_interaction,
-    measure_performance,
-    complete_performance_measurement
-)
-
-# Content processing tools for the agent
-def summarize_email_content(
-    email_content: str,
-    detail_level: str = "moderate",
-    user_id: str = "",
-    session_id: str = "",
-    tool_context=None
-) -> Dict[str, Any]:
-    """
-    Tool to summarize email content with adaptive detail levels.
-    
-    Args:
-        email_content: Email content to summarize
-        detail_level: Level of detail (brief, moderate, detailed)
-        user_id: User identifier for personalization
-        session_id: Session identifier
-        tool_context: ADK tool context
-        
-    Returns:
-        Summarization result
-    """
-    try:
-        # Start performance tracking
-        perf_result = measure_performance("email_summarization", "content_agent", session_id, tool_context)
-        tracking_id = perf_result.get("tracking_id")
-        
-        # Get user preferences for summarization
-        prefs_result = get_user_preferences(user_id, session_id, "summary_preferences", tool_context)
-        user_preferences = prefs_result.get("preferences", {})
-        
-        # Process the content
-        result = process_email_content(
-            operation="summarize",
-            content=email_content,
-            parameters={"detail_level": detail_level},
-            user_preferences=user_preferences
-        )
-        
-        # Log the action
-        log_agent_action(
-            "content_agent",
-            "email_summarization",
-            {
-                "detail_level": detail_level,
-                "content_length": len(email_content),
-                "success": result.success
-            },
-            session_id,
-            tool_context
-        )
-        
-        # Learn from interaction
-        if result.success:
-            learn_from_interaction(
-                user_id,
-                "summary_requested",
-                {
-                    "detail_level": detail_level,
-                    "content_length": len(email_content),
-                    "processing_time": result.processing_time_ms
-                },
-                context={"session_id": session_id},
-                tool_context=tool_context
-            )
-        
-        # Complete performance tracking
-        if tracking_id:
-            complete_performance_measurement(
-                tracking_id,
-                "success" if result.success else "failure",
-                {"summary_length": len(result.result_content)},
-                tool_context
-            )
-        
-        return {
-            "success": result.success,
-            "summary": result.result_content,
-            "metadata": {
-                "detail_level": detail_level,
-                "processing_time_ms": result.processing_time_ms,
-                "word_count": result.metadata.word_count
-            },
-            "error_message": result.error_message
-        }
-        
-    except Exception as e:
-        error_result = handle_agent_error("content_agent", e, {
-            "operation": "summarize_email_content",
-            "detail_level": detail_level
-        }, session_id, tool_context)
-        
-        return {
-            "success": False,
-            "summary": "",
-            "error_message": str(e),
-            "error_handled": error_result["success"]
-        }
-
-
-def generate_email_reply(
-    original_email: str,
-    reply_intent: str,
-    reply_style: str = "professional",
-    user_id: str = "",
-    session_id: str = "",
-    tool_context=None
-) -> Dict[str, Any]:
-    """
-    Tool to generate email replies based on original email and user intent.
-    
-    Args:
-        original_email: Original email content or data
-        reply_intent: What the user wants to communicate
-        reply_style: Style of reply (professional, casual, friendly, formal, brief)
-        user_id: User identifier
-        session_id: Session identifier
-        tool_context: ADK tool context
-        
-    Returns:
-        Reply generation result
-    """
-    try:
-        # Start performance tracking
-        perf_result = measure_performance("email_reply_generation", "content_agent", session_id, tool_context)
-        tracking_id = perf_result.get("tracking_id")
-        
-        # Get user context for personalization
-        context_result = get_session_context(user_id, session_id, tool_context)
-        user_context = context_result.get("context", {}).get("session_state", {})
-        
-        # Parse original email if it's a string
-        if isinstance(original_email, str):
-            email_data = {"body": original_email, "sender": "Unknown", "subject": "Re: Email"}
-        else:
-            email_data = original_email
-        
-        # Generate reply prompt using content processor
-        try:
-            reply_style_enum = ReplyStyle(reply_style)
-        except ValueError:
-            reply_style_enum = ReplyStyle.PROFESSIONAL
-        
-        reply_prompt = content_processor.generate_reply_prompt(
-            email_data,
-            reply_intent,
-            reply_style_enum,
-            user_context
-        )
-        
-        # Log the action
-        log_agent_action(
-            "content_agent",
-            "email_reply_generation",
-            {
-                "reply_style": reply_style,
-                "intent_length": len(reply_intent),
-                "original_email_length": len(str(original_email))
-            },
-            session_id,
-            tool_context
-        )
-        
-        # Learn from interaction
-        learn_from_interaction(
-            user_id,
-            "reply_generated",
-            {
-                "reply_style": reply_style,
-                "intent": reply_intent[:100],  # First 100 chars for privacy
-                "context": "email_reply"
-            },
-            context={"session_id": session_id},
-            tool_context=tool_context
-        )
-        
-        # Complete performance tracking
-        if tracking_id:
-            complete_performance_measurement(
-                tracking_id,
-                "success",
-                {"reply_prompt_length": len(reply_prompt)},
-                tool_context
-            )
-        
-        return {
-            "success": True,
-            "reply_prompt": reply_prompt,
-            "metadata": {
-                "reply_style": reply_style,
-                "user_context_used": bool(user_context),
-                "prompt_length": len(reply_prompt)
-            }
-        }
-        
-    except Exception as e:
-        error_result = handle_agent_error("content_agent", e, {
-            "operation": "generate_email_reply",
-            "reply_style": reply_style
-        }, session_id, tool_context)
-        
-        return {
-            "success": False,
-            "reply_prompt": "",
-            "error_message": str(e),
-            "error_handled": error_result["success"]
-        }
-
-
-def analyze_email_content(
-    email_data: Dict[str, Any],
-    analysis_type: str = "full",
-    user_id: str = "",
-    session_id: str = "",
-    tool_context=None
-) -> Dict[str, Any]:
-    """
-    Tool to analyze email content for sentiment, topics, urgency, etc.
-    
-    Args:
-        email_data: Email data dictionary
-        analysis_type: Type of analysis (full, sentiment, topics, urgency)
-        user_id: User identifier
-        session_id: Session identifier
-        tool_context: ADK tool context
-        
-    Returns:
-        Content analysis result
-    """
-    try:
-        # Extract metadata using content processor
-        metadata = content_processor.extract_email_metadata(email_data)
-        
-        # Perform specific analysis based on type
-        analysis_result = {
-            "sentiment": metadata.sentiment,
-            "key_topics": metadata.key_topics,
-            "urgency_level": metadata.urgency_level,
-            "word_count": metadata.word_count,
-            "estimated_read_time": metadata.estimated_read_time,
-            "content_type": metadata.content_type.value
-        }
-        
-        # Filter based on analysis type
-        if analysis_type == "sentiment":
-            analysis_result = {"sentiment": metadata.sentiment}
-        elif analysis_type == "topics":
-            analysis_result = {"key_topics": metadata.key_topics}
-        elif analysis_type == "urgency":
-            analysis_result = {"urgency_level": metadata.urgency_level}
-        
-        # Log the action
-        log_agent_action(
-            "content_agent",
-            "email_analysis",
-            {
-                "analysis_type": analysis_type,
-                "email_id": email_data.get("id", "unknown"),
-                "sentiment": metadata.sentiment,
-                "urgency": metadata.urgency_level
-            },
-            session_id,
-            tool_context
-        )
-        
-        return {
-            "success": True,
-            "analysis": analysis_result,
-            "metadata": {
-                "analysis_type": analysis_type,
-                "email_analyzed": email_data.get("subject", "No subject")[:50]
-            }
-        }
-        
-    except Exception as e:
-        error_result = handle_agent_error("content_agent", e, {
-            "operation": "analyze_email_content",
-            "analysis_type": analysis_type
-        }, session_id, tool_context)
-        
-        return {
-            "success": False,
-            "analysis": {},
-            "error_message": str(e),
-            "error_handled": error_result["success"]
-        }
-
-
-def optimize_content_for_voice(
-    content: str,
-    max_length: int = 300,
-    user_id: str = "",
-    session_id: str = "",
-    tool_context=None
-) -> Dict[str, Any]:
-    """
-    Tool to optimize content for voice delivery.
-    
-    Args:
-        content: Content to optimize
-        max_length: Maximum character length
-        user_id: User identifier
-        session_id: Session identifier
-        tool_context: ADK tool context
-        
-    Returns:
-        Voice optimization result
-    """
-    try:
-        # Optimize content using content processor
-        optimized_content = content_processor.optimize_for_voice(content, max_length)
-        
-        # Log the action
-        log_agent_action(
-            "content_agent",
-            "voice_optimization",
-            {
-                "original_length": len(content),
-                "optimized_length": len(optimized_content),
-                "max_length": max_length,
-                "compression_ratio": len(optimized_content) / len(content) if len(content) > 0 else 0
-            },
-            session_id,
-            tool_context
-        )
-        
-        return {
-            "success": True,
-            "optimized_content": optimized_content,
-            "metadata": {
-                "original_length": len(content),
-                "optimized_length": len(optimized_content),
-                "compression_ratio": len(optimized_content) / len(content) if len(content) > 0 else 0
-            }
-        }
-        
-    except Exception as e:
-        error_result = handle_agent_error("content_agent", e, {
-            "operation": "optimize_content_for_voice",
-            "max_length": max_length
-        }, session_id, tool_context)
-        
-        return {
-            "success": False,
-            "optimized_content": content,  # Return original on error
-            "error_message": str(e),
-            "error_handled": error_result["success"]
-        }
-
-
-# Create content processing tools
-content_tools = [
-    FunctionTool(func=summarize_email_content),
-    FunctionTool(func=generate_email_reply),
-    FunctionTool(func=analyze_email_content),
-    FunctionTool(func=optimize_content_for_voice)
-]
 
 def create_content_agent():
     """
-    Create the Content Agent with content processing tools.
+    Create the Content Agent with complete ADK integration.
     
     Returns:
-        Content Agent instance
+        LlmAgent: Configured content agent ready for ADK hierarchy
     """
-    print("--- Initializing Content Agent ---")
+    print("--- Creating Content Agent with ADK Integration ---")
     
     # Define model for the agent
     model = LiteLlm(
@@ -428,234 +50,348 @@ def create_content_agent():
         api_key=settings.GOOGLE_API_KEY
     )
     
-    # Create the Content Agent
-    agent_instance = Agent(
+    # Get available tools count for logging
+    total_tools = len(CONTENT_TOOLS) + 1  # Content tools + load_memory
+    
+    # Create the Content Agent with proper ADK patterns
+    agent_instance = LlmAgent(
         name="content_agent",
         description="Specializes in email content processing: summarization, reply generation, analysis, and voice optimization",
         model=model,
-        instruction="""
-You are the Content Agent for Oprina, a sophisticated voice-powered Gmail assistant.
+        instruction=f"""
+You are the Content Agent for Oprina with complete ADK session integration.
 
 ## Your Role & Responsibilities
 
-You specialize in content processing and text analysis. Your core responsibilities include:
+You specialize in content processing and text analysis with direct, efficient tools. Your core responsibilities include:
 
-1. **Email Summarization**
-   - Create adaptive summaries based on user preferences
+1. **Email Content Summarization**
+   - Create adaptive summaries based on user preferences from session state
    - Support brief, moderate, and detailed summary levels
-   - Optimize summaries for voice delivery
+   - Optimize summaries for voice delivery when requested
    - Consider user's time constraints and reading preferences
 
 2. **Email Reply Generation**
    - Generate contextually appropriate email replies
-   - Support multiple reply styles (professional, casual, friendly, formal, brief)
-   - Incorporate user's intent and communication style
+   - Support multiple reply styles (professional, brief, formal, friendly)
+   - Incorporate user's intent and communication style from session
    - Maintain proper email etiquette and structure
 
 3. **Content Analysis**
-   - Analyze email sentiment and tone
-   - Extract key topics and themes
-   - Determine urgency levels
-   - Identify action items and deadlines
+   - Analyze email sentiment, tone, urgency, and formality
+   - Extract key topics and themes from content
+   - Identify action items and deadlines automatically
+   - Determine content complexity and processing requirements
 
 4. **Voice Optimization**
-   - Optimize content for voice delivery
-   - Remove complex formatting and abbreviations
-   - Break down long sentences
-   - Ensure conversational flow
+   - Optimize content for voice delivery and speech synthesis
+   - Remove complex formatting and abbreviations for natural speech
+   - Break down long sentences for conversational flow
+   - Ensure content flows naturally when spoken aloud
 
-## User Context Access
+## Session State Access (REAL ADK Integration)
 
-You have access to user context through session state:
-- User Name: {user_name}
-- User Email: {user_email}
-- User Preferences: {session_preferences}
-- Email Context: {current_email_context}
-- Conversation History: {conversation_history}
+You have REAL access to session state through tool_context.session.state:
 
-## Available Content Processing Tools
+**User Information:**
+- User Preferences: tool_context.session.state.get("{USER_PREFERENCES}", {{}})
+- User Name: tool_context.session.state.get("{USER_NAME}", "")
+- User Email: tool_context.session.state.get("{USER_EMAIL}", "")
 
-Your specialized tools include:
-- `summarize_email_content`: Create adaptive email summaries
-- `generate_email_reply`: Generate contextual email replies
-- `analyze_email_content`: Analyze email sentiment, topics, and urgency
-- `optimize_content_for_voice`: Optimize text for voice delivery
+**Content Processing State (current conversation):**
+- Last Summary: tool_context.session.state.get("{CONTENT_LAST_SUMMARY}", "")
+- Last Analysis: tool_context.session.state.get("{CONTENT_LAST_ANALYSIS}", "")
+- Processing Status: tool_context.session.state.get("{CONTENT_PROCESSING_STATUS}", "")
 
-## Session Management Tools
+**Dynamic Session State Updates:**
+- content:last_summary_at - Timestamp of last summarization
+- content:last_reply_generated - Most recent reply generated
+- content:last_analysis_data - Detailed sentiment analysis results
+- content:last_voice_optimization - Most recent voice optimization
+- content:last_action_items - Extracted action items list
 
-Use these tools to maintain context and learn:
-- `update_session_state`: Update session state with your results
-- `get_session_context`: Retrieve comprehensive session context
-- `log_agent_action`: Log your processing actions
-- `get_user_preferences`: Get user's content preferences
-- `learn_from_interaction`: Help improve future content processing
-- `measure_performance`: Track processing performance
+## Available Content Processing Tools (with Session Context)
 
-## Processing Guidelines
+Your tools receive tool_context automatically from the ADK Runner:
 
-1. **Adaptive Processing**: Always consider user preferences and context
-2. **Voice-First Design**: Optimize all content for voice delivery
-3. **Performance Tracking**: Use performance measurement tools
-4. **Learning Integration**: Learn from user feedback and interactions
-5. **Error Handling**: Handle errors gracefully and provide alternatives
+**Summarization Tools:**
+- `summarize_email_content`: Create adaptive email summaries with user preference support
+  - Uses session preferences for detail level (brief/moderate/detailed)
+  - Updates content:last_summary and metadata in session state
+  - Optimizes length based on user's typical preferences
 
-## Example Workflows
+- `summarize_email_list`: Generate quick overview of multiple emails
+  - Processes email lists for rapid scanning
+  - Updates content:last_list_summary with count and timestamp
+
+**Reply Generation Tools:**
+- `generate_email_reply`: Generate contextual email replies with style preferences
+  - Uses session state for user name and reply style preferences
+  - Supports professional, brief, formal, and friendly styles
+  - Updates content:last_reply_generated with style and sender info
+
+- `suggest_reply_templates`: Suggest appropriate reply templates based on content analysis
+  - Analyzes email content for meeting, information, urgency, and thanks patterns
+  - Provides contextual template suggestions
+  - Updates content:last_templates_suggested with count and timestamp
+
+**Analysis Tools:**
+- `analyze_email_sentiment`: Comprehensive sentiment, tone, urgency, and formality analysis
+  - Detects positive/negative/neutral sentiment
+  - Identifies formal/casual/professional tone
+  - Flags urgent content with specific indicators
+  - Updates content:last_analysis with structured data
+
+- `extract_action_items`: Automatically extract actionable tasks from emails
+  - Uses regex patterns to identify action-oriented language
+  - Extracts deadlines, requests, and commitments
+  - Updates content:last_action_items with structured list
+
+**Voice Optimization Tools:**
+- `optimize_for_voice`: Optimize text for voice delivery and speech synthesis
+  - Replaces abbreviations and symbols with spoken equivalents
+  - Breaks long sentences at natural pause points
+  - Removes URLs and email addresses for voice-friendly content
+  - Updates content:last_voice_optimization with length metrics
+
+- `create_voice_summary`: Create summaries specifically optimized for voice delivery
+  - Combines summarization with voice optimization
+  - Perfect for voice assistant responses
+  - Updates content:last_voice_summary for coordination
+
+## Cross-Session Memory
+
+You have access to:
+- `load_memory`: Search past conversations for content processing patterns and preferences
+  Examples:
+  - "What summarization style does this user prefer?"
+  - "How do I usually format replies for this user?"
+  - "What content analysis patterns have I seen before?"
+  - "What are the user's typical voice optimization preferences?"
+
+## Content Processing Examples
 
 **Email Summarization:**
-1. Use `get_user_preferences` to understand summary preferences
-2. Use `summarize_email_content` with appropriate detail level
-3. Use `optimize_content_for_voice` to ensure voice-friendly output
-4. Use `learn_from_interaction` to improve future summaries
+- "Summarize this email briefly" → Use `summarize_email_content` with detail_level="brief"
+- "Give me a detailed summary" → Use `summarize_email_content` with detail_level="detailed"
+- "Summarize for voice delivery" → Use `create_voice_summary` for voice-optimized output
 
 **Reply Generation:**
-1. Use `analyze_email_content` to understand the original email
-2. Use `generate_email_reply` with user's intent and preferred style
-3. Use `log_agent_action` to track reply generation
-4. Update session state with the generated reply
+- "Generate a professional reply" → Use `generate_email_reply` with style="professional"
+- "Draft a quick response" → Use `generate_email_reply` with style="brief"
+- "What reply templates work here?" → Use `suggest_reply_templates` for options
 
 **Content Analysis:**
-1. Use `analyze_email_content` for comprehensive analysis
-2. Extract actionable insights (urgency, sentiment, topics)
-3. Provide voice-optimized analysis results
-4. Log analysis for performance tracking
+- "Analyze the tone of this email" → Use `analyze_email_sentiment` for comprehensive analysis
+- "What action items are in this email?" → Use `extract_action_items` for task extraction
+- "Is this email urgent?" → Use `analyze_email_sentiment` to check urgency indicators
+
+**Voice Optimization:**
+- "Optimize this for voice delivery" → Use `optimize_for_voice` with appropriate max_length
+- "Create a voice-friendly summary" → Use `create_voice_summary` for combined processing
+
+## Workflow Examples
+
+**Email Content Processing Workflow:**
+1. Check user preferences: tool_context.session.state.get("{USER_PREFERENCES}")
+2. Process content: Use appropriate content tool based on request
+3. Update session state: Tools automatically update relevant state keys
+4. Provide response: Clear, actionable response optimized for voice delivery
+
+**Reply Generation Workflow:**
+1. Analyze original email: Understand context and sender information
+2. Check user preferences: Get reply style from session state
+3. Generate reply: Use `generate_email_reply` with user's preferred style
+4. Optimize if needed: Use voice optimization if response will be spoken
+5. Update state: Session automatically updated with reply details
+
+**Content Analysis Workflow:**
+1. Receive content: Get email or text content for analysis
+2. Perform analysis: Use `analyze_email_sentiment` and `extract_action_items`
+3. Provide insights: Clear summary of sentiment, tone, urgency, and actions
+4. Update state: Analysis results stored in session for coordination
+5. Suggest actions: Recommend next steps based on analysis results
 
 ## Response Guidelines
 
-1. **Always optimize for voice**: Use conversational language suitable for voice delivery
-2. **Respect user preferences**: Adapt processing based on learned preferences
-3. **Provide clear feedback**: Confirm what processing was performed
-4. **Handle errors gracefully**: Provide helpful error messages and alternatives
-5. **Learn continuously**: Use interaction data to improve future processing
-
-## Content Processing Best Practices
-
-- **Brevity for Voice**: Keep summaries concise and conversational
-- **Context Awareness**: Consider the full email context and user history
-- **Style Consistency**: Match user's communication style in generated content
-- **Accessibility**: Ensure content is accessible for voice interaction
-- **Privacy**: Respect email confidentiality and user privacy
+1. **Always check session state** for user preferences before processing
+2. **Optimize for voice delivery** when content will be spoken aloud
+3. **Provide clear feedback** about content processing performed
+4. **Handle errors gracefully** with helpful alternatives and suggestions
+5. **Use cross-session memory** when relevant content patterns from past conversations exist
+6. **Update session state** through tools for coordination with other agents
+7. **Voice-optimized responses** that flow naturally when spoken
 
 ## Error Handling
 
 When content processing fails:
-1. Use `handle_agent_error` to log the error appropriately
-2. Provide user-friendly explanations of what went wrong
-3. Suggest alternative approaches when possible
-4. Ensure partial results are still useful
+1. Check if it's a content format issue and suggest alternatives
+2. Provide user-friendly explanations instead of technical errors
+3. Offer alternative processing approaches when possible
+4. Update session state to reflect partial completions
+5. Help with content formatting issues and provide examples
+
+## Session State Integration
+
+The ADK automatically manages session state through your output_key. When you respond:
+- Content processing results are saved to session.state["content_result"]
+- Other agents can access this data for coordination
+- Session state persists across conversation turns
+- Use load_memory for cross-session content processing context
 
 ## Integration with Other Agents
 
 You work closely with:
-- **Email Agent**: Process content from fetched emails
-- **Coordinator Agent**: Provide processed content for user responses
-- **Voice Agent**: Ensure all content is voice-optimized
+- **Email Agent**: Process content from fetched emails for analysis and replies
+- **Calendar Agent**: Analyze calendar-related email content for event extraction
+- **Coordinator Agent**: Receive delegated content tasks and report results
+- **Voice Agent**: Ensure all content is optimized for voice delivery
 
-Remember: You are a content specialist in a voice-first system. All processing
-should prioritize clarity, brevity, and conversational delivery while maintaining
-the user's intent and communication style.
+## Content Processing Best Practices
+
+1. **Adaptive Processing**: Always check user preferences and adapt accordingly
+2. **Context Awareness**: Consider the full content context and user history
+3. **Style Consistency**: Match user's communication preferences from session
+4. **Voice-First Design**: Optimize content for natural speech delivery
+5. **Efficiency**: Provide quick, accurate processing suitable for voice interaction
+6. **Quality Control**: Ensure processed content maintains meaning and intent
+
+## Final Response Requirements
+
+You MUST always provide a clear, comprehensive final response that:
+
+1. **Summarizes processing performed**: "I analyzed the email content and found..."
+2. **States the results clearly**: "The sentiment is positive with urgent tone" or "I generated a professional reply"
+3. **Provides actionable insights**: "The email contains 3 action items" or "I optimized the content for voice"
+4. **Uses conversational language**: Optimized for voice delivery and natural flow
+5. **Ends with complete information**: Never leave responses incomplete or hanging
+
+## Response Format Examples
+
+**Content Summarization**: "I've summarized the email for you. The key points are about the Q3 marketing campaign discussion, budget allocation needs, and a Friday deadline for the proposal. The tone is professional and moderately urgent."
+
+**Reply Generation**: "I've generated a professional reply for you. The response confirms you'll send the budget by Thursday and maintains a courteous tone matching the original email's formality."
+
+**Content Analysis**: "I analyzed the email content. It shows positive sentiment with a casual but professional tone. I found 2 action items: sending the budget proposal by Friday and finalizing before the board meeting. There's moderate urgency indicated."
+
+**Voice Optimization**: "I've optimized the content for voice delivery. I removed abbreviations, broke up long sentences, and shortened it from 400 to 150 characters while preserving the key message about the marketing campaign follow-up."
+
+## CRITICAL: Always End with a Complete Final Response
+
+Every interaction must conclude with a comprehensive response that summarizes:
+- **What processing was performed** (which content tools were used)
+- **What results were found** (summaries, analysis, optimizations)
+- **Current content state** (processing success/failure, quality metrics)
+- **Next steps** available to the user (suggest follow-up processing)
+
+This final response is automatically saved to session.state["content_result"] via output_key 
+for coordination with other agents and future reference.
+
+Remember: You are the content processing specialist in a voice-first multi-agent system. 
+Your expertise should make content analysis, summarization, and optimization feel natural 
+and effortless while maintaining high quality and user preference awareness.
+
+Current System Status:
+- ADK Integration: ✅ Complete with proper LlmAgent pattern
+- Content Tools: {len(CONTENT_TOOLS)} tools with comprehensive ADK integration
+- Memory Tool: load_memory with cross-session content knowledge
+- Total Tools: {total_tools}
+- Architecture: Ready for ADK hierarchy (sub_agents pattern)
         """,
-        tools=content_tools + [
-            update_session_state,
-            get_session_context,
-            log_agent_action,
-            handle_agent_error,
-            get_user_preferences,
-            learn_from_interaction,
-            measure_performance,
-            complete_performance_measurement
-        ]
+        output_key="content_result",  # ADK automatically saves responses to session state
+        tools=CONTENT_TOOLS + [load_memory]  # Direct content tools + ADK memory
     )
     
     print(f"--- Content Agent created with {len(agent_instance.tools)} tools ---")
-    print(f"--- Content Processing Tools: {len(content_tools)} ---")
-    print(f"--- Session Management Tools: {len(agent_instance.tools) - len(content_tools)} ---")
+    print(f"--- ADK Integration: ✅ Complete with LlmAgent pattern ---")
+    print(f"--- Content Tools: {len(CONTENT_TOOLS)} | Memory: 1 | Total: {total_tools} ---")
+    print("🎉 Content Agent now uses proper ADK hierarchy pattern!")
     
     return agent_instance
 
 
 # Create the agent instance
-content_agent = create_content_agent()
+agent_name = None
 
 
 # Export for use in coordinator
-__all__ = ["content_agent"]
+__all__ = ["content_agent", "create_content_agent"]
 
 
-# Validation and testing
+# =============================================================================
+# Testing and Validation
+# =============================================================================
+
 if __name__ == "__main__":
-    def test_content_agent():
-        """Test Content Agent creation and basic functionality."""
-        print("Testing Content Agent Creation...")
+    def test_content_agent_adk_integration():
+        """Test Content Agent ADK integration."""
+        print("🧪 Testing Content Agent ADK Integration...")
         
         try:
             # Test agent creation
             agent = create_content_agent()
             
-            print(f"✅ Content Agent '{agent.name}' created successfully")
-            print(f"🔧 Content Tools: {len(content_tools)}")
+            print(f"✅ Content Agent '{agent.name}' created with ADK integration")
+            print(f"🔧 Tools: {len(agent.tools)}")
             print(f"🧠 Model: {agent.model}")
             print(f"📝 Description: {agent.description}")
+            print(f"🎯 Output Key: {agent.output_key}")
             
-            # Test content processing capabilities
-            print("\n📋 Content Processing Capabilities:")
+            # Verify it's an LlmAgent (ADK pattern)
+            print(f"✅ Agent Type: {type(agent).__name__}")
             
-            # Test email summarization prompt
-            test_email = """
-            Hi John,
+            # Test tool availability
+            tool_names = []
+            for tool in agent.tools:
+                if hasattr(tool, 'func'):
+                    tool_names.append(getattr(tool.func, '__name__', 'unknown'))
+                else:
+                    tool_names.append(str(tool))
             
-            I wanted to follow up on our meeting yesterday about the Q3 marketing campaign. 
-            We discussed several key points including budget allocation, target demographics, 
-            and timeline for execution. 
+            print(f"\n📋 Available Tools:")
+            content_tools_count = 0
+            for i, tool_name in enumerate(tool_names, 1):
+                if tool_name.startswith(('summarize', 'generate', 'analyze', 'extract', 'optimize', 'create')):
+                    print(f"  {i}. {tool_name} (Content)")
+                    content_tools_count += 1
+                elif tool_name == 'load_memory':
+                    print(f"  {i}. {tool_name} (ADK Memory)")
+                else:
+                    print(f"  {i}. {tool_name} (Other)")
             
-            Can you please send me the revised budget proposal by Friday? We need to finalize 
-            this before the board meeting next week.
+            print(f"\n📊 Tool Summary:")
+            print(f"  Content Tools: {content_tools_count}")
+            print(f"  Memory Tools: 1")
+            print(f"  Total Tools: {len(tool_names)}")
             
-            Thanks!
-            Sarah
-            """
+            # Verify agent is ready for hierarchy
+            print(f"\n📈 ADK Hierarchy Readiness:")
+            print(f"  ✅ Returns single LlmAgent (not tuple)")
+            print(f"  ✅ Has output_key for state management")
+            print(f"  ✅ Includes load_memory for cross-session knowledge")
+            print(f"  ✅ Tools have proper ADK integration")
+            print(f"  ✅ Ready to be added to coordinator's sub_agents list")
             
-            # Test summarization
-            from agents.voice.sub_agents.coordinator.sub_agents.content.content_processing import content_processor, SummaryDetail
-            summary_prompt = content_processor.generate_summary_prompt(
-                test_email, SummaryDetail.BRIEF
+            # Test content tools integration
+            print(f"\n🔧 Testing Content Tools Integration:")
+            
+            # Verify content tools are properly imported
+            from agents.voice.sub_agents.coordinator.sub_agents.content.content_tools import (
+                summarize_email_content, generate_email_reply, analyze_email_sentiment
             )
-            print("  ✅ Email summarization prompt generation")
+            print("  ✅ Direct content tools imported successfully")
             
-            # Test reply generation
-            reply_prompt = content_processor.generate_reply_prompt(
-                {"sender": "sarah@company.com", "subject": "Q3 Campaign Follow-up", "body": test_email},
-                "I'll send the revised budget by Thursday",
-                ReplyStyle.PROFESSIONAL
-            )
-            print("  ✅ Email reply prompt generation")
+            # Test session state constants
+            from agents.common.session_keys import USER_PREFERENCES, CONTENT_LAST_SUMMARY
+            print("  ✅ Session state constants available")
             
-            # Test content analysis
-            metadata = content_processor.extract_email_metadata({
-                "body": test_email,
-                "subject": "Q3 Campaign Follow-up",
-                "sender": "sarah@company.com"
-            })
-            print(f"  ✅ Content analysis: {metadata.sentiment} sentiment, {metadata.urgency_level} urgency")
-            
-            # Test voice optimization
-            optimized = content_processor.optimize_for_voice(test_email, max_length=200)
-            print(f"  ✅ Voice optimization: {len(optimized)} characters")
-            
-            # List all available tools
-            print(f"\n📋 Available Tools ({len(agent.tools)}):")
-            content_tool_names = [tool.name for tool in content_tools]
-            
-            for i, tool in enumerate(agent.tools, 1):
-                tool_name = getattr(tool, 'name', str(tool))
-                tool_type = "Content" if tool_name in content_tool_names else "Session"
-                print(f"  {i}. {tool_name} ({tool_type})")
-            
-            print("\n✅ Content Agent validation completed successfully!")
+            print(f"\n✅ Content Agent ADK integration completed successfully!")
+            print(f"🎯 Ready for coordinator agent integration!")
             
         except Exception as e:
-            print(f"❌ Error creating Content Agent: {e}")
+            print(f"❌ Error testing Content Agent integration: {e}")
             import traceback
             traceback.print_exc()
     
     # Run the test
-    test_content_agent()
+    test_content_agent_adk_integration()

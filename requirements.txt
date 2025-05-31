@@ -1,116 +1,59 @@
 # =============================================================================
-# Oprina Voice-Powered Gmail Assistant - Dependencies
-# Updated for Sprint 1: Memory + Agents with Native Audio Gemini
+# Oprina Requirements - Clean ADK Setup
 # =============================================================================
 
 # Core ADK (Agent Development Kit)
 google-adk
 
-# Database & Storage
+# Google AI/Cloud (minimal set to avoid conflicts)
+google-generativeai
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
+# LLM
+litellm
+
+# Database and Storage
 supabase
-redis
+asyncpg
 psycopg2-binary
 
-# Configuration & Environment
-pydantic
-python-dotenv
-
-# Web Framework & API
+# Web Framework and API
 fastapi
-uvicorn[standard]
+uvicorn
+pydantic
+pydantic-settings
+
+# Voice Processing
+speechrecognition
+pyaudio
+pydub
 websockets
+
+# HTTP and Async
+httpx
+aiohttp
+aiofiles
 python-multipart
 
-# Authentication & Security
-python-jose[cryptography]
-passlib[bcrypt]
-cryptography
-
-# HTTP & API Clients
-httpx
-requests
-aiohttp
-
-# Data Processing & Utilities
-pandas
+# Utilities and Data Processing
+python-dotenv
+python-jose
+passlib
+email-validator
 python-dateutil
 pytz
-email-validator
 
-# Async & Task Processing
-asyncio-throttle
-aiofiles
-
-# Logging & Monitoring
+# Logging
 structlog
-rich
+colorama
 
-# Development & Testing Dependencies
+# Development and Testing
 pytest
 pytest-asyncio
 pytest-cov
 black
 isort
-flake8
 mypy
-
-# =============================================================================
-# Installation Instructions
-# =============================================================================
-
-# For development installation:
-# pip install -r requirements.txt
-
-# For production installation (without dev dependencies):
-# pip install google-adk supabase redis psycopg2-binary pydantic python-dotenv fastapi uvicorn websockets python-multipart python-jose passlib cryptography httpx requests aiohttp pandas python-dateutil pytz email-validator asyncio-throttle aiofiles structlog rich
-
-# =============================================================================
-# Key Dependencies Explanation
-# =============================================================================
-
-# google-adk: Agent Development Kit for multi-agent orchestration
-# supabase: Database client for conversation context and chat history
-# redis: Caching layer for email data and agent coordination
-# psycopg2-binary: PostgreSQL adapter for Supabase connections
-# pydantic: Data validation and settings management
-# fastapi: Modern web framework for APIs
-# uvicorn: ASGI server for FastAPI
-
-# =============================================================================
-# System Dependencies (install via package manager)
-# =============================================================================
-
-# Ubuntu/Debian:
-# sudo apt-get update
-# sudo apt-get install -y \
-#     build-essential \
-#     python3-dev \
-#     libffi-dev \
-#     libssl-dev \
-#     libpq-dev \
-#     redis-server
-
-# macOS (via Homebrew):
-# brew install redis postgresql
-
-# Windows:
-# - Install Redis for Windows
-# - Install PostgreSQL
-# - Visual Studio Build Tools may be required for some packages
-
-# =============================================================================
-# Notes
-# =============================================================================
-
-# Voice/Audio Processing: Using Gemini native audio models
-# - gemini-2.5-flash-preview-native-audio-dialog
-# - gemini-2.5-flash-exp-native-audio-thinking-dialog
-# No additional audio libraries needed
-
-# Gmail Integration: Handled by Calvin's MCP server
-# No Gmail API libraries needed in this sprint
-
-# Memory Architecture:
-# - Supabase: Current conversation context + chat history
-# - Redis: Email caching + agent coordination
-# - ADK InMemoryMemoryService: Long-term learning patterns
