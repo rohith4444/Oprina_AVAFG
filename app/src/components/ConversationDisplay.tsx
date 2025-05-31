@@ -67,15 +67,6 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
         )}
         <div ref={messagesEndRef}></div>
       </div>
-      
-      <div className="conversation-input">
-        <input 
-          type="text" 
-          placeholder="Type your message..." 
-          className="text-input"
-        />
-        <button className="send-button">Send</button>
-      </div>
     </div>
   );
 };

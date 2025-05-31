@@ -2,6 +2,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: #f8f9fa;
 }
 
 .auth-container {
@@ -14,25 +15,33 @@
 
 .auth-card {
   width: 100%;
-  max-width: 450px;
-  background-color: var(--background);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 2rem;
-  animation: fadeIn 0.5s ease-out;
 }
 
 .auth-title {
   font-size: 1.75rem;
+  font-weight: 600;
   text-align: center;
-  margin-bottom: 1.5rem;
+  color: #1a1a1a;
+  margin-bottom: 0.5rem;
+}
+
+.auth-subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
 }
 
 .auth-error {
-  background-color: #FEE2E2;
-  color: #DC2626;
+  background-color: #fee2e2;
+  color: #dc2626;
   padding: 0.75rem;
-  border-radius: 0.25rem;
+  border-radius: 6px;
   margin-bottom: 1.5rem;
   font-size: 0.875rem;
 }
@@ -41,51 +50,149 @@
   margin-bottom: 1.5rem;
 }
 
-.auth-divider {
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.form-label span {
+  color: #dc2626;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #5b7cff;
+  box-shadow: 0 0 0 3px rgba(91, 124, 255, 0.1);
+}
+
+.password-input-wrapper {
   position: relative;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.remember-me input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+
+.auth-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #000;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.auth-button:hover {
+  background-color: #1a1a1a;
+}
+
+.auth-button:disabled {
+  background-color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
   text-align: center;
   margin: 1.5rem 0;
+  font-size: 0.875rem;
+  color: #6b7280;
 }
 
 .auth-divider::before,
 .auth-divider::after {
   content: '';
-  position: absolute;
-  top: 50%;
-  width: 45%;
-  height: 1px;
-  background-color: var(--border);
-}
-
-.auth-divider::before {
-  left: 0;
-}
-
-.auth-divider::after {
-  right: 0;
+  flex: 1;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .auth-divider span {
-  display: inline-block;
-  padding: 0 0.5rem;
-  background-color: var(--background);
-  position: relative;
-  z-index: 1;
-  color: var(--text);
-  font-size: 0.875rem;
+  margin: 0 1rem;
+}
+
+.google-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.google-button:hover {
+  background-color: #f8f9fa;
+  border-color: #d1d5db;
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .auth-footer {
   margin-top: 1.5rem;
   text-align: center;
   font-size: 0.875rem;
+  color: #4b5563;
 }
 
 .auth-link {
-  color: var(--primary-blue);
+  color: #5b7cff;
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s ease;
 }
 
 .auth-link:hover {
@@ -97,18 +204,10 @@
   align-items: flex-start;
   gap: 0.5rem;
   font-size: 0.875rem;
+  color: #4b5563;
+  margin-bottom: 1.5rem;
 }
 
 .terms-checkbox input[type="checkbox"] {
   margin-top: 0.25rem;
-}
-
-@media (max-width: 480px) {
-  .auth-card {
-    padding: 1.5rem;
-  }
-  
-  .auth-title {
-    font-size: 1.5rem;
-  }
 }

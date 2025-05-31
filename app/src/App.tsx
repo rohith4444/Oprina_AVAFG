@@ -5,6 +5,8 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
+import ContactPage from './pages/ContactPage';
+import SettingsPage from './pages/SettingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -21,6 +23,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/contact" 
+            element={
+              <ProtectedRoute>
+                <ContactPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             } 
           />

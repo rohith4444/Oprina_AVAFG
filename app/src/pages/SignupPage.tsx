@@ -1,9 +1,9 @@
+// ✅ FIXED LoginPage.tsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ToggleLeft as Google } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import Button from '../components/Button';
 import Footer from '../components/Footer';
 import '../styles/AuthPages.css';
 
@@ -11,6 +11,8 @@ const SignupPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup, loginWithGoogle } = useAuth();
@@ -18,22 +20,22 @@ const SignupPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password || !confirmPassword) {
       setError('Please fill in all fields');
       return;
     }
-    
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
-    
+
     try {
       setError('');
       setLoading(true);
@@ -52,11 +54,10 @@ const SignupPage: React.FC = () => {
       setError('');
       setLoading(true);
       await loginWithGoogle();
-      navigate('/dashboard');
+      // Supabase will redirect to dashboard
     } catch (err) {
       setError('Failed to sign up with Google.');
       console.error(err);
-    } finally {
       setLoading(false);
     }
   };
@@ -64,84 +65,119 @@ const SignupPage: React.FC = () => {
   return (
     <div className="auth-page">
       <Navbar />
-      
       <div className="auth-container">
         <div className="auth-card">
-          <h1 className="auth-title">Sign Up</h1>
-          
+          <h1 className="auth-title">Sign up for Oprina</h1>
+          <p className="auth-subtitle">Create your account to get started</p>
+
           {error && <div className="auth-error">{error}</div>}
-          
+
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="email" className="form-label">Email</label>
+              <label className="form-label" htmlFor="email">
+                Email <span>*</span>
+              </label>
               <input
                 type="email"
                 id="email"
                 className="form-input"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
                 required
               />
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="password" className="form-label">Password</label>
-              <input
-                type="password"
-                id="password"
-                className="form-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-                required
-              />
+              <label className="form-label" htmlFor="password">
+                Password <span>*</span>
+              </label>
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  className="form-input"
+                  placeholder="Create a password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="confirm-password" className="form-label">Confirm Password</label>
-              <input
-                type="password"
-                id="confirm-password"
-                className="form-input"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={loading}
-                required
-              />
+              <label className="form-label" htmlFor="confirm-password">
+                Confirm Password <span>*</span>
+              </label>
+              <div className="password-input-wrapper">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  id="confirm-password"
+                  className="form-input"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
-            
-            <div className="form-group terms-checkbox">
+
+            <div className="terms-checkbox">
               <input type="checkbox" id="terms" required />
               <label htmlFor="terms">
-                I agree to the <Link to="/terms" className="auth-link">Terms of Service</Link> and <Link to="/privacy" className="auth-link">Privacy Policy</Link>
+                I agree to the{' '}
+                <Link to="/terms" className="auth-link">Terms of Service</Link>
+                {' '}and{' '}
+                <Link to="/privacy" className="auth-link">Privacy Policy</Link>
               </label>
             </div>
-            
-            <Button
+
+            <button
               type="submit"
-              variant="primary"
-              fullWidth
+              className="auth-button"
               disabled={loading}
             >
-              {loading ? 'Creating account...' : 'Sign Up'}
-            </Button>
+              {loading ? 'Creating account...' : 'Create Account'}
+            </button>
           </form>
-          
+
           <div className="auth-divider">
-            <span>OR</span>
+            <span>Or continue with</span>
           </div>
-          
-          <Button
-            variant="outline"
-            fullWidth
+
+          <button
+            type="button"
+            className="google-button"
             onClick={handleGoogleSignUp}
             disabled={loading}
-            icon={<Google size={18} />}
           >
+            <img
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+              alt="Google"
+              className="google-icon"
+            />
             Sign up with Google
-          </Button>
-          
+          </button>
+
           <div className="auth-footer">
             Already have an account?{' '}
             <Link to="/login" className="auth-link">
@@ -150,7 +186,6 @@ const SignupPage: React.FC = () => {
           </div>
         </div>
       </div>
-      
       <Footer />
     </div>
   );

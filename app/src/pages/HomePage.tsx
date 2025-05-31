@@ -1,3 +1,4 @@
+// ✅ FIXED SignupPage.tsx + HomePage.tsx integration
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Mic, Zap, Shield } from 'lucide-react';
@@ -13,7 +14,7 @@ const HomePage: React.FC = () => {
   return (
     <div className="home-page">
       <Navbar />
-      
+
       <section className="hero">
         <div className="hero-content">
           <h1 className="hero-title">
@@ -25,8 +26,8 @@ const HomePage: React.FC = () => {
           <p className="hero-subtitle">
             Manage your inbox through natural conversation with an intelligent, visual assistant
           </p>
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             className="hero-cta"
             onClick={() => navigate('/signup')}
           >
@@ -34,27 +35,27 @@ const HomePage: React.FC = () => {
           </Button>
         </div>
       </section>
-      
+
       <section className="features">
         <div className="container">
           <h2 className="section-title">Why Choose Oprina</h2>
           <div className="features-grid">
-            <FeatureCard 
+            <FeatureCard
               icon={<Mic />}
               title="Natural Voice Control"
               description="Use your voice to compose, read, and manage emails with natural language commands."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<Mail />}
               title="Seamless Gmail Integration"
               description="Connect directly to your Gmail account for instant access to your inbox."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<Zap />}
               title="Intelligent Responses"
               description="AI-powered suggestions help you respond to emails quickly and effectively."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<Shield />}
               title="Secure & Private"
               description="Your data is encrypted and protected. We never store your emails or content."
@@ -62,7 +63,7 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
-      
+
       <section className="how-it-works">
         <div className="container">
           <h2 className="section-title">How It Works</h2>
@@ -91,7 +92,7 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
-      
+
       <section className="cta-section">
         <div className="container">
           <div className="cta-card">
@@ -99,8 +100,8 @@ const HomePage: React.FC = () => {
             <p className="cta-text">
               Join thousands of users who are already saving time with voice-powered email management.
             </p>
-            <Button 
-              variant="primary" 
+            <Button
+              variant="primary"
               className="cta-button"
               onClick={() => navigate('/signup')}
             >
@@ -109,7 +110,7 @@ const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
-      
+
       <Footer />
     </div>
   );

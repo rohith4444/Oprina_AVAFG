@@ -1,15 +1,17 @@
+// ✅ FIXED LoginPage.tsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ToggleLeft as Google } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import Button from '../components/Button';
 import Footer from '../components/Footer';
 import '../styles/AuthPages.css';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login, loginWithGoogle } = useAuth();
@@ -17,12 +19,10 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
     }
-    
     try {
       setError('');
       setLoading(true);
@@ -41,11 +41,10 @@ const LoginPage: React.FC = () => {
       setError('');
       setLoading(true);
       await loginWithGoogle();
-      navigate('/dashboard');
+      // Supabase handles redirect, so don't navigate manually here
     } catch (err) {
       setError('Failed to sign in with Google.');
       console.error(err);
-    } finally {
       setLoading(false);
     }
   };
@@ -53,70 +52,97 @@ const LoginPage: React.FC = () => {
   return (
     <div className="auth-page">
       <Navbar />
-      
       <div className="auth-container">
         <div className="auth-card">
-          <h1 className="auth-title">Log In</h1>
-          
+          <h1 className="auth-title">Log in to Oprina</h1>
+          <p className="auth-subtitle">Enter your details below</p>
           {error && <div className="auth-error">{error}</div>}
-          
+
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="email" className="form-label">Email</label>
+              <label className="form-label" htmlFor="email">
+                Email <span>*</span>
+              </label>
               <input
                 type="email"
                 id="email"
                 className="form-input"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
                 required
               />
             </div>
-            
+
             <div className="form-group">
-              <label htmlFor="password" className="form-label">Password</label>
-              <input
-                type="password"
-                id="password"
-                className="form-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-                required
-              />
+              <label className="form-label" htmlFor="password">
+                Password <span>*</span>
+              </label>
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  className="form-input"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
-            
+
             <div className="form-group">
-              <Link to="/forgot-password" className="auth-link">
-                Forgot password?
-              </Link>
+              <div className="remember-me">
+                <input
+                  type="checkbox"
+                  id="remember"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <label htmlFor="remember">Remember me</label>
+                <Link to="/forgot-password" className="auth-link" style={{ marginLeft: 'auto' }}>
+                  Forgot password?
+                </Link>
+              </div>
             </div>
-            
-            <Button
+
+            <button
               type="submit"
-              variant="primary"
-              fullWidth
+              className="auth-button"
               disabled={loading}
             >
-              {loading ? 'Logging in...' : 'Log In'}
-            </Button>
+              {loading ? 'Logging in...' : 'Log in'}
+            </button>
           </form>
-          
+
           <div className="auth-divider">
-            <span>OR</span>
+            <span>Or continue with</span>
           </div>
-          
-          <Button
-            variant="outline"
-            fullWidth
+
+          <button
+            type="button"
+            className="google-button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            icon={<Google size={18} />}
           >
+            <img
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+              alt="Google"
+              className="google-icon"
+            />
             Log in with Google
-          </Button>
-          
+          </button>
+
           <div className="auth-footer">
             Don't have an account?{' '}
             <Link to="/signup" className="auth-link">
@@ -125,7 +151,6 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
       </div>
-      
       <Footer />
     </div>
   );

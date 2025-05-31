@@ -16,63 +16,64 @@ const Avatar: React.FC<AvatarProps> = ({ isListening, isSpeaking }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set up dimensions
     canvas.width = 300;
     canvas.height = 300;
     
-    // Avatar state variables
     let animationFrame: number;
-    let waveRadius = 0;
     
     const drawAvatar = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Draw face
+      // Draw placeholder human avatar
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      // Head
       ctx.beginPath();
-      ctx.arc(150, 150, 100, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.arc(centerX, centerY - 30, 60, 0, Math.PI * 2);
+      ctx.fillStyle = '#E2E8F0';
       ctx.fill();
       ctx.strokeStyle = '#5B7CFF';
       ctx.lineWidth = 3;
       ctx.stroke();
       
-      // Draw eyes
+      // Body
       ctx.beginPath();
-      ctx.arc(120, 130, 10, 0, Math.PI * 2);
-      ctx.arc(180, 130, 10, 0, Math.PI * 2);
+      ctx.moveTo(centerX - 40, centerY + 30);
+      ctx.quadraticCurveTo(centerX, centerY + 120, centerX + 40, centerY + 30);
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fill();
+      ctx.strokeStyle = '#5B7CFF';
+      ctx.stroke();
+      
+      // Face features
+      if (isSpeaking) {
+        // Animated mouth when speaking
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY + 10, 20, 10 + Math.sin(Date.now() / 200) * 5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // Regular smile
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 30, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.stroke();
+      }
+      
+      // Eyes
+      ctx.beginPath();
+      ctx.arc(centerX - 20, centerY - 20, 5, 0, Math.PI * 2);
+      ctx.arc(centerX + 20, centerY - 20, 5, 0, Math.PI * 2);
       ctx.fillStyle = '#000000';
       ctx.fill();
       
-      // Draw mouth based on state
-      ctx.beginPath();
-      if (isSpeaking) {
-        // Speaking mouth (oval shape)
-        ctx.ellipse(150, 180, 20, 15, 0, 0, Math.PI * 2);
-      } else {
-        // Normal smile
-        ctx.arc(150, 170, 30, 0.1 * Math.PI, 0.9 * Math.PI);
-      }
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      
-      // Draw sound waves when listening
+      // Listening animation
       if (isListening) {
-        waveRadius += 1;
-        if (waveRadius > 50) waveRadius = 0;
-        
+        const radius = 80 + Math.sin(Date.now() / 500) * 10;
         ctx.beginPath();
-        ctx.arc(150, 150, 100 + waveRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(79, 209, 197, ${1 - waveRadius / 50})`;
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(79, 209, 197, ${0.5 + Math.sin(Date.now() / 500) * 0.5})`;
         ctx.lineWidth = 2;
         ctx.stroke();
-        
-        if (waveRadius > 25) {
-          ctx.beginPath();
-          ctx.arc(150, 150, 100 + waveRadius - 25, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(74, 222, 128, ${1 - (waveRadius - 25) / 50})`;
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
       }
       
       animationFrame = requestAnimationFrame(drawAvatar);
@@ -87,7 +88,7 @@ const Avatar: React.FC<AvatarProps> = ({ isListening, isSpeaking }) => {
   
   return (
     <div className={`avatar ${isListening ? 'listening' : ''} ${isSpeaking ? 'speaking' : ''}`}>
-      <canvas ref={canvasRef} className="avatar-canvas"></canvas>
+      <canvas ref={canvasRef} className="avatar-canvas" />
     </div>
   );
 };
