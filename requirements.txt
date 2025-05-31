@@ -1,0 +1,59 @@
+# =============================================================================
+# Oprina Requirements - Clean ADK Setup
+# =============================================================================
+
+# Core ADK (Agent Development Kit)
+google-adk
+
+# Google AI/Cloud (minimal set to avoid conflicts)
+google-generativeai
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
+# LLM
+litellm
+
+# Database and Storage
+supabase
+asyncpg
+psycopg2-binary
+
+# Web Framework and API
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+
+# Voice Processing
+speechrecognition
+pyaudio
+pydub
+websockets
+
+# HTTP and Async
+httpx
+aiohttp
+aiofiles
+python-multipart
+
+# Utilities and Data Processing
+python-dotenv
+python-jose
+passlib
+email-validator
+python-dateutil
+pytz
+
+# Logging
+structlog
+colorama
+
+# Development and Testing
+pytest
+pytest-asyncio
+pytest-cov
+black
+isort
+mypy
