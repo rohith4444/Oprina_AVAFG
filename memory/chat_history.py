@@ -14,12 +14,14 @@ Key Features:
 """
 
 import uuid, sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.logging.logger import setup_logger
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from supabase import create_client, Client
+
+# Add project root to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from services.logging.logger import setup_logger
 from config.settings import settings
 
 

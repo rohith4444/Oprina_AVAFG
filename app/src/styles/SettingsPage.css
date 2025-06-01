@@ -1,0 +1,232 @@
+.settings-page {
+  min-height: 100vh;
+  background-color: var(--background-alt);
+  padding: 2rem;
+}
+
+.settings-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  margin-bottom: 2rem;
+}
+
+.back-button:hover {
+  background-color: var(--background);
+}
+
+.settings-title {
+  font-size: 2rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+  color: var(--heading);
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 2rem;
+  background-color: var(--background);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.settings-sidebar {
+  padding: 1.5rem;
+  border-right: 1px solid var(--border);
+  background-color: var(--background);
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 0.375rem;
+  color: var(--text);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 0.5rem;
+}
+
+.tab-button:hover {
+  background-color: var(--background-alt);
+}
+
+.tab-button.active {
+  background-color: var(--background-alt);
+  color: var(--primary-blue);
+  font-weight: 500;
+}
+
+.settings-content {
+  padding: 2rem;
+  background-color: var(--background);
+}
+
+.settings-section {
+  max-width: 600px;
+}
+
+.settings-section h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--heading);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  background-color: var(--background);
+  color: var(--text);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px rgba(91, 124, 255, 0.1);
+}
+
+.connected-apps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background-color: var(--background);
+}
+
+.service-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.service-info h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.service-info p {
+  font-size: 0.875rem;
+  color: var(--text);
+  opacity: 0.7;
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.action-group {
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.action-group:last-child {
+  border-bottom: none;
+}
+
+.action-group h3 {
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: var(--heading);
+}
+
+.password-form {
+  max-width: 400px;
+}
+
+.danger-zone {
+  margin-top: 2rem;
+}
+
+.delete-account {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+.delete-account:hover {
+  background-color: #fee2e2 !important;
+}
+
+.danger-note {
+  font-size: 0.875rem;
+  color: #ef4444;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .settings-sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1rem;
+  }
+  
+  .settings-content {
+    padding: 1rem;
+  }
+  
+  .service-item {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .service-info {
+    flex-direction: column;
+    text-align: center;
+  }
+}
