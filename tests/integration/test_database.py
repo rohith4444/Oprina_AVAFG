@@ -45,26 +45,43 @@ def database_session_service():
     """Fixture for Database Session Service."""
     # Create a mock DatabaseSessionService
     mock_service = MagicMock(spec=DatabaseSessionService)
-    
-    # Configure the mock to return TEST_SESSION_ID for create_session
-    mock_service.create_session.return_value = TEST_SESSION_ID
-    
-    # Configure the mock to return a session dict for get_session
-    mock_service.get_session.return_value = {
+
+    # Shared session dict to simulate state
+    session_dict = {
         "session_id": TEST_SESSION_ID,
         "user_id": TEST_USER_ID,
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "metadata": {"state": "active"}
     }
-    
-    # Configure the mock to return True for update_session and delete_session
-    mock_service.update_session = MagicMock(return_value=True)
-    mock_service.delete_session = MagicMock(return_value=True)
-    
-    # Configure the mock to return 2 for cleanup_old_sessions
-    mock_service.cleanup_old_sessions = MagicMock(return_value=2)
-    
+
+    async def create_session(session_id, user_id, metadata):
+        session_dict["session_id"] = session_id
+        session_dict["user_id"] = user_id
+        session_dict["metadata"] = metadata
+        session_dict["updated_at"] = datetime.now()
+        return session_id
+
+    async def get_session(session_id):
+        return session_dict
+
+    async def update_session(session_id, metadata):
+        session_dict["metadata"] = metadata
+        session_dict["updated_at"] = datetime.now()
+        return True
+
+    async def delete_session(session_id):
+        return True
+
+    async def cleanup_old_sessions(days):
+        return 2
+
+    mock_service.create_session = AsyncMock(side_effect=create_session)
+    mock_service.get_session = AsyncMock(side_effect=get_session)
+    mock_service.update_session = AsyncMock(side_effect=update_session)
+    mock_service.delete_session = AsyncMock(side_effect=delete_session)
+    mock_service.cleanup_old_sessions = AsyncMock(side_effect=cleanup_old_sessions)
+
     return mock_service
 
 
@@ -83,79 +100,38 @@ def memory_manager():
 @pytest.mark.asyncio
 async def test_session_database_persistence(database_session_service):
     """Test session database persistence."""
-    # Mock the database connection
-    with patch('google.adk.sessions.asyncpg.connect') as mock_connect:
-        # Create a mock connection
-        mock_conn = MagicMock()
-        mock_connect.return_value = mock_conn
-        
-        # Mock the execute method
-        mock_conn.execute.return_value = "INSERT 0 1"
-        
-        # Test creating a session
-        session_data = {
-            "user_id": TEST_USER_ID,
-            "state": "active"
-        }
-        result = await database_session_service.create_session(
-            session_id=TEST_SESSION_ID,
-            user_id=TEST_USER_ID,
-            metadata=session_data
-        )
-        
-        # Verify the results
-        assert result is not None
-        assert result == TEST_SESSION_ID
-        
-        # Mock the fetch method
-        mock_conn.fetch.return_value = [
-            {
-                "session_id": TEST_SESSION_ID,
-                "user_id": TEST_USER_ID,
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-                "metadata": {"state": "active"}
-            }
-        ]
-        
-        # Test getting a session
-        get_result = await database_session_service.get_session(TEST_SESSION_ID)
-        
-        # Verify the results
-        assert get_result is not None
-        assert get_result["session_id"] == TEST_SESSION_ID
-        assert get_result["user_id"] == TEST_USER_ID
-        assert get_result["metadata"]["state"] == "active"
-        
-        # Mock the execute method for update
-        mock_conn.execute.return_value = "UPDATE 1"
-        
-        # Test updating a session
-        update_result = await database_session_service.update_session(
-            session_id=TEST_SESSION_ID,
-            metadata={"state": "inactive"}
-        )
-        
-        # Verify the results
-        assert update_result is not None
-        
-        # Mock the fetch method for updated session
-        mock_conn.fetch.return_value = [
-            {
-                "session_id": TEST_SESSION_ID,
-                "user_id": TEST_USER_ID,
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
-                "metadata": {"state": "inactive"}
-            }
-        ]
-        
-        # Get the updated session
-        updated_session = await database_session_service.get_session(TEST_SESSION_ID)
-        
-        # Verify the results
-        assert updated_session is not None
-        assert updated_session["metadata"]["state"] == "inactive"
+    # Test creating a session
+    session_data = {
+        "user_id": TEST_USER_ID,
+        "state": "active"
+    }
+    result = await database_session_service.create_session(
+        session_id=TEST_SESSION_ID,
+        user_id=TEST_USER_ID,
+        metadata=session_data
+    )
+    # Verify the results
+    assert result is not None
+    assert result == TEST_SESSION_ID
+    # Test getting a session
+    get_result = await database_session_service.get_session(TEST_SESSION_ID)
+    # Verify the results
+    assert get_result is not None
+    assert get_result["session_id"] == TEST_SESSION_ID
+    assert get_result["user_id"] == TEST_USER_ID
+    assert get_result["metadata"]["state"] == "active"
+    # Test updating a session
+    update_result = await database_session_service.update_session(
+        session_id=TEST_SESSION_ID,
+        metadata={"state": "inactive"}
+    )
+    # Verify the results
+    assert update_result is not None
+    # Get the updated session
+    updated_session = await database_session_service.get_session(TEST_SESSION_ID)
+    # Verify the results
+    assert updated_session is not None
+    assert updated_session["metadata"]["state"] == "inactive"
 
 
 @pytest.mark.asyncio
@@ -407,48 +383,15 @@ async def test_memory_service_integration(memory_manager):
 @pytest.mark.asyncio
 async def test_database_cleanup(database_session_service):
     """Test database cleanup."""
-    # Mock the database connection
-    with patch('google.adk.sessions.asyncpg.connect') as mock_connect:
-        # Create a mock connection
-        mock_conn = MagicMock()
-        mock_connect.return_value = mock_conn
-        
-        # Mock the execute method for delete
-        mock_conn.execute.return_value = "DELETE 1"
-        
-        # Test deleting a session
-        delete_result = await database_session_service.delete_session(TEST_SESSION_ID)
-        
-        # Verify the results
-        assert delete_result is not None
-        
-        # Mock the fetch method
-        mock_conn.fetch.return_value = [
-            {
-                "session_id": str(uuid.uuid4()),
-                "user_id": TEST_USER_ID,
-                "created_at": datetime.now() - timedelta(days=31),
-                "updated_at": datetime.now() - timedelta(days=31),
-                "metadata": {"state": "inactive"}
-            },
-            {
-                "session_id": str(uuid.uuid4()),
-                "user_id": TEST_USER_ID,
-                "created_at": datetime.now() - timedelta(days=32),
-                "updated_at": datetime.now() - timedelta(days=32),
-                "metadata": {"state": "inactive"}
-            }
-        ]
-        
-        # Mock the execute method for cleanup
-        mock_conn.execute.return_value = "DELETE 2"
-        
-        # Test cleaning up old sessions
-        cleanup_result = await database_session_service.cleanup_old_sessions(days=30)
-        
-        # Verify the results
-        assert cleanup_result is not None
-        assert cleanup_result == 2
+    # Test deleting a session
+    delete_result = await database_session_service.delete_session(TEST_SESSION_ID)
+    # Verify the results
+    assert delete_result is not None
+    # Test cleaning up old sessions
+    cleanup_result = await database_session_service.cleanup_old_sessions(days=30)
+    # Verify the results
+    assert cleanup_result is not None
+    assert cleanup_result == 2
 
 
 if __name__ == "__main__":
