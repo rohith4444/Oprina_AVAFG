@@ -393,3 +393,24 @@ if __name__ == "__main__":
         print(f"💾 Cross-session memory via load_memory tool")
     else:
         print(f"\n🔧 Please review and fix issues before Voice Agent integration")
+
+class CoordinatorAgent:
+    def __init__(self, mcp_client, *args, **kwargs):
+        self._mcp_client = mcp_client
+        self.email_agent = create_email_agent()
+        self.content_agent = create_content_agent()
+        self.calendar_agent = create_calendar_agent()
+    
+    async def process(self, event):
+        # Route to appropriate sub-agent based on content
+        content = event.get("content", "").lower()
+        
+        if "email" in content or "gmail" in content or "inbox" in content:
+            return await self.email_agent.process(event)
+        elif "calendar" in content or "schedule" in content or "meeting" in content:
+            return await self.calendar_agent.process(event)
+        elif "summarize" in content or "analyze" in content or "content" in content:
+            return await self.content_agent.process(event)
+        else:
+            # Default to email agent if no clear routing
+            return await self.email_agent.process(event)

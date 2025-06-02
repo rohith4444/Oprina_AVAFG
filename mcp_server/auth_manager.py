@@ -47,7 +47,9 @@ class AuthManager:
             Optional[Credentials]: Google credentials if authenticated, None otherwise
         """
         if not self.credentials:
-            token_file = 'token.json'
+            token_file = 'credentials/gmail_token.json'
+            print(f"[DEBUG] Looking for token file at: {os.path.abspath(token_file)}")
+            print(f"[DEBUG] File exists: {os.path.exists(token_file)}")
             if os.path.exists(token_file):
                 try:
                     self.credentials = Credentials.from_authorized_user_file(token_file, [
@@ -59,8 +61,8 @@ class AuthManager:
                     ])
                     if self.credentials and self.credentials.valid:
                         return self.credentials
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error loading credentials from {token_file}: {e}")
         return self.credentials
     
     async def get_gmail_service(self):

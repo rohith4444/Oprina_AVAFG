@@ -243,32 +243,103 @@ class OprinaMemoryManager:
     
     async def get_session(self, user_id: str, session_id: str):
         """
-        Get ADK session by ID.
+        Get an existing session by user_id and session_id.
         
         Args:
             user_id: User identifier
             session_id: Session identifier
             
         Returns:
-            Session object or None
+            Session object or None if not found
         """
         try:
-            session = await self._session_service.get_session(
-                app_name=self.app_name,
-                user_id=user_id,
-                session_id=session_id
-            )
+            self.logger.info(f"Getting session {session_id} for user {user_id}")
+            session = await self._session_service.get_session(user_id, session_id)
             
             if session:
-                self.logger.debug(f"Retrieved session {session_id} for user {user_id}")
+                self.logger.info(f"✅ Session {session_id} retrieved for user {user_id}")
                 return session
             else:
-                self.logger.debug(f"Session {session_id} not found for user {user_id}")
+                self.logger.warning(f"Session {session_id} not found for user {user_id}")
                 return None
                 
         except Exception as e:
             self.logger.error(f"Failed to get session {session_id}: {e}")
-            return None
+            raise
+    
+    async def set_session_state(self, user_id: str, session_id: str, state_data: dict) -> bool:
+        """
+        Set session state data for a specific session.
+        
+        Args:
+            user_id: The user ID
+            session_id: The session ID
+            state_data: The state data to set
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            session = await self.get_session(user_id, session_id)
+            if session:
+                session.state.update(state_data)
+                await self._session_service.save_session(session)
+                self.logger.info(f"Session state updated for {session_id} (user {user_id})")
+                return True
+            else:
+                self.logger.warning(f"Failed to set session state: Session {session_id} not found")
+                return False
+        except Exception as e:
+            self.logger.error(f"Failed to set session state: {str(e)}")
+            return False
+            
+    async def get_session_state(self, user_id: str, session_id: str) -> dict:
+        """
+        Get session state data for a specific session.
+        
+        Args:
+            user_id: The user ID
+            session_id: The session ID
+            
+        Returns:
+            dict: The session state data, or an empty dict if not found
+        """
+        try:
+            session = await self.get_session(user_id, session_id)
+            if session:
+                self.logger.info(f"Retrieved session state for {session_id} (user {user_id})")
+                return session.state
+            else:
+                self.logger.warning(f"Failed to get session state: Session {session_id} not found")
+                return {}
+        except Exception as e:
+            self.logger.error(f"Failed to get session state: {str(e)}")
+            return {}
+            
+    async def delete_session_state(self, user_id: str, session_id: str) -> bool:
+        """
+        Delete session state data for a specific session.
+        
+        Args:
+            user_id: The user ID
+            session_id: The session ID
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            session = await self.get_session(user_id, session_id)
+            if session:
+                session.state = {}
+                await self._session_service.save_session(session)
+                self.logger.info(f"Session state deleted for {session_id} (user {user_id})")
+                return True
+            else:
+                self.logger.warning(f"Failed to delete session state: Session {session_id} not found")
+                return False
+        except Exception as e:
+            self.logger.error(f"Failed to delete session state: {str(e)}")
+            return False
     
     async def run_agent(
         self, 

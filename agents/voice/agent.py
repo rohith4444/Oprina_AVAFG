@@ -512,3 +512,12 @@ if __name__ == "__main__":
     
     # Run test when file is executed directly
     test_voice_agent_sync()
+
+class VoiceAgent:
+    def __init__(self, mcp_client, *args, **kwargs):
+        self._mcp_client = mcp_client
+        self.coordinator = create_coordinator_agent()
+    
+    async def process(self, event):
+        # Delegate to coordinator agent
+        return await self.coordinator.process(event)

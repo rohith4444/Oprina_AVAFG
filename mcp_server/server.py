@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from mcp_server.auth_manager import AuthManager
 from mcp_server.tools.gmail_tool import GmailTool
 from mcp_server.tools.calendar_tool import CalendarTool
+from mcp_server.tools.content_tool import ContentTool
 
 # Configure logging
 logging.basicConfig(
@@ -49,17 +50,20 @@ class MCPServer:
         self.auth_manager = AuthManager()
         self.gmail_tool = GmailTool(self.auth_manager)
         self.calendar_tool = CalendarTool(self.auth_manager)
+        self.content_tool = ContentTool()
         self.clients = set()
+        self.client_sessions = {}  # Map websocket to session state
     
-    async def handle_client(self, websocket, path):
+    async def handle_client(self, websocket):
         """
         Handle a client connection.
         
         Args:
             websocket: WebSocket connection
-            path: Request path
         """
         self.clients.add(websocket)
+        # Initialize session state for this client
+        self.client_sessions[websocket] = {"gmail_connected": False, "calendar_connected": False}
         logger.info(f"Client connected. Total clients: {len(self.clients)}")
         
         try:
@@ -69,8 +73,8 @@ class MCPServer:
                     request = json.loads(message)
                     logger.info(f"Received request: {request}")
                     
-                    # Handle the request
-                    response = await self.handle_request(request)
+                    # Pass the session state for this client
+                    response = await self.handle_request(request, self.client_sessions[websocket])
                     
                     # Send the response
                     await websocket.send(json.dumps(response))
@@ -91,25 +95,22 @@ class MCPServer:
             logger.info("Client connection closed")
         finally:
             self.clients.remove(websocket)
+            # Clean up session state for this client
+            if websocket in self.client_sessions:
+                del self.client_sessions[websocket]
             logger.info(f"Client disconnected. Total clients: {len(self.clients)}")
     
-    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_request(self, request: Dict[str, Any], session_state: Dict[str, bool]) -> Dict[str, Any]:
         """
         Handle a request from the client.
         
         Args:
             request: Request data
+            session_state: Session state for the client
             
         Returns:
             Dict[str, Any]: Response data
         """
-        # Check if the user is authenticated
-        if not await self.auth_manager.check_auth():
-            return {
-                "status": "error",
-                "message": "Not authenticated with Google services"
-            }
-        
         # Get the tool and action
         tool = request.get("tool")
         action = request.get("action")
@@ -121,12 +122,23 @@ class MCPServer:
                 "message": "Missing tool or action"
             }
         
+        # Skip global auth check for authenticate action
+        if action != "authenticate":
+            # Check if the user is authenticated
+            if not await self.auth_manager.check_auth():
+                return {
+                    "status": "error",
+                    "message": "Not authenticated with Google services"
+                }
+        
         # Handle the request based on the tool and action
         try:
             if tool == "gmail":
-                return await self.handle_gmail_request(action, params)
+                return await self.handle_gmail_request(action, params, session_state)
             elif tool == "calendar":
-                return await self.handle_calendar_request(action, params)
+                return await self.handle_calendar_request(action, params, session_state)
+            elif tool == "content":
+                return await self.handle_content_request(action, params)
             else:
                 return {
                     "status": "error",
@@ -139,21 +151,33 @@ class MCPServer:
                 "message": str(e)
             }
     
-    async def handle_gmail_request(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_gmail_request(self, action: str, params: Dict[str, Any], session_state: Dict[str, bool]) -> Dict[str, Any]:
         """
         Handle a Gmail request.
         
         Args:
             action: Action to perform
             params: Action parameters
+            session_state: Session state
             
         Returns:
             Dict[str, Any]: Response data
         """
+        if action == "authenticate":
+            session_state["gmail_connected"] = True
+            logger.info(f"[DIAG] Gmail session state updated: {session_state} (id={id(session_state)})")
+            return {"status": "success", "message": "Gmail authenticated and session state updated."}
+        logger.info(f"[DIAG] Gmail session state at check: {session_state} (id={id(session_state)})")
+        logger.info(f"[DIAG] session_state.get('gmail_connected', False): {session_state.get('gmail_connected', False)}")
+        if not session_state.get("gmail_connected", False):
+            logger.info(f"Gmail not connected. Session state: {session_state}")
+            return {"status": "success", "data": [{"result": "Gmail not connected. Please authenticate first."}]}
         if action == "list_messages":
             query = params.get("query", "")
             max_results = params.get("max_results", 10)
-            messages = await self.gmail_tool.list_messages(query, max_results)
+            logger.info(f"[DIAG] Calling gmail_tool.list_messages with query='{query}', max_results={max_results}")
+            messages = await self.gmail_tool.list_messages(query, max_results, session_state)
+            logger.info(f"[DIAG] gmail_tool.list_messages returned: {messages}")
             return {
                 "status": "success",
                 "data": messages
@@ -210,23 +234,35 @@ class MCPServer:
                 "message": f"Unknown Gmail action: {action}"
             }
     
-    async def handle_calendar_request(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_calendar_request(self, action: str, params: Dict[str, Any], session_state: Dict[str, bool]) -> Dict[str, Any]:
         """
         Handle a Calendar request.
         
         Args:
             action: Action to perform
             params: Action parameters
+            session_state: Session state
             
         Returns:
             Dict[str, Any]: Response data
         """
+        if action == "authenticate":
+            session_state["calendar_connected"] = True
+            logger.info(f"[DIAG] Calendar session state updated: {session_state} (id={id(session_state)})")
+            return {"status": "success", "message": "Calendar authenticated and session state updated."}
+        logger.info(f"[DIAG] Calendar session state at check: {session_state} (id={id(session_state)})")
+        logger.info(f"[DIAG] session_state.get('calendar_connected', False): {session_state.get('calendar_connected', False)}")
+        if not session_state.get("calendar_connected", False):
+            logger.info(f"Calendar not connected. Session state: {session_state}")
+            return {"status": "success", "data": [{"result": "Calendar not connected. Please authenticate first."}]}
         if action == "list_events":
             time_min = params.get("time_min")
             time_max = params.get("time_max")
             max_results = params.get("max_results", 10)
             single_events = params.get("single_events", True)
-            events = await self.calendar_tool.list_events(time_min, time_max, max_results, single_events)
+            logger.info(f"[DIAG] Calling calendar_tool.list_events with time_min={time_min}, time_max={time_max}, max_results={max_results}, single_events={single_events}")
+            events = await self.calendar_tool.list_events(time_min, time_max, max_results, single_events, session_state=session_state)
+            logger.info(f"[DIAG] calendar_tool.list_events returned: {events}")
             return {
                 "status": "success",
                 "data": events
@@ -301,24 +337,104 @@ class MCPServer:
                 "message": f"Unknown Calendar action: {action}"
             }
     
+    async def handle_content_request(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle a Content request.
+        
+        Args:
+            action: Action to perform
+            params: Action parameters
+            
+        Returns:
+            Dict[str, Any]: Response data
+        """
+        if action == "summarize_email_content":
+            content = params.get("content")
+            detail_level = params.get("detail_level", "moderate")
+            if not content:
+                return {
+                    "status": "error",
+                    "message": "Missing content"
+                }
+            return await self.content_tool.summarize_email_content(content, detail_level)
+            
+        elif action == "summarize_email_list":
+            emails = params.get("emails")
+            max_emails = params.get("max_emails", 5)
+            if not emails:
+                return {
+                    "status": "error",
+                    "message": "Missing emails"
+                }
+            return await self.content_tool.summarize_email_list(emails, max_emails)
+            
+        elif action == "generate_email_reply":
+            original_email = params.get("original_email")
+            reply_intent = params.get("reply_intent")
+            style = params.get("style", "professional")
+            if not original_email or not reply_intent:
+                return {
+                    "status": "error",
+                    "message": "Missing original_email or reply_intent"
+                }
+            return await self.content_tool.generate_email_reply(original_email, reply_intent, style)
+            
+        elif action == "analyze_email_sentiment":
+            content = params.get("content")
+            if not content:
+                return {
+                    "status": "error",
+                    "message": "Missing content"
+                }
+            return await self.content_tool.analyze_email_sentiment(content)
+            
+        elif action == "extract_action_items":
+            content = params.get("content")
+            if not content:
+                return {
+                    "status": "error",
+                    "message": "Missing content"
+                }
+            return await self.content_tool.extract_action_items(content)
+            
+        elif action == "optimize_for_voice":
+            content = params.get("content")
+            max_length = params.get("max_length", 200)
+            if not content:
+                return {
+                    "status": "error",
+                    "message": "Missing content"
+                }
+            return await self.content_tool.optimize_for_voice(content, max_length)
+            
+        elif action == "create_voice_summary":
+            content = params.get("content")
+            if not content:
+                return {
+                    "status": "error",
+                    "message": "Missing content"
+                }
+            return await self.content_tool.create_voice_summary(content)
+            
+        else:
+            return {
+                "status": "error",
+                "message": f"Unknown Content action: {action}"
+            }
+    
     async def start(self):
-        """Start the MCP server."""
-        server = await websockets.serve(
-            self.handle_client,
-            self.host,
-            self.port
-        )
+        """
+        Start the MCP server.
+        """
+        server = await websockets.serve(self.handle_client, self.host, self.port)
         logger.info(f"MCP server started on ws://{self.host}:{self.port}")
         await server.wait_closed()
 
 async def main():
-    """Main entry point for the MCP server."""
-    # Get host and port from environment variables
-    host = os.getenv("MCP_HOST", "localhost")
-    port = int(os.getenv("MCP_PORT", "8765"))
-    
-    # Create and start the server
-    server = MCPServer(host, port)
+    """
+    Main entry point for the MCP server.
+    """
+    server = MCPServer()
     await server.start()
 
 if __name__ == "__main__":

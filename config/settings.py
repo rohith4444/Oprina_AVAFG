@@ -215,6 +215,16 @@ class Settings(BaseSettings):
         description="API server port"
     )
     
+    # MCP Server Settings
+    MCP_HOST: str = Field(
+        default="localhost",
+        description="MCP server host"
+    )
+    MCP_PORT: int = Field(
+        default=8001,
+        description="MCP server port"
+    )
+    
     # Frontend Settings
     FRONTEND_URL: str = Field(
         default="http://localhost:3000",

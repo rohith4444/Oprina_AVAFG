@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import the client
-from mcp_server.client import main
+from mcp_server.client import main, MCPClient
 
 # Configure logging
 logging.basicConfig(
@@ -24,6 +24,19 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+async def main():
+    client = MCPClient()
+    await client.connect()
+    try:
+        # Authenticate with Gmail and Calendar first
+        await client.authenticate_gmail()
+        await client.authenticate_calendar()
+        # Now list messages/events
+        await client.list_gmail_messages()
+        await client.list_calendar_events()
+    finally:
+        await client.disconnect()
 
 if __name__ == "__main__":
     try:

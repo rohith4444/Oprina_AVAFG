@@ -233,15 +233,15 @@ def run_oauth_flow(scopes: List[str], service_name: str, port: int = 8080) -> Op
     Returns:
         Credentials object if successful, None otherwise
     """
+    print("DEBUG: Entered run_oauth_flow for", service_name)
     try:
         logger.info(f"Starting OAuth flow for {service_name}...")
-        
         flow = create_oauth_flow(scopes, service_name)
+        # Always print the OAuth URL for manual authentication
+        print("If a browser does not open, please visit this URL to authenticate:", flow.authorization_url()[0])
         creds = flow.run_local_server(port=port)
-        
         logger.info(f"OAuth flow completed successfully for {service_name}")
         return creds
-        
     except Exception as e:
         logger.error(f"OAuth flow failed for {service_name}: {e}")
         return None
@@ -296,6 +296,7 @@ def get_or_create_credentials(
         
         # Need to run OAuth flow
         logger.info(f"Running OAuth flow for {service_name}...")
+        print("DEBUG: About to call run_oauth_flow for", service_name)
         creds = run_oauth_flow(scopes, service_name)
         
         if creds:

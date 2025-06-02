@@ -1,0 +1,21 @@
+# Testing dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.1
+pytest-cov>=4.1.0
+httpx>=0.24.1
+aiohttp>=3.8.5
+faker>=19.3.0
+factory-boy>=3.3.0
+
+# For web testing (Phase 3)
+selenium>=4.11.0
+playwright>=1.37.0
+
+# For performance testing (Phase 4)
+locust>=2.16.1
+aiohttp-load>=0.1.0
+
+# For mocking
+responses>=0.23.3
+pytest-httpserver>=1.0.8 

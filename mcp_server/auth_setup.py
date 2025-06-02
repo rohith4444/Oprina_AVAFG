@@ -35,7 +35,7 @@ SCOPES = [
 async def authenticate():
     """Authenticate with Google services."""
     creds = None
-    token_file = 'token.json'
+    token_file = 'credentials/gmail_token.json'
     
     # Check if token file exists
     if os.path.exists(token_file):

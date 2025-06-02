@@ -10,6 +10,8 @@ import asyncio
 import logging
 import websockets
 from dotenv import load_dotenv
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Configure logging
 logging.basicConfig(
@@ -44,8 +46,12 @@ class MCPClient:
     
     async def connect(self):
         """Connect to the MCP server."""
-        self.websocket = await websockets.connect(self.uri)
-        logger.info(f"Connected to {self.uri}")
+        try:
+            self.websocket = await websockets.connect(self.uri)
+            logger.info(f"Connected to {self.uri}")
+        except Exception as e:
+            logger.error(f"Failed to connect to {self.uri}: {e}")
+            raise
     
     async def disconnect(self):
         """Disconnect from the MCP server."""
@@ -58,7 +64,7 @@ class MCPClient:
         Send a request to the MCP server.
         
         Args:
-            tool: Tool to use (gmail, calendar)
+            tool: Tool to use (gmail, calendar, content)
             action: Action to perform
             params: Action parameters
             
@@ -187,12 +193,141 @@ class MCPClient:
             params["attendees"] = attendees
         
         return await self.send_request("calendar", "create_event", params)
+    
+    # Content tool methods
+    async def summarize_email_content(self, content: str, detail_level: str = "moderate") -> dict:
+        """
+        Summarize email content.
+        
+        Args:
+            content: Email content to summarize
+            detail_level: Detail level for summary (brief, moderate, detailed)
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "summarize_email_content", {
+            "content": content,
+            "detail_level": detail_level
+        })
+    
+    async def summarize_email_list(self, emails: str, max_emails: int = 5) -> dict:
+        """
+        Summarize a list of emails.
+        
+        Args:
+            emails: List of emails to summarize
+            max_emails: Maximum number of emails to summarize
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "summarize_email_list", {
+            "emails": emails,
+            "max_emails": max_emails
+        })
+    
+    async def generate_email_reply(self, original_email: str, reply_intent: str, style: str = "professional") -> dict:
+        """
+        Generate email reply.
+        
+        Args:
+            original_email: Original email content
+            reply_intent: User's intent for the reply
+            style: Reply style (brief, professional, formal, friendly)
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "generate_email_reply", {
+            "original_email": original_email,
+            "reply_intent": reply_intent,
+            "style": style
+        })
+    
+    async def analyze_email_sentiment(self, content: str) -> dict:
+        """
+        Analyze email sentiment.
+        
+        Args:
+            content: Email content to analyze
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "analyze_email_sentiment", {
+            "content": content
+        })
+    
+    async def extract_action_items(self, content: str) -> dict:
+        """
+        Extract action items from email content.
+        
+        Args:
+            content: Email content to analyze
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "extract_action_items", {
+            "content": content
+        })
+    
+    async def optimize_for_voice(self, content: str, max_length: int = 200) -> dict:
+        """
+        Optimize text for voice delivery.
+        
+        Args:
+            content: Text to optimize
+            max_length: Maximum length of optimized text
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "optimize_for_voice", {
+            "content": content,
+            "max_length": max_length
+        })
+    
+    async def create_voice_summary(self, content: str) -> dict:
+        """
+        Create a voice-optimized summary.
+        
+        Args:
+            content: Content to summarize
+            
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("content", "create_voice_summary", {
+            "content": content
+        })
+
+    async def authenticate_gmail(self) -> dict:
+        """
+        Authenticate with Gmail.
+        
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("gmail", "authenticate", {})
+
+    async def authenticate_calendar(self) -> dict:
+        """
+        Authenticate with Calendar.
+        
+        Returns:
+            dict: Response from the server
+        """
+        return await self.send_request("calendar", "authenticate", {})
 
 async def main():
     """Main entry point for the MCP client."""
     # Get host and port from environment variables
     host = os.getenv("MCP_HOST", "localhost")
     port = int(os.getenv("MCP_PORT", "8765"))
+    
+    logger.info(f"Connecting to MCP server at {host}:{port}")
     
     # Create the client
     client = MCPClient(host, port)
@@ -209,6 +344,27 @@ async def main():
         response = await client.list_calendar_events(max_results=5)
         print(json.dumps(response, indent=2))
         
+        # Example: Summarize email content
+        sample_email = """
+        From: John Doe <john.doe@example.com>
+        Subject: Project Update
+        
+        Hi Team,
+        
+        I wanted to provide an update on the project we discussed last week. We've made significant progress on the frontend implementation and are now moving to the backend integration phase.
+        
+        The timeline is still on track, and we expect to complete the first phase by the end of the month. Please let me know if you have any questions or concerns.
+        
+        Best regards,
+        John
+        """
+        response = await client.summarize_email_content(sample_email, "moderate")
+        print(json.dumps(response, indent=2))
+        
+    except Exception as e:
+        logger.error(f"Error in main: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     finally:
         # Disconnect from the server
         await client.disconnect()
