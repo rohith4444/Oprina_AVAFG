@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import HeyGenAvatar from '../components/HeyGenAvatar';
+import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
 import VoiceControls from '../components/VoiceControls';
 import ConversationDisplay from '../components/ConversationDisplay';
 import GmailPanel from '../components/GmailPanel';
 import '../styles/DashboardPage.css';
+import EnvTest from '../components/EnvTest';
 
 interface Message {
   id: string;
@@ -33,7 +34,7 @@ const DashboardPage: React.FC = () => {
   // Avatar state management
   const [avatarReady, setAvatarReady] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const avatarRef = useRef<any>(null);
+  const avatarRef = useRef<HeyGenAvatarRef>(null);
   
   const navigate = useNavigate();
 
@@ -250,7 +251,9 @@ const DashboardPage: React.FC = () => {
                       onAvatarStartTalking={handleAvatarStartTalking}
                       onAvatarStopTalking={handleAvatarStopTalking}
                     />
-                    
+
+                    <EnvTest />
+
                     {/* Avatar Status Messages */}
                     {avatarError && (
                       <div className="avatar-error-notice">

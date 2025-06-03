@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import StreamingAvatar, { 
   AvatarQuality, 
   StreamingEvents, 
@@ -22,14 +22,19 @@ interface AvatarSession {
   isReady: boolean;
 }
 
-const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
+// Define the methods that will be exposed via ref
+export interface HeyGenAvatarRef {
+  speak: (text: string) => Promise<void>;
+}
+
+const HeyGenAvatar = forwardRef<HeyGenAvatarRef, HeyGenAvatarProps>(({
   isListening,
   isSpeaking,
   onAvatarReady,
   onAvatarError,
   onAvatarStartTalking,
   onAvatarStopTalking
-}) => {
+}, ref) => {
   const [avatarSession, setAvatarSession] = useState<AvatarSession | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,31 +59,92 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
     };
   }, []);
 
+  // Use isSpeaking prop to avoid unused warning
+  useEffect(() => {
+    if (isSpeaking !== isAvatarTalking) {
+      console.log('Speaking state sync:', { external: isSpeaking, internal: isAvatarTalking });
+    }
+  }, [isSpeaking, isAvatarTalking]);
+
+  // ✅ NEW: Create session token from API key
+  const createSessionToken = async (): Promise<string> => {
+    try {
+      console.log('🎫 Creating session token with API key...');
+      
+      const response = await fetch('https://api.heygen.com/v1/streaming.create_token', {
+        method: 'POST',
+        headers: {
+          'x-api-key': HEYGEN_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 Token creation response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Token creation failed:', response.status, errorText);
+        throw new Error(`Failed to create token: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Session token created successfully');
+      
+      return data.token;
+    } catch (error) {
+      console.error('❌ Error creating session token:', error);
+      throw error;
+    }
+  };
+
   const initializeAvatar = async () => {
     try {
       setIsLoading(true);
       setError(null);
       setConnectionStatus('connecting');
 
-      console.log('🚀 Initializing HeyGen Streaming Avatar...');
+      // Debug environment variables
+      console.log('🔍 DEBUGGING - Environment Check:');
+      console.log('- API Key exists:', !!HEYGEN_API_KEY);
+      console.log('- API Key length:', HEYGEN_API_KEY?.length);
+      console.log('- API Key first 10 chars:', HEYGEN_API_KEY?.substring(0, 10));
+      console.log('- Avatar ID exists:', !!HEYGEN_AVATAR_ID);
+      console.log('- Avatar ID value:', HEYGEN_AVATAR_ID);
 
-      // Create StreamingAvatar instance with correct configuration
+      // ✅ STEP 1: Create session token from API key
+      console.log('🎫 Creating session token...');
+      const sessionToken = await createSessionToken();
+      console.log('✅ Session token obtained');
+
+      // ✅ STEP 2: Create StreamingAvatar with session token (not API key)
+      console.log('🚀 Initializing HeyGen Streaming Avatar with session token...');
       const streamingAvatar = new StreamingAvatar({
-        token: HEYGEN_API_KEY
+        token: sessionToken  // Use session token, not API key!
       });
+
+      console.log('✅ StreamingAvatar instance created');
 
       // Set up event handlers BEFORE creating session
       setupAvatarEvents(streamingAvatar);
 
-      console.log('📝 Creating avatar session...');
-
-      // Create avatar session with correct parameters
-      const sessionInfo = await streamingAvatar.createStartAvatar({
-        quality: AvatarQuality.High, // Use proper enum
+      console.log('📝 Creating avatar session with config:', {
+        quality: AvatarQuality.High,
         avatarName: HEYGEN_AVATAR_ID,
         voice: {
-          voiceId: 'ff8c5120ac8b4b86bf00bcf896cd8bdd', // Default female voice
-          rate: 1.0, // 0.5 ~ 1.5
+          voiceId: 'ff8c5120ac8b4b86bf00bcf896cd8bdd',
+          rate: 1.0,
+          emotion: VoiceEmotion.FRIENDLY
+        },
+        language: 'en'
+      });
+
+      // ✅ STEP 3: Create avatar session
+      const sessionInfo = await streamingAvatar.createStartAvatar({
+        quality: AvatarQuality.High,
+        avatarName: HEYGEN_AVATAR_ID,
+        voice: {
+          voiceId: 'ff8c5120ac8b4b86bf00bcf896cd8bdd',
+          rate: 1.0,
           emotion: VoiceEmotion.FRIENDLY
         },
         language: 'en'
@@ -86,15 +152,17 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
 
       console.log('✅ Avatar session created:', sessionInfo.session_id);
 
+      // ✅ STEP 4: Set avatar session state
       setAvatarSession({
         streamingAvatar,
-        sessionId: sessionInfo.session_id, // Use session_id from response
+        sessionId: sessionInfo.session_id,
         isReady: true
       });
 
       setConnectionStatus('connected');
       setIsLoading(false);
-      
+
+      // ✅ STEP 5: Notify parent component
       if (onAvatarReady) {
         onAvatarReady();
       }
@@ -102,7 +170,17 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
       console.log('🎉 Avatar ready for interaction!');
 
     } catch (err) {
-      console.error('❌ Avatar initialization failed:', err);
+      console.error('❌ Avatar initialization failed - DETAILED ERROR:');
+      console.error('- Error type:', typeof err);
+      console.error('- Error message:', err instanceof Error ? err.message : 'Unknown error');
+      console.error('- Full error object:', err);
+      
+      // Check if it's a fetch/API error
+      if (err && typeof err === 'object' && 'response' in err) {
+        console.error('- API Response Status:', (err as any).response?.status);
+        console.error('- API Response Data:', (err as any).response?.data);
+      }
+      
       const errorMessage = err instanceof Error ? err.message : 'Failed to initialize avatar';
       setError(errorMessage);
       setIsLoading(false);
@@ -185,7 +263,7 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
         console.log('💬 Avatar speaking:', text);
         await avatarSession.streamingAvatar.speak({
           text: text,
-          task_type: TaskType.TALK // Use proper enum
+          task_type: TaskType.REPEAT // Use REPEAT to just say the text
         });
       } catch (err) {
         console.error('Error making avatar speak:', err);
@@ -198,12 +276,12 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
 
   // Test function for Day 1 testing
   const testAvatarSpeech = () => {
-    const testText = "Hello! I'm your Oprina voice assistant. I'm ready to help you with your emails and calendar. This is a test of my speech capabilities.";
+    const testText = "Hello! I'm your Oprina voice assistant. I'm ready to help you with your emails and calendar. This is a test of my speech capabilities with perfect lip synchronization.";
     speak(testText);
   };
 
   // Expose speak method to parent component via ref
-  React.useImperativeHandle(React.forwardRef(() => null), () => ({
+  useImperativeHandle(ref, () => ({
     speak
   }));
 
@@ -241,7 +319,7 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
           <div className="loading-overlay">
             <div className="spinner"></div>
             <p>Initializing avatar...</p>
-            <small>Setting up WebRTC connection...</small>
+            <small>Creating session token and WebRTC connection...</small>
           </div>
         )}
 
@@ -329,6 +407,6 @@ const HeyGenAvatar: React.FC<HeyGenAvatarProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default HeyGenAvatar;
