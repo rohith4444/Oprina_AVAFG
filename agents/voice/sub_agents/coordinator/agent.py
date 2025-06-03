@@ -268,9 +268,9 @@ exceptional coordinated experiences for voice-first Gmail and Calendar assistanc
     logger.info(f"Coordinator Agent created with {len(agent_instance.sub_agents)} sub-agents")
     logger.info(f"Sub-agents: {[agent.name for agent in agent_instance.sub_agents]}")
     logger.info(f"Coordination Tools: {coordination_tools_count} | Memory: 1 | Total: {total_tools}")
-    logger.info("✅ ADK Auto-Delegation: Enabled with sub_agents hierarchy")
-    logger.info("✅ Session State: Managed via output_key and tool_context")
-    logger.info("✅ Ready for complex multi-agent workflow coordination!")
+    logger.info("ADK Auto-Delegation: Enabled with sub_agents hierarchy")
+    logger.info("Session State: Managed via output_key and tool_context")
+    logger.info("Ready for complex multi-agent workflow coordination!")
     
     return agent_instance
 
@@ -394,23 +394,57 @@ if __name__ == "__main__":
     else:
         print(f"\n🔧 Please review and fix issues before Voice Agent integration")
 
-class CoordinatorAgent:
-    def __init__(self, mcp_client, *args, **kwargs):
-        self._mcp_client = mcp_client
-        self.email_agent = create_email_agent()
-        self.content_agent = create_content_agent()
-        self.calendar_agent = create_calendar_agent()
-    
-    async def process(self, event):
-        # Route to appropriate sub-agent based on content
-        content = event.get("content", "").lower()
+class ProcessableCoordinatorAgent(LlmAgent):
+    async def process(self, event, app_name=None, session_service=None, memory_service=None):
+        """
+        Process an event with proper session state handling.
         
-        if "email" in content or "gmail" in content or "inbox" in content:
-            return await self.email_agent.process(event)
-        elif "calendar" in content or "schedule" in content or "meeting" in content:
-            return await self.calendar_agent.process(event)
-        elif "summarize" in content or "analyze" in content or "content" in content:
-            return await self.content_agent.process(event)
-        else:
-            # Default to email agent if no clear routing
-            return await self.email_agent.process(event)
+        Args:
+            event: The event to process
+            app_name: The application name
+            session_service: The session service
+            memory_service: The memory service
+            
+        Returns:
+            The processed event result
+        """
+        if not all([app_name, session_service, memory_service]):
+            raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
+        
+        # Create a runner with the provided services
+        runner = Runner(
+            agent=self,
+            app_name=app_name,
+            session_service=session_service,
+            memory_service=memory_service
+        )
+        
+        # Run the event through the runner
+        return await runner.run(event)
+
+def create_coordinator_runner():
+    """
+    Create a coordinator agent runner with proper session state handling.
+    
+    Returns:
+        A configured Runner instance
+    """
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.memory import InMemoryMemoryService
+    
+    # Create the agent
+    agent = create_coordinator_agent()
+    
+    # Create services
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    
+    # Create and configure the runner
+    runner = Runner(
+        agent=agent,
+        app_name="test_app",
+        session_service=session_service,
+        memory_service=memory_service
+    )
+    
+    return runner

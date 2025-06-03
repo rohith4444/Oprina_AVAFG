@@ -129,7 +129,7 @@ class MCPServer:
                 return {
                     "status": "error",
                     "message": "Not authenticated with Google services"
-                }
+            }
         
         # Handle the request based on the tool and action
         try:

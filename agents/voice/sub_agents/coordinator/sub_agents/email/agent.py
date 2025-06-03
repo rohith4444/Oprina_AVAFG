@@ -8,6 +8,7 @@ Simplified to return a single LlmAgent with proper ADK integration.
 import os
 import sys
 import asyncio
+from typing import Optional
 
 # Calculate project root more reliably
 current_file = os.path.abspath(__file__)
@@ -37,9 +38,31 @@ from agents.common.session_keys import (
 )
 
 class ProcessableEmailAgent(LlmAgent):
-    async def process(self, event):
-        # Create a runner for this agent (minimal, for test/integration context)
-        runner = Runner(self)
+    async def process(self, event, app_name=None, session_service=None, memory_service=None):
+        """
+        Process an event with proper session state handling.
+        
+        Args:
+            event: The event to process
+            app_name: The application name
+            session_service: The session service
+            memory_service: The memory service
+            
+        Returns:
+            The processed event result
+        """
+        if not all([app_name, session_service, memory_service]):
+            raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
+        
+        # Create a runner with the provided services
+        runner = Runner(
+            agent=self,
+            app_name=app_name,
+            session_service=session_service,
+            memory_service=memory_service
+        )
+        
+        # Run the event through the runner
         return await runner.run(event)
 
 class EmailAgent:
@@ -337,7 +360,7 @@ async def gmail_search_messages(tool_context, query: str, max_results: int = 10)
         }
 
 # Gmail sending tools
-async def gmail_send_message(tool_context, to: str, subject: str, body: str, cc: str = None, bcc: str = None):
+async def gmail_send_message(tool_context, to: str, subject: str, body: str, cc: Optional[str] = None, bcc: Optional[str] = None):
     """
     Send Gmail message.
     
@@ -622,9 +645,25 @@ def create_email_runner():
         Runner: Email agent runner
     """
     from google.adk.runner import Runner
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.memory import InMemoryMemoryService
     
+    # Create the agent
     agent = create_email_agent()
-    return Runner(agent)
+    
+    # Create services
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    
+    # Create runner with proper configuration
+    runner = Runner(
+        agent=agent,
+        app_name="test_app",
+        session_service=session_service,
+        memory_service=memory_service
+    )
+    
+    return runner
 
 if __name__ == "__main__":
     def test_email_agent_adk_integration():

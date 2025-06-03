@@ -74,9 +74,31 @@ CALENDAR_TOOLS = [
 total_tools = len(CALENDAR_TOOLS) + 1  # +1 for load_memory tool
 
 class ProcessableCalendarAgent(Agent):
-    async def process(self, event):
-        # Create a runner for this agent (minimal, for test/integration context)
-        runner = Runner(self)
+    async def process(self, event, app_name=None, session_service=None, memory_service=None):
+        """
+        Process an event with proper session state handling.
+        
+        Args:
+            event: The event to process
+            app_name: The application name
+            session_service: The session service
+            memory_service: The memory service
+            
+        Returns:
+            The processed event result
+        """
+        if not all([app_name, session_service, memory_service]):
+            raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
+        
+        # Create a runner with the provided services
+        runner = Runner(
+            agent=self,
+            app_name=app_name,
+            session_service=session_service,
+            memory_service=memory_service
+        )
+        
+        # Run the event through the runner
         return await runner.run(event)
 
 def create_calendar_agent():
@@ -346,6 +368,32 @@ and availability management!
     
     return agent_instance
 
+def create_calendar_runner():
+    """
+    Create a calendar agent runner with proper session state handling.
+    
+    Returns:
+        A configured Runner instance
+    """
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.memory import InMemoryMemoryService
+    
+    # Create the agent
+    agent = create_calendar_agent()
+    
+    # Create services
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    
+    # Create and configure the runner
+    runner = Runner(
+        agent=agent,
+        app_name="test_app",
+        session_service=session_service,
+        memory_service=memory_service
+    )
+    
+    return runner
 
 # Create the agent instance
 agent_name = None

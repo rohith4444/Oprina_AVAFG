@@ -9,6 +9,7 @@ import asyncio
 from typing import Dict, Any, Optional
 from google.adk.tools import FunctionTool
 from datetime import datetime
+import base64
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -42,12 +43,15 @@ def _run_async_safely(coro):
             return future.result()
 
 
-def process_audio_input(audio_data: bytes, tool_context=None) -> str:
-    """Process audio input using Google Cloud Speech-to-Text"""
-    if not validate_tool_context(tool_context, "process_audio_input"):
+def process_audio_input(audio_data_base64: str, tool_context=None) -> str:
+    """Process audio input using Google Cloud Speech-to-Text (accepts base64-encoded audio)"""
+    if not tool_context or not hasattr(tool_context, 'session'):
+        logger.error("process_audio_input: Tool context missing session")
         return "Error: No valid tool context provided"
     
     try:
+        # Decode base64 audio to bytes
+        audio_data = base64.b64decode(audio_data_base64)
         # Log operation
         log_tool_execution(tool_context, "process_audio_input", "speech_to_text", True,
                          f"Audio data size: {len(audio_data)} bytes")
@@ -85,9 +89,10 @@ def process_audio_input(audio_data: bytes, tool_context=None) -> str:
         return f"Error processing audio: {str(e)}"
 
 
-def generate_audio_output(text: str, voice_settings: Dict = None, tool_context=None) -> str:
+def generate_audio_output(text: str, voice_settings: dict = {}, tool_context=None) -> str:
     """Generate audio output using Google Cloud Text-to-Speech"""
-    if not validate_tool_context(tool_context, "generate_audio_output"):
+    if not tool_context or not hasattr(tool_context, 'session'):
+        logger.error("generate_audio_output: Tool context missing session")
         return "Error: No valid tool context provided"
     
     try:
@@ -136,12 +141,15 @@ def generate_audio_output(text: str, voice_settings: Dict = None, tool_context=N
         return f"Error generating audio: {str(e)}"
 
 
-def check_audio_quality(audio_data: bytes, tool_context=None) -> str:
-    """Analyze audio input quality and provide recommendations"""
-    if not validate_tool_context(tool_context, "check_audio_quality"):
+def check_audio_quality(audio_data_base64: str, tool_context=None) -> str:
+    """Analyze audio input quality and provide recommendations (accepts base64-encoded audio)"""
+    if not tool_context or not hasattr(tool_context, 'session'):
+        logger.error("check_audio_quality: Tool context missing session")
         return "Error: No valid tool context provided"
     
     try:
+        # Decode base64 audio to bytes
+        audio_data = base64.b64decode(audio_data_base64)
         # Log operation
         log_tool_execution(tool_context, "check_audio_quality", "analyze_quality", True,
                          f"Analyzing {len(audio_data)} bytes")
@@ -187,7 +195,8 @@ def check_audio_quality(audio_data: bytes, tool_context=None) -> str:
 
 def update_voice_preferences(preferences: Dict[str, Any], tool_context=None) -> str:
     """Update user voice preferences in session state"""
-    if not validate_tool_context(tool_context, "update_voice_preferences"):
+    if not tool_context or not hasattr(tool_context, 'session'):
+        logger.error("update_voice_preferences: Tool context missing session")
         return "Error: No valid tool context provided"
     
     try:
@@ -196,31 +205,23 @@ def update_voice_preferences(preferences: Dict[str, Any], tool_context=None) -> 
                          f"Updating {len(preferences)} preferences")
         
         # Update agent activity
-        update_agent_activity(tool_context, "voice_agent", "updating_preferences")
+        update_agent_activity(tool_context, "voice_agent", "updating_voice_preferences")
         
-        # Get current user preferences
-        current_prefs = get_user_preferences(tool_context, {})
-        
-        # Update voice-specific preferences
-        voice_settings = current_prefs.get("voice_settings", {})
-        voice_settings.update(preferences)
-        current_prefs["voice_settings"] = voice_settings
-        
-        # Save updated preferences
-        success = update_user_preferences(tool_context, current_prefs)
+        # Update user preferences
+        success = update_user_preferences(tool_context, {"voice_settings": preferences})
         
         if success:
-            # Update session state
+            # Update voice-specific state
+            tool_context.session.state[VOICE_ACTIVE_PREFERENCES] = preferences
             tool_context.session.state[VOICE_PREFERENCES_UPDATED_AT] = format_timestamp()
-            tool_context.session.state[VOICE_ACTIVE_PREFERENCES] = voice_settings
             
             log_tool_execution(tool_context, "update_voice_preferences", "update_prefs", True,
-                             "Preferences updated successfully")
+                             f"Updated voice preferences: {preferences}")
             
-            return f"Voice preferences updated: {', '.join(preferences.keys())}"
+            return f"Voice preferences updated successfully"
         else:
             log_tool_execution(tool_context, "update_voice_preferences", "update_prefs", False,
-                             "Failed to save preferences")
+                             "Failed to update preferences")
             return "Failed to update voice preferences"
             
     except Exception as e:
@@ -286,7 +287,7 @@ async def test_voice_tools():
         print("🔐 Testing tool context validation...")
         try:
             # Test with None context
-            result = process_audio_input(b"test", None)
+            result = process_audio_input("test", None)
             context_validation_works = "Error: No valid tool context provided" in result
             
             if context_validation_works:
@@ -330,7 +331,9 @@ async def test_voice_tools():
             mock_context = MockToolContext()
             
             # Test audio quality check with mock context
-            quality_result = check_audio_quality(b"fake_audio_data" * 100, mock_context)
+            import base64
+            fake_audio = base64.b64encode(b"fake_audio_data" * 100).decode()
+            quality_result = check_audio_quality(fake_audio, mock_context)
             
             # Check if session state was updated
             state_updated = len(mock_context.session.state) > 0

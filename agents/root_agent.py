@@ -33,7 +33,7 @@ def get_root_agent():
         logger.info(f"Root agent '{root_agent.name}' created successfully")
         logger.info(f"Sub-agents: {len(root_agent.sub_agents)}")
         logger.info(f"Tools: {len(root_agent.tools)}")
-        logger.info("✅ ADK root agent ready for integration")
+        logger.info("ADK root agent ready for integration")
         
         return root_agent
         
@@ -47,6 +47,7 @@ root_agent = get_root_agent()
 # Export for ADK integration
 __all__ = ["root_agent", "get_root_agent"]
 
+# Now, root_agent is available as a global variable for ADK Web to find
 
 if __name__ == "__main__":
     print("🤖 Testing Root Agent Creation...")
@@ -74,3 +75,7 @@ if __name__ == "__main__":
         print(f"❌ Root agent creation failed: {e}")
         import traceback
         traceback.print_exc()
+
+# Add this line for ADK Web compatibility
+# ADK Web looks for both 'root_agent' and 'agent' attributes
+agent = root_agent

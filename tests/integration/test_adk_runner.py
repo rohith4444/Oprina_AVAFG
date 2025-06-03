@@ -1,13 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-@pytest.fixture
-async def adk_runner():
-    # Import and create the ADK runner using the app's factory
-    from adk_app import create_adk_runner
-    runner = create_adk_runner()
-    yield runner
-
 @pytest.mark.asyncio
 async def test_runner_session_management(adk_runner):
     """Test that the ADK runner manages sessions correctly."""

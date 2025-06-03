@@ -78,7 +78,7 @@ def create_adk_runner():
         logger.info("Creating ADK Runner for Oprina...")
         
         # Import root agent
-        from root_agent import root_agent
+        from agents.root_agent import root_agent
         
         # Create ADK services
         session_service, memory_service = create_adk_services()
@@ -126,7 +126,7 @@ async def health_check():
         
         # Check root agent
         try:
-            from root_agent import root_agent
+            from agents.root_agent import root_agent
             health["checks"]["root_agent"] = root_agent is not None
             health["checks"]["root_agent_name"] = root_agent.name if root_agent else None
         except Exception as e:
@@ -237,7 +237,7 @@ async def main():
         print(f"\n🎙️ Voice Agent Hierarchy:")
         
         # Show agent hierarchy
-        from root_agent import root_agent
+        from agents.root_agent import root_agent
         print(f"  └── {root_agent.name} (Root)")
         for sub_agent in root_agent.sub_agents:
             print(f"      └── {sub_agent.name}")

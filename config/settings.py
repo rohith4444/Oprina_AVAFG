@@ -13,10 +13,10 @@ import urllib.parse
 
 # Add project root to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.logging.logger import setup_logger
+# from services.logging.logger import setup_logger
 
 # Configure logging for settings
-logger = setup_logger("settings", console_output=True)
+# logger = setup_logger("settings", console_output=True)
 
 
 class Settings(BaseSettings):
@@ -159,29 +159,29 @@ class Settings(BaseSettings):
     
     # ADK Model Configuration
     ADK_MODEL: str = Field(
-        default="gemini-1.5-flash",  # ✅ Changed to stable model
+        default="gemini-2.0-flash",  # Changed to stable model
         description="Primary model for ADK agents"
     )
 
     # Alternative models for specific agents
     VOICE_MODEL: str = Field(
-        default="gemini-2.5-flash-preview-05-20",  # ✅ Changed to stable model
+        default="gemini-2.0-flash",  # Changed to stable model
         description="Model for voice agent"
     )
     COORDINATOR_MODEL: str = Field(
-        default="gemini-1.5-flash",  # ✅ Already correct
+        default="gemini-2.0-flash",  # Already correct
         description="Model for coordinator agent"
     )
     EMAIL_MODEL: str = Field(
-        default="gemini-1.5-flash",  # ✅ Changed to stable model
+        default="gemini-2.0-flash",  # Changed to stable model
         description="Model for email agent"
     )
     CONTENT_MODEL: str = Field(
-        default="gemini-1.5-flash",  # ✅ Changed to stable model
+        default="gemini-2.0-flash",  # Changed to stable model
         description="Model for content agent"
     )
     CALENDAR_MODEL: str = Field(
-        default="gemini-1.5-flash",  # ✅ Changed to stable model
+        default="gemini-2.0-flash",  # Changed to stable model
         description="Model for calendar agent"
     )
 
@@ -397,11 +397,11 @@ class Settings(BaseSettings):
                 "?sslmode=require"
             )
             
-            logger.debug(f"Generated ADK database URL for project: {project_id}")
+            # logger.debug(f"Generated ADK database URL for project: {project_id}")
             return connection_string
             
         except Exception as e:
-            logger.error(f"Failed to generate ADK database URL: {e}")
+            # logger.error(f"Failed to generate ADK database URL: {e}")
             raise ValueError(f"Could not generate database URL: {e}")
     
     @property
@@ -484,7 +484,7 @@ class Settings(BaseSettings):
     
     def _validate_configuration(self):
         """Validate configuration settings."""
-        logger.info("Validating Oprina configuration...")
+        # logger.info("Validating Oprina configuration...")
         
         # Check required Google API key
         if not self.GOOGLE_API_KEY or self.GOOGLE_API_KEY == "your_api_key_here":
@@ -506,7 +506,8 @@ class Settings(BaseSettings):
             if not self.VERTEX_AI_PROJECT_ID:
                 raise ValueError("VERTEX_AI_PROJECT_ID must be set when using vertexai_rag memory service")
             if not self.VERTEX_AI_RAG_CORPUS_ID:
-                logger.warning("VERTEX_AI_RAG_CORPUS_ID not set - you'll need to create a RAG corpus")
+                # logger.warning("VERTEX_AI_RAG_CORPUS_ID not set - you'll need to create a RAG corpus")
+                pass
         
         # Validate database configuration if using database sessions
         if self.SESSION_SERVICE_TYPE == "database":
@@ -515,7 +516,7 @@ class Settings(BaseSettings):
             try:
                 # Test database URL generation
                 db_url = self.adk_database_url
-                logger.debug("Database URL validation passed")
+                # logger.debug("Database URL validation passed")
             except Exception as e:
                 raise ValueError(f"Invalid database configuration: {e}")
         
@@ -528,13 +529,16 @@ class Settings(BaseSettings):
             if self.JWT_SECRET_KEY == "your-super-secret-jwt-key-change-in-production":
                 raise ValueError("JWT_SECRET_KEY must be changed for production")
             if self.DEBUG:
-                logger.warning("DEBUG is enabled in production environment")
+                # logger.warning("DEBUG is enabled in production environment")
+                pass
             if self.MEMORY_SERVICE_TYPE == "inmemory":
-                logger.warning("Using inmemory memory service in production - consider upgrading to vertexai_rag")
+                # logger.warning("Using inmemory memory service in production - consider upgrading to vertexai_rag")
+                pass
             if self.SESSION_SERVICE_TYPE == "inmemory":
-                logger.warning("Using inmemory session service in production - consider upgrading to database")
+                # logger.warning("Using inmemory session service in production - consider upgrading to database")
+                pass
         
-        logger.info("Configuration validation completed successfully")
+        # logger.info("Configuration validation completed successfully")
 
 
 # Global settings instance
@@ -590,7 +594,7 @@ def validate_adk_database_connection() -> bool:
         
         return asyncio.run(test_connection())
     except Exception as e:
-        logger.error(f"ADK database connection test failed: {e}")
+        # logger.error(f"ADK database connection test failed: {e}")
         return False
 
 
@@ -610,10 +614,10 @@ def validate_vertex_ai_rag_access() -> bool:
         
         # Test basic access (this will fail if credentials are wrong)
         # Note: This is a basic test - actual RAG corpus validation would require more setup
-        logger.info("Vertex AI RAG configuration appears valid")
+        # logger.info("Vertex AI RAG configuration appears valid")
         return True
     except Exception as e:
-        logger.error(f"Vertex AI RAG validation failed: {e}")
+        # logger.error(f"Vertex AI RAG validation failed: {e}")
         return False
 
 
@@ -623,6 +627,7 @@ def validate_vertex_ai_rag_access() -> bool:
 
 def print_configuration():
     """Print current configuration (excluding sensitive data)."""
+    # logger.info("=== Oprina ADK Configuration ===")
     logger.info("=== Oprina ADK Configuration ===")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug Mode: {settings.DEBUG}")
@@ -655,6 +660,7 @@ def print_configuration():
 
 def test_adk_configuration():
     """Test ADK-specific configuration."""
+    # logger.info("Testing ADK Configuration...")
     logger.info("Testing ADK Configuration...")
     
     try:
@@ -680,6 +686,7 @@ def test_adk_configuration():
         return True
         
     except Exception as e:
+        # logger.error(f"❌ ADK configuration test failed: {e}")
         logger.error(f"❌ ADK configuration test failed: {e}")
         return False
 

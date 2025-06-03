@@ -1,81 +1,119 @@
-import logging
-import logging.handlers
+"""
+Logging Service for Oprina
+
+This module provides a centralized logging service for the Oprina voice assistant.
+It configures logging with proper formatting and handlers.
+"""
+
+import os
 import sys
-from pathlib import Path
-from typing import Optional
+import logging
+from logging.handlers import RotatingFileHandler
+from datetime import datetime
 
-class CustomFormatter(logging.Formatter):
-    """Custom formatter with colors for different log levels"""
-    
-    grey = "\x1b[38;21m"
-    blue = "\x1b[38;5;39m"
-    yellow = "\x1b[38;5;226m"
-    red = "\x1b[38;5;196m"
-    bold_red = "\x1b[31;1m"
-    reset = "\x1b[0m"
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-    def __init__(self, fmt: str):
-        super().__init__()
-        self.fmt = fmt
-        self.FORMATS = {
-            logging.DEBUG: self.grey + self.fmt + self.reset,
-            logging.INFO: self.blue + self.fmt + self.reset,
-            logging.WARNING: self.yellow + self.fmt + self.reset,
-            logging.ERROR: self.red + self.fmt + self.reset,
-            logging.CRITICAL: self.bold_red + self.fmt + self.reset
-        }
+# Do NOT import settings at the top level to avoid circular import
+# from config.settings import settings
 
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
+# Custom StreamHandler to force UTF-8 encoding if possible
+class Utf8StreamHandler(logging.StreamHandler):
+    def __init__(self, stream=None):
+        super().__init__(stream)
+        # Try to set encoding to UTF-8
+        if hasattr(self.stream, 'reconfigure'):
+            try:
+                self.stream.reconfigure(encoding='utf-8')
+            except Exception:
+                pass
+        elif hasattr(self.stream, 'encoding'):
+            try:
+                self.stream.encoding = 'utf-8'
+            except Exception:
+                pass
 
-def setup_logger(
-    name: str,
-    level: int = logging.DEBUG,
-    log_file: bool = True,
-    console_output: bool = True
-) -> logging.Logger:
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except UnicodeEncodeError:
+            # Fallback: remove non-ASCII characters and try again
+            record.msg = str(record.msg).encode('ascii', errors='replace').decode('ascii')
+            super().emit(record)
+
+def setup_logger(name, console_output=True, log_level=None):
     """
-    Set up logger with socket handler and optionally file and console handlers
+    Set up a logger with proper formatting and handlers.
     
     Args:
         name: Logger name
-        level: Logging level
-        log_file: Whether to write to log file
         console_output: Whether to output to console
+        log_level: Logging level (defaults to settings.LOG_LEVEL)
+        
+    Returns:
+        logging.Logger: Configured logger
     """
+    # Get log level from settings if not specified
+    if log_level is None:
+        try:
+            from config.settings import settings
+            log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+        except Exception:
+            log_level = logging.INFO
+    
+    # Create logger
     logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    # Remove existing handlers
-    logger.handlers = []
-
-    # Socket handler for remote logging
-    socket_handler = logging.handlers.SocketHandler('localhost', 9020)
-    logger.addHandler(socket_handler)
-
-    # File handler
-    if log_file:
-        log_dir = Path("logs")
-        log_dir.mkdir(exist_ok=True)
-        file_handler = logging.FileHandler(
-            log_dir / f"{name.replace('.', '_')}.log"
-        )
-        file_handler.setFormatter(
-            logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        )
-        logger.addHandler(file_handler)
-
-    # Console handler
-    # if console_output:
-    #     console_handler = logging.StreamHandler(sys.stdout)
-    #     console_handler.setFormatter(
-    #         CustomFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    #     )
-    #     logger.addHandler(console_handler)
-
+    logger.setLevel(log_level)
+    
+    # Clear existing handlers
+    if logger.handlers:
+        logger.handlers.clear()
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Create console handler if requested
+    if console_output:
+        # Use custom UTF-8 handler
+        console_handler = Utf8StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        # Warn if encoding is not UTF-8
+        encoding = getattr(sys.stdout, 'encoding', None)
+        if encoding and encoding.lower() != 'utf-8':
+            logger.warning(f"Console encoding is {encoding}. Unicode/emoji may not display correctly. Run 'chcp 65001' in your terminal for UTF-8 support.")
+    
+    # Create file handler
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    log_file = os.path.join(log_dir, f"{name}_{datetime.now().strftime('%Y%m%d')}.log")
+    file_handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=10*1024*1024,  # 10MB
+        backupCount=5
+    )
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    # Fix for Windows encoding issues with emoji
+    if sys.platform == 'win32':
+        # Set console encoding to UTF-8 if possible
+        if hasattr(sys.stdout, 'reconfigure'):
+            try:
+                sys.stdout.reconfigure(encoding='utf-8')
+            except Exception:
+                pass
+        if hasattr(sys.stderr, 'reconfigure'):
+            try:
+                sys.stderr.reconfigure(encoding='utf-8')
+            except Exception:
+                pass
+    
     return logger
 
-# Create a default logger for the application
-app_logger = setup_logger("multi_agent_system")
+# Remove the default logger creation at the module level to avoid circular import
+# app_logger = setup_logger("multi_agent_system")

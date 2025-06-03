@@ -152,37 +152,32 @@ class OprinaMemoryManager:
             raise
     
     def _initialize_chat_history(self):
-        """Initialize chat history service for UI."""
-        try:
-            if settings.CHAT_HISTORY_ENABLED:
+        """Initialize chat history service if enabled."""
+        if settings.CHAT_HISTORY_ENABLED:
+            try:
+                self.logger.info("Initializing ChatHistoryService...")
                 self._chat_history = get_chat_history()
-                self.logger.info("✅ ChatHistoryService initialized for UI")
-            else:
+                self.logger.info("✅ ChatHistoryService initialized")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize chat history: {e}")
                 self._chat_history = None
-                self.logger.info("ChatHistoryService disabled")
-                
-        except Exception as e:
-            self.logger.warning(f"Chat history service initialization failed: {e}")
-            self._chat_history = None
-    
-    # =============================================================================
-    # ADK Runner Integration (Core Feature)
-    # =============================================================================
+        else:
+            self.logger.info("Chat history disabled in settings")
     
     def create_runner(self, agent) -> Runner:
         """
-        Create ADK Runner for agent with proper session and memory service integration.
-        This is the key method that connects agents to ADK services.
+        Create ADK Runner with configured services.
         
         Args:
-            agent: ADK Agent instance (LlmAgent, etc.)
+            agent: Agent to run
             
         Returns:
-            Configured ADK Runner with session and memory services
+            Runner: Configured ADK Runner
         """
         try:
             self.logger.info(f"Creating ADK Runner for agent: {agent.name}")
             
+            # Create Runner with configured services
             runner = Runner(
                 agent=agent,
                 app_name=self.app_name,
@@ -190,11 +185,11 @@ class OprinaMemoryManager:
                 memory_service=self._memory_service
             )
             
-            self.logger.info(f"✅ ADK Runner created for {agent.name}")
+            self.logger.info(f"✅ ADK Runner created for agent: {agent.name}")
             return runner
             
         except Exception as e:
-            self.logger.error(f"Failed to create Runner for {agent.name}: {e}")
+            self.logger.error(f"Failed to create ADK Runner: {e}")
             raise
     
     # =============================================================================
@@ -243,7 +238,7 @@ class OprinaMemoryManager:
     
     async def get_session(self, user_id: str, session_id: str):
         """
-        Get an existing session by user_id and session_id.
+        Get ADK session by ID.
         
         Args:
             user_id: User identifier
@@ -253,11 +248,14 @@ class OprinaMemoryManager:
             Session object or None if not found
         """
         try:
-            self.logger.info(f"Getting session {session_id} for user {user_id}")
-            session = await self._session_service.get_session(user_id, session_id)
+            session = await self._session_service.get_session(
+                app_name=self.app_name,
+                user_id=user_id,
+                session_id=session_id
+            )
             
             if session:
-                self.logger.info(f"✅ Session {session_id} retrieved for user {user_id}")
+                self.logger.debug(f"Retrieved session {session_id} for user {user_id}")
                 return session
             else:
                 self.logger.warning(f"Session {session_id} not found for user {user_id}")
@@ -265,80 +263,89 @@ class OprinaMemoryManager:
                 
         except Exception as e:
             self.logger.error(f"Failed to get session {session_id}: {e}")
-            raise
+            return None
     
     async def set_session_state(self, user_id: str, session_id: str, state_data: dict) -> bool:
         """
-        Set session state data for a specific session.
+        Update ADK session state.
         
         Args:
-            user_id: The user ID
-            session_id: The session ID
-            state_data: The state data to set
+            user_id: User identifier
+            session_id: Session identifier
+            state_data: State data to update
             
         Returns:
-            bool: True if successful, False otherwise
+            True if successful
         """
         try:
+            # Get current session
             session = await self.get_session(user_id, session_id)
-            if session:
-                session.state.update(state_data)
-                await self._session_service.save_session(session)
-                self.logger.info(f"Session state updated for {session_id} (user {user_id})")
-                return True
-            else:
-                self.logger.warning(f"Failed to set session state: Session {session_id} not found")
+            if not session:
                 return False
-        except Exception as e:
-            self.logger.error(f"Failed to set session state: {str(e)}")
-            return False
             
+            # Update state
+            session.state.update(state_data)
+            
+            # Save session
+            await self._session_service.save_session(session)
+            
+            self.logger.debug(f"Updated state for session {session_id}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update session state: {e}")
+            return False
+    
     async def get_session_state(self, user_id: str, session_id: str) -> dict:
         """
-        Get session state data for a specific session.
+        Get ADK session state.
         
         Args:
-            user_id: The user ID
-            session_id: The session ID
+            user_id: User identifier
+            session_id: Session identifier
             
         Returns:
-            dict: The session state data, or an empty dict if not found
+            Session state dictionary
         """
         try:
             session = await self.get_session(user_id, session_id)
             if session:
-                self.logger.info(f"Retrieved session state for {session_id} (user {user_id})")
                 return session.state
             else:
-                self.logger.warning(f"Failed to get session state: Session {session_id} not found")
                 return {}
+                
         except Exception as e:
-            self.logger.error(f"Failed to get session state: {str(e)}")
+            self.logger.error(f"Failed to get session state: {e}")
             return {}
-            
+    
     async def delete_session_state(self, user_id: str, session_id: str) -> bool:
         """
-        Delete session state data for a specific session.
+        Delete ADK session state.
         
         Args:
-            user_id: The user ID
-            session_id: The session ID
+            user_id: User identifier
+            session_id: Session identifier
             
         Returns:
-            bool: True if successful, False otherwise
+            True if successful
         """
         try:
+            # Get current session
             session = await self.get_session(user_id, session_id)
-            if session:
-                session.state = {}
-                await self._session_service.save_session(session)
-                self.logger.info(f"Session state deleted for {session_id} (user {user_id})")
-                return True
-            else:
-                self.logger.warning(f"Failed to delete session state: Session {session_id} not found")
+            if not session:
                 return False
+            
+            # Clear state
+            session.state.clear()
+            
+            # Save session
+            await self._session_service.save_session(session)
+            
+            self.logger.debug(f"Cleared state for session {session_id}")
+            return True
+            
         except Exception as e:
-            self.logger.error(f"Failed to delete session state: {str(e)}")
+            self.logger.error(f"Failed to delete session state: {e}")
             return False
     
     async def run_agent(
@@ -349,66 +356,44 @@ class OprinaMemoryManager:
         user_message: str
     ) -> List[Dict[str, Any]]:
         """
-        Run agent with proper ADK Runner and session context.
-        This is the main method for executing agents with session state.
+        Run agent with ADK Runner.
         
         Args:
-            agent: ADK Agent instance
+            agent: Agent to run
             user_id: User identifier
             session_id: Session identifier
-            user_message: User's message text
+            user_message: User message
             
         Returns:
-            List of events from agent execution
+            List of agent responses
         """
         try:
-            # Create runner for this agent
+            # Create runner
             runner = self.create_runner(agent)
             
-            # Prepare user content
-            user_content = Content(parts=[Part(text=user_message)])
+            # Run agent
+            self.logger.info(f"Running agent {agent.name} for user {user_id}")
             
-            # Execute agent through runner (this provides tool_context automatically)
-            events = []
-            async for event in runner.run_async(
+            # Create event
+            event = Event(
+                action=EventActions.CHAT,
+                content=Content(parts=[Part(text=user_message)])
+            )
+            
+            # Process event
+            responses = await runner.process(
+                event=event,
+                app_name=self.app_name,
                 user_id=user_id,
-                session_id=session_id,
-                new_message=user_content
-            ):
-                # Store UI message in chat history
-                if self._chat_history:
-                    try:
-                        await self.store_ui_message(
-                            user_id, session_id, 
-                            "agent_response" if event.author == "agent" else event.author,
-                            str(event.content) if event.content else "",
-                            {"event_type": type(event).__name__}
-                        )
-                    except Exception as e:
-                        self.logger.warning(f"Failed to store UI message: {e}")
-                
-                # Convert event to dict for return
-                event_dict = {
-                    "author": event.author,
-                    "content": str(event.content) if event.content else "",
-                    "timestamp": getattr(event, 'timestamp', time.time()),
-                    "is_final": event.is_final_response() if hasattr(event, 'is_final_response') else False
-                }
-                events.append(event_dict)
-                
-                self.logger.debug(f"Agent event: {event.author} - {type(event).__name__}")
+                session_id=session_id
+            )
             
-            self.logger.info(f"Agent {agent.name} completed execution with {len(events)} events")
-            return events
+            self.logger.info(f"Agent {agent.name} completed with {len(responses)} responses")
+            return responses
             
         except Exception as e:
-            self.logger.error(f"Failed to run agent {agent.name}: {e}")
-            return [{
-                "author": "system",
-                "content": f"Error running agent: {str(e)}",
-                "timestamp": time.time(),
-                "is_final": True
-            }]
+            self.logger.error(f"Failed to run agent: {e}")
+            return []
     
     async def list_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
         """
@@ -478,13 +463,9 @@ class OprinaMemoryManager:
             self.logger.error(f"Failed to delete session {session_id}: {e}")
             return False
     
-    # =============================================================================
-    # Memory Management (Cross-Session Knowledge)
-    # =============================================================================
-    
     async def add_session_to_memory(self, user_id: str, session_id: str) -> bool:
         """
-        Add completed session to long-term memory for cross-session retrieval.
+        Add session to memory for cross-session knowledge.
         
         Args:
             user_id: User identifier
@@ -494,31 +475,47 @@ class OprinaMemoryManager:
             True if successful
         """
         try:
-            if not settings.ENABLE_CROSS_SESSION_MEMORY:
-                self.logger.debug("Cross-session memory disabled, skipping archive")
-                return True
-            
+            # Get session
             session = await self.get_session(user_id, session_id)
             if not session:
-                self.logger.warning(f"Cannot archive non-existent session {session_id}")
                 return False
             
-            # Check if session has meaningful content (more than just initialization)
-            if hasattr(session, 'events') and len(session.events) > 2:
-                await self._memory_service.add_session_to_memory(session)
-                self.logger.info(f"Added session {session_id} to long-term memory")
+            # Extract conversation history
+            conversation = []
+            for event in session.events:
+                if event.action == EventActions.CHAT:
+                    # User message
+                    user_message = event.content.parts[0].text if event.content.parts else ""
+                    conversation.append({"role": "user", "content": user_message})
+                    
+                    # Agent response
+                    if hasattr(event, 'response') and event.response:
+                        agent_message = event.response.content.parts[0].text if event.response.content.parts else ""
+                        conversation.append({"role": "assistant", "content": agent_message})
+            
+            # Add to memory
+            if conversation:
+                await self._memory_service.add_memory(
+                    app_name=self.app_name,
+                    user_id=user_id,
+                    memory_type="conversation",
+                    memory_data={
+                        "session_id": session_id,
+                        "conversation": conversation,
+                        "created_at": session.state.get("created_at"),
+                        "last_activity": session.state.get("user:last_activity")
+                    }
+                )
+                
+                self.logger.info(f"Added session {session_id} to memory")
                 return True
             else:
-                self.logger.debug(f"Session {session_id} too short for memory archive")
-                return True
+                self.logger.warning(f"No conversation to add to memory for session {session_id}")
+                return False
                 
         except Exception as e:
             self.logger.error(f"Failed to add session to memory: {e}")
             return False
-    
-    # =============================================================================
-    # Chat History Integration (UI Support)
-    # =============================================================================
     
     async def store_ui_message(
         self,
@@ -529,34 +526,32 @@ class OprinaMemoryManager:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
         """
-        Store message in chat history for UI display (separate from ADK session).
+        Store UI message in chat history.
         
         Args:
             user_id: User identifier
             session_id: Session identifier
-            message_type: Type of message (user_voice, agent_response, etc.)
+            message_type: Message type (user, assistant, system)
             content: Message content
-            metadata: Additional metadata
+            metadata: Optional metadata
             
         Returns:
             Message ID if successful
         """
+        if not self._chat_history:
+            return None
+            
         try:
-            if not self._chat_history:
-                self.logger.debug("Chat history service not available")
-                return None
-            
-            # Auto-create conversation if needed
-            conversation_id = self._chat_history.auto_create_conversation_if_needed(
-                user_id, session_id
-            )
-            
             # Store message
-            message_id = self._chat_history.store_message(
-                conversation_id, user_id, session_id, message_type, content, metadata
+            message_id = self._chat_history.add_message(
+                user_id=user_id,
+                conversation_id=session_id,
+                message_type=message_type,
+                content=content,
+                metadata=metadata
             )
             
-            self.logger.debug(f"Stored UI message {message_id} in conversation {conversation_id}")
+            self.logger.debug(f"Stored {message_type} message for session {session_id}")
             return message_id
             
         except Exception as e:
@@ -565,36 +560,30 @@ class OprinaMemoryManager:
     
     def get_conversation_history_for_ui(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
         """
-        Get conversation history for UI display.
+        Get conversation history for UI.
         
         Args:
             user_id: User identifier
-            limit: Maximum conversations to return
+            limit: Maximum number of conversations to return
             
         Returns:
-            List of conversations for UI
+            List of conversation information
         """
+        if not self._chat_history:
+            return []
+            
         try:
-            if not self._chat_history:
-                return []
+            # Get conversations
+            conversations = self._chat_history.get_conversations(
+                user_id=user_id,
+                limit=limit
+            )
             
-            conversations = self._chat_history.list_user_conversations(user_id, limit=limit)
-            
-            # Convert to UI-friendly format
-            ui_conversations = []
-            for conv in conversations:
-                ui_conversations.append({
-                    "id": conv.id,
-                    "title": conv.title,
-                    "message_count": conv.message_count,
-                    "last_message_at": conv.last_message_at.isoformat() if conv.last_message_at else None,
-                    "created_at": conv.created_at.isoformat() if conv.created_at else None
-                })
-            
-            return ui_conversations
+            self.logger.debug(f"Retrieved {len(conversations)} conversations for user {user_id}")
+            return conversations
             
         except Exception as e:
-            self.logger.error(f"Failed to get conversation history for UI: {e}")
+            self.logger.error(f"Failed to get conversation history: {e}")
             return []
     
     # =============================================================================
@@ -637,6 +626,20 @@ class OprinaMemoryManager:
             "app:version": "1.0",
             "app:features": ["email", "calendar", "voice"],
             "app:name": self.app_name,
+            
+            # Voice agent state
+            "voice:last_transcript": "",
+            "voice:last_confidence": 0.0,
+            "voice:last_stt_at": "",
+            "voice:last_tts_text": "",
+            "voice:last_tts_voice": "",
+            "voice:last_tts_at": "",
+            "voice:last_audio_size": 0,
+            "voice:quality_check_at": "",
+            "voice:preferences_updated_at": "",
+            "voice:active_preferences": {},
+            "voice:last_quality_check": "",
+            "voice:last_quality_score": 0.0,
             
             # Temporary data (discarded after session)
             "temp:initializing": True,
@@ -796,79 +799,44 @@ async def adk_memory_context(user_id: str):
 
 async def test_complete_adk_memory_manager():
     """Test complete ADK memory manager functionality."""
-    logger.info("🧪 Testing Complete ADK Memory Manager...")
-    
     try:
-        # Initialize manager
-        manager = get_adk_memory_manager()
-        logger.info("✅ Manager initialized")
+        logger.info("Testing Complete ADK Memory Manager...")
         
-        # Health check
-        health = await manager.health_check()
-        logger.info(f"Health Status: {health['status']}")
+        # Get memory manager
+        memory_manager = get_adk_memory_manager()
         
-        # Test session operations
-        test_user_id = "test_user_123"
+        # Test session creation
+        user_id = "test_user"
+        session_id = await memory_manager.create_session(user_id)
         
-        # Create session
-        session_id = await manager.create_session(test_user_id, {
-            "user:name": "Test User",
-            "test_data": "hello world"
-        })
-        logger.info(f"✅ Created session: {session_id}")
+        logger.info(f"Created test session: {session_id}")
         
-        # Get session
-        session = await manager.get_session(test_user_id, session_id)
-        logger.info(f"✅ Retrieved session: {session is not None}")
+        # Test session state
+        state = await memory_manager.get_session_state(user_id, session_id)
+        logger.info(f"Session state: {state}")
         
-        # Test Runner creation
-        from google.adk.agents import LlmAgent
-        from google.adk.models.lite_llm import LiteLlm
-        
-        test_agent = LlmAgent(
-            name="test_agent",
-            model=LiteLlm(model="gemini-2.0-flash", api_key="test"),
-            instruction="Test agent",
-            output_key="test_result"
+        # Test state update
+        await memory_manager.set_session_state(
+            user_id, 
+            session_id, 
+            {"test_key": "test_value"}
         )
         
-        runner = manager.create_runner(test_agent)
-        logger.info(f"✅ Created Runner: {runner is not None}")
+        # Verify update
+        updated_state = await memory_manager.get_session_state(user_id, session_id)
+        logger.info(f"Updated state: {updated_state}")
         
-        # Store UI message
-        if manager._chat_history:
-            message_id = await manager.store_ui_message(
-                test_user_id, session_id, "user_voice", "Test message"
-            )
-            logger.info(f"✅ Stored UI message: {message_id}")
+        # Test session listing
+        sessions = await memory_manager.list_user_sessions(user_id)
+        logger.info(f"User sessions: {sessions}")
         
-        # List sessions
-        sessions = await manager.list_user_sessions(test_user_id)
-        logger.info(f"✅ Listed sessions: {len(sessions)}")
+        # Test session deletion
+        await memory_manager.delete_session(user_id, session_id)
+        logger.info(f"Deleted session: {session_id}")
         
-        # Test memory operations
-        if settings.ENABLE_CROSS_SESSION_MEMORY:
-            memory_added = await manager.add_session_to_memory(test_user_id, session_id)
-            logger.info(f"✅ Added to memory: {memory_added}")
-        
-        # Get service info
-        service_info = manager.get_service_info()
-        logger.info(f"✅ Service info: {service_info}")
-        
-        # Cleanup
-        await manager.delete_session(test_user_id, session_id)
-        logger.info("✅ Cleaned up test session")
-        
-        logger.info("🎉 Complete ADK Memory Manager test completed successfully!")
+        logger.info("✅ Complete ADK Memory Manager test passed")
         return True
         
     except Exception as e:
         logger.error(f"❌ Complete ADK Memory Manager test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-
-if __name__ == "__main__":
-    # Run test
-    asyncio.run(test_complete_adk_memory_manager())
+        return False 

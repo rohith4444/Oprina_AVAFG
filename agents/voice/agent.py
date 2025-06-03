@@ -247,7 +247,7 @@ providing powerful Gmail and Calendar assistance through intelligent voice inter
     logger.info(f"Voice Agent created with {len(agent_instance.sub_agents)} sub-agents")
     logger.info(f"Voice tools: {len(VOICE_TOOLS)} | Memory: 1 | Total: {len(agent_instance.tools)}")
     logger.info(f"Using model: {settings.VOICE_MODEL}")
-    logger.info("✅ Google Cloud Speech integration enabled")
+    logger.info("Google Cloud Speech integration enabled")
 
     return agent_instance
 
@@ -513,11 +513,63 @@ if __name__ == "__main__":
     # Run test when file is executed directly
     test_voice_agent_sync()
 
-class VoiceAgent:
-    def __init__(self, mcp_client, *args, **kwargs):
-        self._mcp_client = mcp_client
-        self.coordinator = create_coordinator_agent()
+class ProcessableVoiceAgent(LlmAgent):
+    async def process(self, event, app_name=None, session_service=None, memory_service=None):
+        """
+        Process an event with proper session state handling.
+        
+        Args:
+            event: The event to process
+            app_name: The application name
+            session_service: The session service
+            memory_service: The memory service
+            
+        Returns:
+            The processed event result
+        """
+        if not all([app_name, session_service, memory_service]):
+            raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
+        
+        # Create a runner with the provided services
+        runner = Runner(
+            agent=self,
+            app_name=app_name,
+            session_service=session_service,
+            memory_service=memory_service
+        )
+        
+        # Ensure the event has a session
+        if not hasattr(event, 'session'):
+            # Create a new session if none exists
+            session = session_service.create_session()
+            event.session = session
+        
+        # Run the event through the runner
+        return await runner.run(event)
+
+def create_voice_runner():
+    """
+    Create a voice agent runner with proper session state handling.
     
-    async def process(self, event):
-        # Delegate to coordinator agent
-        return await self.coordinator.process(event)
+    Returns:
+        A configured Runner instance
+    """
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.memory import InMemoryMemoryService
+    
+    # Create the agent
+    agent = create_voice_agent()
+    
+    # Create services
+    session_service = InMemorySessionService()
+    memory_service = InMemoryMemoryService()
+    
+    # Create and configure the runner
+    runner = Runner(
+        agent=agent,
+        app_name="test_app",
+        session_service=session_service,
+        memory_service=memory_service
+    )
+    
+    return runner
