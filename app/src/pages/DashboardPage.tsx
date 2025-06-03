@@ -3,11 +3,8 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
-import VoiceControls from '../components/VoiceControls';
 import ConversationDisplay from '../components/ConversationDisplay';
-import GmailPanel from '../components/GmailPanel';
 import '../styles/DashboardPage.css';
-import EnvTest from '../components/EnvTest';
 
 interface Message {
   id: string;
@@ -25,8 +22,8 @@ interface Conversation {
 const DashboardPage: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
-  const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [recognition, setRecognition] = useState<InstanceType<typeof window.SpeechRecognition> | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -39,6 +36,19 @@ const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   const activeMessages = conversations.find(c => c.id === activeConversationId)?.messages || [];
+
+  // Initialize with a default conversation
+  useEffect(() => {
+    if (conversations.length === 0) {
+      const defaultConversation: Conversation = {
+        id: Date.now().toString(),
+        messages: [],
+        timestamp: new Date(),
+      };
+      setConversations([defaultConversation]);
+      setActiveConversationId(defaultConversation.id);
+    }
+  }, [conversations.length]);
 
   const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
     setConversations(prev => {
@@ -72,7 +82,6 @@ const DashboardPage: React.FC = () => {
     if (gmailToken) {
       localStorage.setItem('gmail_token', gmailToken);
       localStorage.setItem('gmail_connected', 'true');
-      setIsGmailConnected(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
 
@@ -80,18 +89,15 @@ const DashboardPage: React.FC = () => {
     const restoreSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
-      const gmailConnected = localStorage.getItem('gmail_connected') === 'true';
 
       if (user) {
         localStorage.setItem('user', JSON.stringify({
           uid: user.id,
           email: user.email,
         }));
-      } else if (!gmailConnected) {
+      } else {
         navigate('/login');
         return;
-      } else {
-        setIsGmailConnected(true);
       }
     };
 
@@ -133,7 +139,7 @@ const DashboardPage: React.FC = () => {
     }
   }, [navigate, addMessage]);
 
-  // Day 1 dummy response generator (enhanced for avatar testing)
+  // Enhanced dummy response generator
   const generateDummyResponse = (transcript: string): string => {
     const lowerCommand = transcript.toLowerCase();
     
@@ -170,10 +176,21 @@ const DashboardPage: React.FC = () => {
     }
   }, [recognition, isListening]);
 
-  const handleToggleMute = useCallback(() => {
-    setIsMuted(!isMuted);
-    console.log('🔊 Audio mute toggled:', !isMuted);
-  }, [isMuted]);
+  const handleVolumeChange = useCallback((newVolume: number) => {
+    setVolume(newVolume);
+    setIsMuted(newVolume === 0);
+    console.log('🔊 Volume changed to:', newVolume);
+  }, []);
+
+  const handleVolumeIncrement = useCallback(() => {
+    const newVolume = Math.min(100, volume + 10);
+    handleVolumeChange(newVolume);
+  }, [volume, handleVolumeChange]);
+
+  const handleVolumeDecrement = useCallback(() => {
+    const newVolume = Math.max(0, volume - 10);
+    handleVolumeChange(newVolume);
+  }, [volume, handleVolumeChange]);
 
   // Avatar event handlers
   const handleAvatarReady = useCallback(() => {
@@ -198,7 +215,7 @@ const DashboardPage: React.FC = () => {
     setIsSpeaking(false);
   }, []);
 
-  // Conversation management
+  // Conversation management for sidebar
   const handleNewChat = () => {
     const newId = Date.now().toString();
     const newConversation: Conversation = {
@@ -218,105 +235,98 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="dashboard-page">
-      <div className="dashboard-container">
-        <Sidebar
-          className={isGmailConnected ? 'sidebar-collapsed' : ''}
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          onNewChat={handleNewChat}
-          onSelectChat={handleSelectChat}
-        />
-        
-        <main className="main-content">
-          <div className={`main-panel ${isGmailConnected ? 'gmail-connected' : ''}`}>
-            <div className="split-layout">
-              {/* Gmail Panel (if connected) */}
-              {isGmailConnected && (
-                <div className="gmail-view split-half">
-                  <GmailPanel />
-                </div>
-              )}
-              
-              {/* Main Assistant Area */}
-              <div className="assistant-view split-half">
-                <div className="top-section">
-                  {/* Avatar Section */}
-                  <div className="avatar-section">
-                    <HeyGenAvatar
-                      ref={avatarRef}
-                      isListening={isListening}
-                      isSpeaking={isSpeaking}
-                      onAvatarReady={handleAvatarReady}
-                      onAvatarError={handleAvatarError}
-                      onAvatarStartTalking={handleAvatarStartTalking}
-                      onAvatarStopTalking={handleAvatarStopTalking}
-                    />
+      {/* Restored Sidebar */}
+      <Sidebar
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+      />
+      
+      {/* Main Content Area - 50/50 Layout */}
+      <div className="main-content">
+        <div className="dashboard-unified">
+          
+          {/* Left Side: Avatar + Controls (50%) */}
+          <div className="avatar-section">
+            {/* Clean Avatar Container */}
+            <div className="avatar-container-wrapper">
+              <HeyGenAvatar
+                ref={avatarRef}
+                isListening={isListening}
+                isSpeaking={isSpeaking}
+                onAvatarReady={handleAvatarReady}
+                onAvatarError={handleAvatarError}
+                onAvatarStartTalking={handleAvatarStartTalking}
+                onAvatarStopTalking={handleAvatarStopTalking}
+              />
+            </div>
 
-                    <EnvTest />
+             {avatarError && (
+              <div className="avatar-error-message">
+                <p>⚠️ Avatar connection issue</p>
+                <small>{avatarError}</small>
+              </div>
+            )}
 
-                    {/* Avatar Status Messages */}
-                    {avatarError && (
-                      <div className="avatar-error-notice">
-                        <p>⚠️ Avatar connection issue. Please check your HeyGen API key and avatar ID in the .env file.</p>
-                        <small>Error: {avatarError}</small>
-                      </div>
-                    )}
-                    
-                    {!avatarReady && !avatarError && (
-                      <div className="avatar-loading-notice">
-                        <p>🔄 Setting up your avatar...</p>
-                        <small>Connecting to HeyGen streaming service...</small>
-                      </div>
-                    )}
-                    
-                    {avatarReady && (
-                      <div className="avatar-success-notice">
-                        <p>✅ Avatar ready! You can now use voice commands or click "Test Speech".</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Voice Controls Section */}
-                  <div className="controls-section">
-                    <VoiceControls
-                      onStartListening={handleStartListening}
-                      onStopListening={handleStopListening}
-                      onToggleMute={handleToggleMute}
-                      isMuted={isMuted}
-                      isListening={isListening}
-                    />
-                    
-                    {/* Day 1 Testing Information */}
-                    <div className="day1-info">
-                      <h4>🧪 Day 1 - Avatar Testing:</h4>
-                      <ul>
-                        <li><strong>Test Speech:</strong> Click "Test Speech" button on avatar</li>
-                        <li><strong>Voice Recognition:</strong> Use microphone button to speak</li>
-                        <li><strong>Try Commands:</strong> "check my emails", "show calendar", "hello"</li>
-                        <li><strong>Watch Avatar:</strong> Notice perfect lip-sync when speaking</li>
-                      </ul>
-                      <div className="status-indicators">
-                        <span className={`status ${avatarReady ? 'ready' : 'pending'}`}>
-                          Avatar: {avatarReady ? '✅ Ready' : '⏳ Loading'}
-                        </span>
-                        <span className={`status ${recognition ? 'ready' : 'error'}`}>
-                          Speech: {recognition ? '✅ Ready' : '❌ Not Available'}
-                        </span>
-                      </div>
-                    </div>
+            {/* Clean Voice Controls */}
+            <div className="compact-voice-controls">
+              {/* Microphone Button */}
+              <button 
+                className={`btn voice-button mic-button ${isListening ? 'active' : ''}`}
+                onClick={isListening ? handleStopListening : handleStartListening}
+                disabled={!avatarReady}
+                title={isListening ? 'Stop listening' : 'Start listening'}
+              >
+                {isListening ? '🎙️' : '🎤'}
+              </button>
+
+              {/* Volume Control */}
+              <div className="volume-control">
+                <button 
+                  className="btn volume-button"
+                  onClick={handleVolumeDecrement}
+                  disabled={volume === 0}
+                  title="Volume down"
+                >
+                  🔉
+                </button>
+                
+                <div className="volume-slider-container">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volume}
+                    onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                    className="volume-slider"
+                    title={`Volume: ${volume}%`}
+                    disabled={isMuted}
+                  />
+                  <div className="volume-label">
+                    {isMuted ? 'Muted' : `${volume}%`}
                   </div>
                 </div>
                 
-                {/* Conversation Display */}
-                <ConversationDisplay
-                  messages={activeMessages}
-                  isExpanded={true}
-                  onToggleExpand={() => {}}
-                />
+                <button 
+                  className="btn volume-button"
+                  onClick={handleVolumeIncrement}
+                  disabled={volume === 100}
+                  title="Volume up"
+                >
+                  🔊
+                </button>
               </div>
             </div>
           </div>
-        </main>
+
+          {/* Right Side: Conversation (50%) */}
+          <div className="conversation-section">
+            <ConversationDisplay
+              messages={activeMessages}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

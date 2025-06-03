@@ -1,45 +1,47 @@
-/* HeyGen Avatar Component Styles - Correct Implementation */
+/* HeyGenAvatar.css - Compact version for 50% layout using existing design system */
+
 .heygen-avatar {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e8f0fe 100%);
+  padding: 1rem;
+  background: linear-gradient(135deg, var(--background) 0%, var(--background-alt) 100%);
   border-radius: 1rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px var(--shadow);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-  width: 420px;
-  height: 540px;
+  width: 320px;  /* Reduced from 420px */
+  height: 380px; /* Reduced from 540px */
+  border: 1px solid var(--border);
 }
 
 .heygen-avatar.listening {
   background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-  box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.2),
-              0 8px 32px rgba(66, 133, 244, 0.3);
+  box-shadow: 0 0 0 4px rgba(91, 124, 255, 0.2),
+              0 8px 32px rgba(91, 124, 255, 0.3);
   transform: scale(1.02);
 }
 
 .heygen-avatar.speaking {
   background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-  box-shadow: 0 0 0 4px rgba(52, 168, 83, 0.2),
-              0 8px 32px rgba(52, 168, 83, 0.3);
+  box-shadow: 0 0 0 4px rgba(79, 209, 197, 0.2),
+              0 8px 32px rgba(79, 209, 197, 0.3);
   transform: scale(1.02);
 }
 
-/* Avatar Header */
+/* Compact Avatar Header */
 .avatar-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
@@ -51,8 +53,8 @@
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   transition: all 0.3s ease;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
@@ -64,7 +66,7 @@
 }
 
 .status-dot.connected {
-  background-color: #4caf50;
+  background-color: var(--primary-green);
   animation: pulse-green 3s infinite;
 }
 
@@ -78,46 +80,21 @@
 }
 
 .status-text {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #5f6368;
+  color: var(--text);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 
-/* Test Speech Button */
-.test-speech-button {
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, #4285f4, #34a853);
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(66, 133, 244, 0.3);
-}
-
-.test-speech-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(66, 133, 244, 0.4);
-}
-
-.test-speech-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Avatar Container */
+/* Compact Avatar Container */
 .avatar-container {
   position: relative;
-  width: 360px;
-  height: 360px;
+  width: 280px;  /* Reduced from 360px */
+  height: 280px; /* Reduced from 360px */
   border-radius: 1rem;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px var(--shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -130,7 +107,7 @@
   height: 100%;
   object-fit: cover;
   border-radius: 1rem;
-  background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+  background: linear-gradient(135deg, var(--background-alt) 0%, var(--border) 100%);
 }
 
 /* Loading Overlay */
@@ -151,24 +128,25 @@
 }
 
 .spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e8eaed;
-  border-top: 4px solid #4285f4;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--primary-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 1rem;
 }
 
 .loading-overlay p {
-  color: #5f6368;
-  font-size: 1rem;
+  color: var(--text);
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;
 }
 
 .loading-overlay small {
-  color: #9aa0a6;
+  color: var(--text);
+  opacity: 0.7;
   font-size: 0.75rem;
   margin: 0;
 }
@@ -186,19 +164,19 @@
   justify-content: center;
   color: white;
   z-index: 10;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
 }
 
 .error-content h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.25rem;
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
   font-weight: 600;
 }
 
 .error-content p {
-  margin: 0 0 1.5rem 0;
-  font-size: 0.875rem;
+  margin: 0 0 1rem 0;
+  font-size: 0.75rem;
   opacity: 0.9;
   line-height: 1.4;
 }
@@ -211,6 +189,7 @@
   border-radius: 0.5rem;
   cursor: pointer;
   font-weight: 600;
+  font-size: 0.75rem;
   transition: all 0.2s ease;
 }
 
@@ -231,29 +210,29 @@
 
 .ring {
   position: absolute;
-  border: 2px solid rgba(66, 133, 244, 0.4);
+  border: 2px solid rgba(91, 124, 255, 0.4);
   border-radius: 50%;
   animation: ripple 2s infinite;
 }
 
 .ring-1 {
-  width: 220px;
-  height: 220px;
-  margin: -110px 0 0 -110px;
+  width: 180px;
+  height: 180px;
+  margin: -90px 0 0 -90px;
   animation-delay: 0s;
 }
 
 .ring-2 {
-  width: 280px;
-  height: 280px;
-  margin: -140px 0 0 -140px;
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
   animation-delay: 0.5s;
 }
 
 .ring-3 {
-  width: 340px;
-  height: 340px;
-  margin: -170px 0 0 -170px;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
   animation-delay: 1s;
 }
 
@@ -263,16 +242,16 @@
   bottom: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(52, 168, 83, 0.95);
+  background: rgba(79, 209, 197, 0.95);
   color: white;
-  padding: 0.75rem 1rem;
-  border-radius: 1.5rem;
-  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.625rem;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 4px 12px rgba(52, 168, 83, 0.4);
+  box-shadow: 0 4px 12px rgba(79, 209, 197, 0.4);
   z-index: 6;
 }
 
@@ -283,10 +262,10 @@
 }
 
 .wave {
-  width: 3px;
-  height: 12px;
+  width: 2px;
+  height: 8px;
   background: white;
-  border-radius: 1.5px;
+  border-radius: 1px;
   animation: sound-wave 0.6s ease-in-out infinite alternate;
 }
 
@@ -303,22 +282,22 @@
   position: absolute;
   top: 1rem;
   right: 1rem;
-  background: rgba(52, 168, 83, 0.95);
+  background: rgba(79, 209, 197, 0.95);
   color: white;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(52, 168, 83, 0.4);
+  box-shadow: 0 2px 8px rgba(79, 209, 197, 0.4);
   z-index: 6;
 }
 
 .ready-icon {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 /* Bottom Avatar Status */
@@ -326,11 +305,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.5rem;
+  padding: 0.5rem 1rem;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 2rem;
+  border-radius: 1.5rem;
   backdrop-filter: blur(10px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
@@ -338,40 +317,40 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  padding: 0.5rem 1rem;
-  border-radius: 1.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
   transition: all 0.3s ease;
 }
 
 .status-indicator.idle {
-  background: rgba(95, 99, 104, 0.1);
-  color: #5f6368;
+  background: rgba(156, 163, 175, 0.1);
+  color: var(--text);
 }
 
 .status-indicator.listening {
-  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(66, 133, 244, 0.25));
-  color: #1a73e8;
+  background: linear-gradient(135deg, rgba(91, 124, 255, 0.15), rgba(91, 124, 255, 0.25));
+  color: var(--primary-blue);
   animation: pulse-status 2s infinite;
 }
 
 .status-indicator.speaking {
-  background: linear-gradient(135deg, rgba(52, 168, 83, 0.15), rgba(52, 168, 83, 0.25));
-  color: #137333;
+  background: linear-gradient(135deg, rgba(79, 209, 197, 0.15), rgba(79, 209, 197, 0.25));
+  color: var(--primary-teal);
   animation: pulse-status 2s infinite;
 }
 
-/* Debug Info */
+/* Debug Info - Smaller for compact layout */
 .debug-info {
   position: absolute;
   bottom: 0.5rem;
   left: 0.5rem;
   background: rgba(0, 0, 0, 0.8);
   color: white;
-  padding: 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.625rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.5rem;
   font-family: 'Courier New', monospace;
   line-height: 1.2;
   z-index: 7;
@@ -443,45 +422,56 @@
 }
 
 @keyframes sound-wave {
-  0% { height: 8px; }
-  100% { height: 16px; }
+  0% { height: 6px; }
+  100% { height: 12px; }
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
+/* Responsive Design for Compact Layout */
+@media (max-width: 1024px) {
   .heygen-avatar {
-    width: 380px;
-    height: 500px;
-    padding: 1rem;
+    width: 300px;
+    height: 360px;
   }
   
   .avatar-container {
-    width: 320px;
-    height: 320px;
+    width: 260px;
+    height: 260px;
+  }
+}
+
+@media (max-width: 768px) {
+  .heygen-avatar {
+    width: 280px;
+    height: 340px;
+    padding: 0.75rem;
+  }
+  
+  .avatar-container {
+    width: 240px;
+    height: 240px;
   }
   
   .avatar-header {
-    padding: 0.5rem 0.75rem;
-  }
-  
-  .test-speech-button {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.7rem;
+    padding: 0.5rem;
   }
 }
 
 @media (max-width: 480px) {
   .heygen-avatar {
-    width: 340px;
-    height: 460px;
+    width: 260px;
+    height: 320px;
   }
   
   .avatar-container {
-    width: 280px;
-    height: 280px;
+    width: 220px;
+    height: 220px;
   }
   
   .debug-info {
     display: none;
+  }
+  
+  .status-text {
+    font-size: 0.625rem;
   }
 }

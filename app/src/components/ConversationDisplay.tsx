@@ -10,14 +10,10 @@ interface Message {
 
 interface ConversationDisplayProps {
   messages: Message[];
-  isExpanded: boolean;
-  onToggleExpand: () => void;
 }
 
 const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
   messages,
-  isExpanded,
-  onToggleExpand,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -32,40 +28,69 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
   };
 
   return (
-    <div className={`conversation-display ${isExpanded ? 'expanded' : ''}`}>
+    <div className="conversation-display">
+      {/* Header */}
       <div className="conversation-header">
-        <h3>Conversation</h3>
-        <button 
-          className="toggle-button"
-          onClick={onToggleExpand}
-          aria-label={isExpanded ? 'Minimize' : 'Expand'}
-        >
-          {isExpanded ? '▼' : '▲'}
-        </button>
+        <h3 className="conversation-title">Conversation</h3>
+        <div className="conversation-status">
+          <span className="message-count">{messages.length} messages</span>
+        </div>
       </div>
       
+      {/* Messages Container */}
       <div className="messages-container">
         {messages.length === 0 ? (
           <div className="no-messages">
-            <p>Start speaking to Oprina</p>
+            <div className="no-messages-content">
+              <p>Start speaking to Oprina</p>
+              <small>Use the microphone button to begin a conversation</small>
+            </div>
           </div>
         ) : (
-          messages.map((message) => (
-            <div 
-              key={message.id}
-              className={`message ${message.sender === 'user' ? 'user-message' : 'assistant-message'}`}
-            >
-              <div className="message-content">
-                <span className="message-sender">
-                  {message.sender === 'user' ? 'You' : 'Oprina'}
-                </span>
-                <p className="message-text">{message.text}</p>
-                <span className="message-time">{formatTimestamp(message.timestamp)}</span>
+          <>
+            {messages.map((message) => (
+              <div 
+                key={message.id}
+                className={`message ${message.sender === 'user' ? 'user-message' : 'assistant-message'}`}
+              >
+                <div className="message-content">
+                  <div className="message-header">
+                    <span className="message-sender">
+                      {message.sender === 'user' ? 'You' : 'Oprina'}
+                    </span>
+                    <span className="message-time">{formatTimestamp(message.timestamp)}</span>
+                  </div>
+                  <p className="message-text">{message.text}</p>
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+            <div ref={messagesEndRef}></div>
+          </>
         )}
-        <div ref={messagesEndRef}></div>
+      </div>
+
+      {/* Input Area */}
+      <div className="conversation-input">
+        <input
+          type="text"
+          className="text-input"
+          placeholder="Type a message or use voice..."
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              // Could add text input functionality here in the future
+              console.log('Text input pressed:', (e.target as HTMLInputElement).value);
+            }
+          }}
+        />
+        <button 
+          className="send-button"
+          onClick={() => {
+            // Could add send functionality here in the future
+            console.log('Send button clicked');
+          }}
+        >
+          Send
+        </button>
       </div>
     </div>
   );
