@@ -1,0 +1,136 @@
+/* src/styles/QuotaIndicator.css */
+/* Quota indicator styles - matches exact mockup design */
+
+.quota-indicator {
+  background: white;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 0.875rem;
+  min-width: 120px;
+  max-width: 180px;
+  transition: all 0.3s ease;
+}
+
+/* Status-based styling */
+.quota-indicator--success {
+  border-left: 4px solid #4caf50;
+}
+
+.quota-indicator--warning {
+  border-left: 4px solid #ff9800;
+}
+
+.quota-indicator--danger {
+  border-left: 4px solid #f44336;
+}
+
+/* Header section */
+.quota-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.quota-icon {
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.quota-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  line-height: 1;
+}
+
+/* Time display */
+.quota-time {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+}
+
+/* Progress bar */
+.quota-bar {
+  width: 100%;
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.quota-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #ff9800, #f44336);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  min-width: 2px; /* Ensure some progress is always visible */
+}
+
+/* Status-specific progress colors */
+.quota-indicator--success .quota-progress {
+  background: #4caf50;
+}
+
+.quota-indicator--warning .quota-progress {
+  background: #ff9800;
+}
+
+.quota-indicator--danger .quota-progress {
+  background: #f44336;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .quota-indicator {
+    min-width: 100px;
+    max-width: 140px;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .quota-status {
+    font-size: 0.625rem;
+  }
+  
+  .quota-time {
+    font-size: 0.875rem;
+  }
+}
+
+/* Animation for quota changes */
+.quota-indicator {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse animation for critical states */
+.quota-indicator--danger {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2), 0 0 0 2px rgba(244, 67, 54, 0.1);
+  }
+  100% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}

@@ -1,9 +1,17 @@
+// src/pages/DashboardPage.tsx
+// Updated dashboard with HybridAvatarManager integration
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
+import HybridAvatarManager, { HybridAvatarManagerRef } from '../components/HybridAvatarManager';
 import ConversationDisplay from '../components/ConversationDisplay';
+import type { 
+  AvatarModeEvent, 
+  QuotaEvent, 
+  HeyGenSessionEvent 
+} from '../types/heygen';
 import '../styles/DashboardPage.css';
 
 interface Message {
@@ -21,19 +29,18 @@ interface Conversation {
 
 const DashboardPage: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
   const [recognition, setRecognition] = useState<InstanceType<typeof window.SpeechRecognition> | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   
-  // Avatar state management
-  const [avatarReady, setAvatarReady] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  const avatarRef = useRef<HeyGenAvatarRef>(null);
+  // New hybrid avatar state
+  const [currentAvatarMode, setCurrentAvatarMode] = useState<string>('static');
+  const [quotaInfo, setQuotaInfo] = useState<any>(null);
   
   const navigate = useNavigate();
+  const avatarManagerRef = useRef<HybridAvatarManagerRef>(null);
 
   const activeMessages = conversations.find(c => c.id === activeConversationId)?.messages || [];
 
@@ -67,12 +74,14 @@ const DashboardPage: React.FC = () => {
       );
     });
 
-    // If it's an assistant message, make avatar speak
-    if (sender === 'assistant' && avatarRef.current && avatarReady) {
-      console.log('🗣️ Making avatar speak:', text);
-      avatarRef.current.speak(text);
+    // Use hybrid avatar to speak assistant responses
+    if (sender === 'assistant' && avatarManagerRef.current) {
+      console.log('🗣️ Making hybrid avatar speak:', text);
+      avatarManagerRef.current.speak(text).catch(error => {
+        console.error('❌ Failed to make avatar speak:', error);
+      });
     }
-  }, [activeConversationId, avatarReady]);
+  }, [activeConversationId]);
 
   useEffect(() => {
     // Handle Gmail OAuth callback
@@ -153,20 +162,22 @@ const DashboardPage: React.FC = () => {
       return "Hello! I'm your Oprina voice assistant. I'm here to help you manage your emails, calendar, and daily tasks efficiently. You can ask me to check your emails, review your schedule, or summarize your day. What would you like me to help you with?";
     } else if (lowerCommand.includes('test') || lowerCommand.includes('testing')) {
       return "This is a test of my speech capabilities. I can speak any text you send to me with perfect lip synchronization. The avatar technology uses advanced AI to match my mouth movements with the spoken words in real-time.";
+    } else if (lowerCommand.includes('quota') || lowerCommand.includes('time')) {
+      return "I'm currently monitoring my interactive time quota. When my HeyGen interactive time runs out, I'll automatically switch to voice-only mode so we can continue our conversation without interruption. You'll see the quota indicator in the top-right corner.";
+    } else if (lowerCommand.includes('mode') || lowerCommand.includes('switch')) {
+      return "I can operate in different modes: Interactive mode with full visual avatar, TTS mode with voice-only responses, and static mode for low-power usage. The mode indicator shows my current status in the top-left corner.";
     } else {
       return `I understand you said: "${transcript}". I'm your intelligent voice assistant powered by advanced AI technology. I can help you with email management, calendar scheduling, task organization, and much more. Try asking me to check your emails or review your calendar!`;
     }
   };
 
   const handleStartListening = useCallback(() => {
-    if (recognition && !isListening && avatarReady) {
+    if (recognition && !isListening) {
       console.log('🎤 Starting speech recognition...');
       recognition.start();
       setIsListening(true);
-    } else if (!avatarReady) {
-      console.warn('⚠️ Avatar not ready yet, please wait...');
     }
-  }, [recognition, isListening, avatarReady]);
+  }, [recognition, isListening]);
 
   const handleStopListening = useCallback(() => {
     if (recognition && isListening) {
@@ -192,30 +203,55 @@ const DashboardPage: React.FC = () => {
     handleVolumeChange(newVolume);
   }, [volume, handleVolumeChange]);
 
-  // Avatar event handlers
-  const handleAvatarReady = useCallback(() => {
-    console.log('🎉 Avatar is ready for interaction!');
-    setAvatarReady(true);
-    setAvatarError(null);
+  // ============================================================================
+  // HYBRID AVATAR EVENT HANDLERS
+  // ============================================================================
+
+  const handleModeChange = useCallback((event: AvatarModeEvent) => {
+    console.log('🔄 Avatar mode changed:', event.fromMode, '→', event.toMode);
+    setCurrentAvatarMode(event.toMode);
+    
+    // Update UI based on mode change
+    if (event.toMode === 'fallback') {
+      console.log('⚠️ Switched to fallback mode:', event.reason);
+    } else if (event.toMode === 'interactive') {
+      console.log('✅ Switched to interactive mode');
+    }
   }, []);
 
-  const handleAvatarError = useCallback((error: string) => {
-    console.error('❌ Avatar error:', error);
-    setAvatarError(error);
-    setAvatarReady(false);
+  const handleQuotaEvent = useCallback((event: QuotaEvent) => {
+    console.log('📊 Quota event:', event.type, event.remainingMinutes);
+    
+    if (event.type === 'quota_warning') {
+      console.log('⚠️ Quota warning: Low interactive time remaining');
+      // Could show a toast notification here
+    } else if (event.type === 'quota_exceeded') {
+      console.log('❌ Quota exceeded: Switched to voice-only mode');
+      // Could show a notification about the mode switch
+    }
+    
+    // Update quota info for display
+    setQuotaInfo({
+      type: event.type,
+      remainingMinutes: event.remainingMinutes,
+      timestamp: event.timestamp,
+    });
   }, []);
 
-  const handleAvatarStartTalking = useCallback(() => {
-    console.log('🗣️ Avatar started talking');
-    setIsSpeaking(true);
+  const handleSessionEvent = useCallback((event: HeyGenSessionEvent) => {
+    console.log('🎭 HeyGen session event:', event.type);
+    
+    if (event.type === 'session_ready') {
+      console.log('🎉 HeyGen session is ready for interaction');
+    } else if (event.type === 'session_error') {
+      console.log('❌ HeyGen session error occurred');
+    }
   }, []);
 
-  const handleAvatarStopTalking = useCallback(() => {
-    console.log('🤐 Avatar stopped talking');
-    setIsSpeaking(false);
-  }, []);
+  // ============================================================================
+  // CONVERSATION MANAGEMENT
+  // ============================================================================
 
-  // Conversation management for sidebar
   const handleNewChat = () => {
     const newId = Date.now().toString();
     const newConversation: Conversation = {
@@ -233,9 +269,32 @@ const DashboardPage: React.FC = () => {
     console.log('💬 Conversation selected:', id);
   };
 
+  // ============================================================================
+  // MANUAL AVATAR CONTROL
+  // ============================================================================
+
+  const handleManualSpeak = useCallback((text: string) => {
+    if (avatarManagerRef.current && text.trim()) {
+      avatarManagerRef.current.speak(text).catch(error => {
+        console.error('❌ Manual speak failed:', error);
+      });
+    }
+  }, []);
+
+  const handleResetQuota = useCallback(() => {
+    if (avatarManagerRef.current) {
+      avatarManagerRef.current.resetQuota();
+      console.log('🔄 Quota reset manually');
+    }
+  }, []);
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
   return (
     <div className="dashboard-page">
-      {/* Restored Sidebar */}
+      {/* Sidebar - unchanged */}
       <Sidebar
         conversations={conversations}
         activeConversationId={activeConversationId}
@@ -247,35 +306,30 @@ const DashboardPage: React.FC = () => {
       <div className="main-content">
         <div className="dashboard-unified">
           
-          {/* Left Side: Avatar + Controls (50%) */}
+          {/* Left Side: Hybrid Avatar + Controls (50%) */}
           <div className="avatar-section">
-            {/* Clean Avatar Container */}
-            <div className="avatar-container-wrapper">
-              <HeyGenAvatar
-                ref={avatarRef}
-                isListening={isListening}
-                isSpeaking={isSpeaking}
-                onAvatarReady={handleAvatarReady}
-                onAvatarError={handleAvatarError}
-                onAvatarStartTalking={handleAvatarStartTalking}
-                onAvatarStopTalking={handleAvatarStopTalking}
-              />
-            </div>
+            
+            {/* NEW: Hybrid Avatar Manager */}
+            <HybridAvatarManager
+              ref={avatarManagerRef}
+              selectedAvatarId="Ann_Therapist_public"
+              quotaConfig={{
+                totalMinutes: 20,
+                warningThreshold: 5,
+                resetType: 'manual',
+              }}
+              onModeChange={handleModeChange}
+              onQuotaEvent={handleQuotaEvent}
+              onSessionEvent={handleSessionEvent}
+              className="hybrid-avatar-instance"
+            />
 
-             {avatarError && (
-              <div className="avatar-error-message">
-                <p>⚠️ Avatar connection issue</p>
-                <small>{avatarError}</small>
-              </div>
-            )}
-
-            {/* Clean Voice Controls */}
+            {/* Voice Controls - enhanced with hybrid avatar integration */}
             <div className="compact-voice-controls">
               {/* Microphone Button */}
               <button 
                 className={`btn voice-button mic-button ${isListening ? 'active' : ''}`}
                 onClick={isListening ? handleStopListening : handleStartListening}
-                disabled={!avatarReady}
                 title={isListening ? 'Stop listening' : 'Start listening'}
               >
                 {isListening ? '🎙️' : '🎤'}
@@ -317,10 +371,30 @@ const DashboardPage: React.FC = () => {
                   🔊
                 </button>
               </div>
+
+              {/* NEW: Manual Controls for Testing */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="debug-controls">
+                  <button 
+                    className="btn debug-button"
+                    onClick={() => handleManualSpeak('This is a test of the hybrid avatar system.')}
+                    title="Test speech"
+                  >
+                    🗣️
+                  </button>
+                  <button 
+                    className="btn debug-button"
+                    onClick={handleResetQuota}
+                    title="Reset quota"
+                  >
+                    🔄
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right Side: Conversation (50%) */}
+          {/* Right Side: Conversation (50%) - unchanged */}
           <div className="conversation-section">
             <ConversationDisplay
               messages={activeMessages}
@@ -328,6 +402,32 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Development Info Panel */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="dev-info-panel">
+          <h4>🔧 Development Info</h4>
+          <div className="dev-info-grid">
+            <div>
+              <strong>Avatar Mode:</strong> {currentAvatarMode}
+            </div>
+            <div>
+              <strong>Speech Recognition:</strong> {recognition ? 'Available' : 'Not Available'}
+            </div>
+            <div>
+              <strong>Listening:</strong> {isListening ? 'Yes' : 'No'}
+            </div>
+            <div>
+              <strong>Volume:</strong> {volume}%
+            </div>
+            {quotaInfo && (
+              <div>
+                <strong>Last Quota Event:</strong> {quotaInfo.type} ({Math.round(quotaInfo.remainingMinutes)}min)
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

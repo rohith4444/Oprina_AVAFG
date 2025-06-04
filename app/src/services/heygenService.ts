@@ -10,7 +10,6 @@ import type {
   CreateSessionResponse,
   SessionInfo,
   SessionConfig,
-  HeyGenError,
   SessionHealthResponse
 } from '../types/heygen';
 import { createHeyGenError, isHeyGenError } from '../utils/avatarutils';

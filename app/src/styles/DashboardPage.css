@@ -1,4 +1,4 @@
-/* DashboardPage.css - Fixed with Sidebar + 50/50 Layout */
+/* src/styles/DashboardPage.css - Updated with Hybrid Avatar Integration */
 
 /* Main container - Grid with sidebar */
 .dashboard-page {
@@ -8,6 +8,7 @@
   width: 100vw;
   overflow: hidden;
   background: linear-gradient(135deg, var(--background-alt) 0%, var(--background) 100%);
+  position: relative;
 }
 
 /* Main Content Area */
@@ -41,16 +42,15 @@
   border-right: 1px solid var(--border);
 }
 
-.avatar-container-wrapper {
+/* NEW: Hybrid Avatar Instance - replaces old avatar container */
+.hybrid-avatar-instance {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   margin-bottom: 1.5rem;
 }
 
-/* Clean Voice Controls - Removed all status elements */
+/* Updated Voice Controls - enhanced for hybrid avatar */
 .compact-voice-controls {
   display: flex;
   align-items: center;
@@ -61,6 +61,7 @@
   border-radius: 0.75rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 
 /* Voice Button - Using existing button system */
@@ -184,12 +185,76 @@
   font-weight: 500;
 }
 
-/* Right Side: Conversation (50%) */
+/* NEW: Debug Controls (development only) */
+.debug-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.debug-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.5rem;
+  background-color: var(--background-alt);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+.debug-button:hover {
+  background-color: var(--border);
+  transform: scale(1.05);
+}
+
+/* Right Side: Conversation (50%) - unchanged */
 .conversation-section {
   flex: 1;
   background-color: var(--background);
   display: flex;
   flex-direction: column;
+}
+
+/* NEW: Development Info Panel */
+.dev-info-panel {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  max-width: 300px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.dev-info-panel h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: #4ADE80;
+}
+
+.dev-info-grid {
+  display: grid;
+  gap: 0.25rem;
+  font-family: monospace;
+}
+
+.dev-info-grid > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dev-info-grid strong {
+  color: #93C5FD;
+  margin-right: 0.5rem;
 }
 
 /* Animations - Using existing system */
@@ -232,6 +297,14 @@
     flex: 1;
     min-height: 400px;
   }
+  
+  .dev-info-panel {
+    position: relative;
+    bottom: auto;
+    right: auto;
+    margin-top: 1rem;
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 768px) {
@@ -259,6 +332,11 @@
     gap: 0.5rem;
     padding: 1rem;
   }
+  
+  .debug-controls {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 480px) {
@@ -284,5 +362,10 @@
   
   .avatar-section {
     padding: 1rem;
+  }
+  
+  .dev-info-panel {
+    font-size: 0.625rem;
+    padding: 0.75rem;
   }
 }

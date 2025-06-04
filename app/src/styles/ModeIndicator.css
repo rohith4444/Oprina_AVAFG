@@ -1,0 +1,182 @@
+/* src/styles/ModeIndicator.css */
+/* Mode indicator styles - matches exact mockup design */
+
+.mode-indicator {
+  background: white;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 140px;
+  transition: all 0.3s ease;
+}
+
+/* Mode-specific styling */
+.mode-indicator--success {
+  border-left: 4px solid #4caf50;
+  color: #4caf50;
+}
+
+.mode-indicator--warning {
+  border-left: 4px solid #ff9800;
+  color: #ff9800;
+}
+
+.mode-indicator--neutral {
+  border-left: 4px solid #666;
+  color: #666;
+}
+
+.mode-indicator--connecting {
+  border-left: 4px solid #2196f3;
+  color: #2196f3;
+}
+
+/* Icon styling */
+.mode-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mode-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Animation for connecting state */
+.mode-indicator--connecting .mode-icon {
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Hover effects */
+.mode-indicator:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Status-specific animations */
+.mode-indicator--success {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.mode-indicator--warning {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Pulse animation for important states */
+.mode-indicator--warning {
+  animation: warningPulse 3s infinite;
+}
+
+@keyframes warningPulse {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.2), 0 0 0 2px rgba(255, 152, 0, 0.1);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .mode-indicator {
+    min-width: 120px;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .mode-text {
+    font-size: 0.75rem;
+  }
+  
+  .mode-icon {
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .mode-indicator {
+    min-width: 100px;
+    padding: 0.5rem;
+  }
+  
+  .mode-text {
+    font-size: 0.625rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mode-indicator {
+    border-width: 2px;
+  }
+  
+  .mode-indicator--success {
+    border-left-width: 6px;
+  }
+  
+  .mode-indicator--warning {
+    border-left-width: 6px;
+  }
+  
+  .mode-indicator--neutral {
+    border-left-width: 6px;
+  }
+  
+  .mode-indicator--connecting {
+    border-left-width: 6px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .mode-indicator--connecting .mode-icon {
+    animation: none;
+  }
+  
+  .mode-indicator--warning {
+    animation: none;
+  }
+  
+  .mode-indicator {
+    transition: none;
+  }
+}

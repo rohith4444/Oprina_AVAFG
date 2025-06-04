@@ -212,4 +212,238 @@ export const useAudioFallback = (
   }, [isSupported, state.queue]);
 
   /**
-   * Speak
+   * Speak a single text string
+   */
+  const speakText = useCallback((text: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!isSupported) {
+        reject(new Error('Speech synthesis not supported'));
+        return;
+      }
+
+      if (!text.trim()) {
+        resolve();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Apply configuration
+      if (config.voice) {
+        utterance.voice = config.voice;
+      }
+      utterance.rate = config.rate;
+      utterance.pitch = config.pitch;
+      utterance.volume = config.volume;
+
+      // Set up event handlers
+      utterance.onstart = () => {
+        currentUtterance.current = utterance;
+        setState(prev => ({ ...prev, isSpeaking: true, error: null }));
+      };
+
+      utterance.onend = () => {
+        currentUtterance.current = null;
+        setState(prev => ({ ...prev, isSpeaking: false }));
+        resolve();
+      };
+
+      utterance.onerror = (event) => {
+        currentUtterance.current = null;
+        setState(prev => ({ 
+          ...prev, 
+          isSpeaking: false, 
+          error: `Speech synthesis error: ${event.error}` 
+        }));
+        reject(new Error(`Speech synthesis error: ${event.error}`));
+      };
+
+      // Start speaking
+      speechSynthesis.speak(utterance);
+    });
+  }, [isSupported, config]);
+
+  /**
+   * Add text to speech queue
+   */
+  const speak = useCallback(async (text: string): Promise<void> => {
+    if (!isSupported) {
+      throw new Error('Speech synthesis not supported');
+    }
+
+    if (!text.trim()) {
+      return;
+    }
+
+    // Add to queue
+    setState(prev => ({
+      ...prev,
+      queue: [...prev.queue, text],
+      error: null,
+    }));
+
+    // Start processing if not already running
+    if (!isProcessingQueue.current) {
+      setTimeout(() => processQueue(), 50);
+    }
+  }, [isSupported, processQueue]);
+
+  /**
+   * Stop current speech and clear queue
+   */
+  const stop = useCallback(() => {
+    if (isSupported) {
+      speechSynthesis.cancel();
+      currentUtterance.current = null;
+      isProcessingQueue.current = false;
+      
+      setState(prev => ({
+        ...prev,
+        isSpeaking: false,
+        queue: [],
+        error: null,
+      }));
+    }
+  }, [isSupported]);
+
+  /**
+   * Pause current speech
+   */
+  const pause = useCallback(() => {
+    if (isSupported && speechSynthesis.speaking) {
+      speechSynthesis.pause();
+    }
+  }, [isSupported]);
+
+  /**
+   * Resume paused speech
+   */
+  const resume = useCallback(() => {
+    if (isSupported && speechSynthesis.paused) {
+      speechSynthesis.resume();
+    }
+  }, [isSupported]);
+
+  /**
+   * Clear the speech queue without stopping current utterance
+   */
+  const clearQueue = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      queue: [],
+    }));
+  }, []);
+
+  // ============================================================================
+  // CONFIGURATION FUNCTIONS
+  // ============================================================================
+
+  /**
+   * Set voice
+   */
+  const setVoice = useCallback((voice: SpeechSynthesisVoice | null) => {
+    setConfig(prev => ({ ...prev, voice }));
+    setState(prev => ({ ...prev, currentVoice: voice }));
+  }, []);
+
+  /**
+   * Set speech rate
+   */
+  const setRate = useCallback((rate: number) => {
+    const clampedRate = Math.max(0.1, Math.min(10, rate));
+    setConfig(prev => ({ ...prev, rate: clampedRate }));
+  }, []);
+
+  /**
+   * Set speech pitch
+   */
+  const setPitch = useCallback((pitch: number) => {
+    const clampedPitch = Math.max(0, Math.min(2, pitch));
+    setConfig(prev => ({ ...prev, pitch: clampedPitch }));
+  }, []);
+
+  /**
+   * Set speech volume
+   */
+  const setVolume = useCallback((volume: number) => {
+    const clampedVolume = Math.max(0, Math.min(1, volume));
+    setConfig(prev => ({ ...prev, volume: clampedVolume }));
+  }, []);
+
+  /**
+   * Update multiple config properties
+   */
+  const updateConfig = useCallback((newConfig: Partial<AudioFallbackConfig>) => {
+    setConfig(prev => ({ ...prev, ...newConfig }));
+  }, []);
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  /**
+   * Load voices on mount and when voices change
+   */
+  useEffect(() => {
+    if (isSupported) {
+      loadVoices();
+      
+      // Listen for voices changed event
+      const handleVoicesChanged = () => {
+        loadVoices();
+      };
+      
+      speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+      
+      return () => {
+        speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      };
+    }
+  }, [loadVoices, isSupported]);
+
+  /**
+   * Save config to storage when it changes
+   */
+  useEffect(() => {
+    saveConfigToStorage(config);
+  }, [config, saveConfigToStorage]);
+
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      stop();
+    };
+  }, [stop]);
+
+  // ============================================================================
+  // RETURN
+  // ============================================================================
+
+  return {
+    // State
+    state,
+    config,
+    
+    // Actions
+    speak,
+    stop,
+    pause,
+    resume,
+    clearQueue,
+    
+    // Configuration
+    setVoice,
+    setRate,
+    setPitch,
+    setVolume,
+    updateConfig,
+    
+    // Utilities
+    getAvailableVoices,
+    isSupported,
+  };
+};
+
+export default useAudioFallback;

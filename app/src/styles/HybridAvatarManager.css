@@ -1,0 +1,189 @@
+/* src/styles/HybridAvatarManager.css */
+/* Hybrid avatar manager styles - matches exact mockup layout */
+
+.hybrid-avatar-manager {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  gap: 1.5rem;
+}
+
+/* Status Indicators Row - exactly like mockup */
+.status-indicators {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  height: 60px; /* Fixed height for consistency */
+  margin-bottom: 0;
+}
+
+/* Avatar Container - matches existing layout */
+.avatar-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 380px;
+}
+
+/* Fallback TTS Overlay */
+.fallback-tts-overlay {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: 280px;
+  width: 90%;
+}
+
+/* Debug Info (development only) */
+.debug-info {
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 0.375rem;
+  border: 1px solid var(--border, #e5e7eb);
+  font-family: monospace;
+  color: #666;
+  text-align: center;
+  font-size: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* Transition animations for mode changes */
+.hybrid-avatar-manager {
+  transition: all 0.3s ease;
+}
+
+.avatar-container-wrapper {
+  transition: all 0.3s ease;
+}
+
+/* Mode-specific styling */
+.hybrid-avatar-manager[data-mode="interactive"] {
+  /* Interactive mode specific styles if needed */
+}
+
+.hybrid-avatar-manager[data-mode="fallback"] {
+  /* Fallback mode specific styles if needed */
+}
+
+.hybrid-avatar-manager[data-mode="static"] {
+  /* Static mode specific styles if needed */
+}
+
+.hybrid-avatar-manager[data-mode="connecting"] {
+  /* Connecting mode specific styles if needed */
+}
+
+/* Loading state */
+.hybrid-avatar-manager.loading {
+  opacity: 0.8;
+}
+
+.hybrid-avatar-manager.loading .avatar-container-wrapper {
+  pointer-events: none;
+}
+
+/* Error state */
+.hybrid-avatar-manager.error {
+  /* Error state styles if needed */
+}
+
+/* Responsive design - matches existing breakpoints */
+@media (max-width: 1200px) {
+  .hybrid-avatar-manager {
+    gap: 1rem;
+  }
+  
+  .status-indicators {
+    height: auto;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  
+  .avatar-container-wrapper {
+    min-height: 320px;
+  }
+  
+  .fallback-tts-overlay {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    margin-top: 1rem;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .hybrid-avatar-manager {
+    gap: 0.75rem;
+  }
+  
+  .status-indicators {
+    gap: 0.5rem;
+  }
+  
+  .avatar-container-wrapper {
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hybrid-avatar-manager {
+    gap: 0.5rem;
+  }
+  
+  .status-indicators {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .avatar-container-wrapper {
+    min-height: 240px;
+  }
+  
+  .debug-info {
+    font-size: 0.625rem;
+    padding: 0.375rem;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .debug-info {
+    border-width: 2px;
+    background: rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .hybrid-avatar-manager,
+  .avatar-container-wrapper {
+    transition: none;
+  }
+}
+
+/* Focus management for accessibility */
+.hybrid-avatar-manager:focus-within {
+  outline: 2px solid var(--primary-blue, #5B7CFF);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* Print styles */
+@media print {
+  .debug-info {
+    display: none;
+  }
+  
+  .fallback-tts-overlay {
+    display: none;
+  }
+}

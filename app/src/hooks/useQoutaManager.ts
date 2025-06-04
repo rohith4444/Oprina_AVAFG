@@ -7,7 +7,6 @@ import type {
   QuotaStatus,
   QuotaConfig,
   SessionUsage,
-  StoredQuotaData,
   QuotaEvent
 } from '../types/heygen';
 import {
@@ -26,7 +25,6 @@ import {
 // ============================================================================
 
 const STORAGE_KEY = 'heygen_quota_state';
-const STORAGE_VERSION = '1.0.0';
 
 const DEFAULT_CONFIG: QuotaConfig = {
   totalMinutes: 20,
@@ -77,31 +75,19 @@ interface ActiveSession {
 export const useQuotaManager = (
   initialConfig: Partial<QuotaConfig> = {}
 ): UseQuotaManagerReturn => {
+  
+  // ============================================================================
+  // STATE SETUP
+  // ============================================================================
+  
   // Configuration
   const [config, setConfig] = useState<QuotaConfig>({
     ...DEFAULT_CONFIG,
     ...initialConfig,
   });
 
-  // Quota state
-  const [quotaState, setQuotaState] = useState<QuotaState>(() => 
-    loadQuotaFromStorage() || resetQuotaState(config.totalMinutes)
-  );
-
-  // Active sessions tracking
-  const [activeSessions] = useState<Map<string, ActiveSession>>(new Map());
-  
-  // Event listeners
-  const eventListeners = useRef<((event: QuotaEvent) => void)[]>([]);
-
-  // ============================================================================
-  // STORAGE FUNCTIONS
-  // ============================================================================
-
-  /**
-   * Load quota state from localStorage
-   */
-  function loadQuotaFromStorage(): QuotaState | null {
+  // Load quota state from storage
+  const loadQuotaFromStorage = useCallback((): QuotaState | null => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (!stored) return null;
@@ -117,7 +103,22 @@ export const useQuotaManager = (
       console.error('Failed to load quota from storage:', error);
       return null;
     }
-  }
+  }, []);
+
+  // Quota state
+  const [quotaState, setQuotaState] = useState<QuotaState>(() => 
+    loadQuotaFromStorage() || resetQuotaState(config.totalMinutes)
+  );
+
+  // Active sessions tracking
+  const [activeSessions] = useState<Map<string, ActiveSession>>(new Map());
+  
+  // Event listeners
+  const eventListeners = useRef<((event: QuotaEvent) => void)[]>([]);
+
+  // ============================================================================
+  // STORAGE FUNCTIONS
+  // ============================================================================
 
   /**
    * Save quota state to localStorage
@@ -150,7 +151,7 @@ export const useQuotaManager = (
   /**
    * Get remaining time in minutes and seconds
    */
-  const getTimeRemaining = useCallback() => {
+  const getTimeRemaining = useCallback(() => {
     const totalSeconds = Math.max(0, quotaStatus.remainingSeconds);
     return {
       minutes: Math.floor(totalSeconds / 60),
