@@ -1,8 +1,10 @@
+// src/pages/DashboardPage.tsx - Updated Integration
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
+import StaticAvatar, { StaticAvatarRef } from '../components/StaticAvatar';
 import ConversationDisplay from '../components/ConversationDisplay';
 import '../styles/DashboardPage.css';
 
@@ -28,10 +30,14 @@ const DashboardPage: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   
-  // Avatar state management
+  // Avatar configuration - Feature flag for static vs streaming
+  const [useStaticAvatar, setUseStaticAvatar] = useState(true); // Toggle this to switch modes
   const [avatarReady, setAvatarReady] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
-  const avatarRef = useRef<HeyGenAvatarRef>(null);
+  
+  // Refs for both avatar types
+  const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
+  const staticAvatarRef = useRef<StaticAvatarRef>(null);
   
   const navigate = useNavigate();
 
@@ -67,12 +73,17 @@ const DashboardPage: React.FC = () => {
       );
     });
 
-    // If it's an assistant message, make avatar speak
-    if (sender === 'assistant' && avatarRef.current && avatarReady) {
+    // Make avatar speak (works for both static and streaming)
+    if (sender === 'assistant' && avatarReady) {
       console.log('🗣️ Making avatar speak:', text);
-      avatarRef.current.speak(text);
+      
+      if (useStaticAvatar && staticAvatarRef.current) {
+        staticAvatarRef.current.speak(text);
+      } else if (!useStaticAvatar && streamingAvatarRef.current) {
+        streamingAvatarRef.current.speak(text);
+      }
     }
-  }, [activeConversationId, avatarReady]);
+  }, [activeConversationId, avatarReady, useStaticAvatar]);
 
   useEffect(() => {
     // Handle Gmail OAuth callback
@@ -192,7 +203,7 @@ const DashboardPage: React.FC = () => {
     handleVolumeChange(newVolume);
   }, [volume, handleVolumeChange]);
 
-  // Avatar event handlers
+  // Unified avatar event handlers (work for both static and streaming)
   const handleAvatarReady = useCallback(() => {
     console.log('🎉 Avatar is ready for interaction!');
     setAvatarReady(true);
@@ -233,6 +244,14 @@ const DashboardPage: React.FC = () => {
     console.log('💬 Conversation selected:', id);
   };
 
+  // Avatar mode toggle (for testing/development)
+  const toggleAvatarMode = () => {
+    setUseStaticAvatar(!useStaticAvatar);
+    setAvatarReady(false);
+    setAvatarError(null);
+    console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
+  };
+
   return (
     <div className="dashboard-page">
       {/* Restored Sidebar */}
@@ -249,20 +268,53 @@ const DashboardPage: React.FC = () => {
           
           {/* Left Side: Avatar + Controls (50%) */}
           <div className="avatar-section">
-            {/* Clean Avatar Container */}
+            {/* Avatar Mode Toggle (Development Only) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+                <button 
+                  onClick={toggleAvatarMode}
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    fontSize: '0.75rem',
+                    backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
+                </button>
+              </div>
+            )}
+
+            {/* Avatar Container - Conditional Rendering */}
             <div className="avatar-container-wrapper">
-              <HeyGenAvatar
-                ref={avatarRef}
-                isListening={isListening}
-                isSpeaking={isSpeaking}
-                onAvatarReady={handleAvatarReady}
-                onAvatarError={handleAvatarError}
-                onAvatarStartTalking={handleAvatarStartTalking}
-                onAvatarStopTalking={handleAvatarStopTalking}
-              />
+              {useStaticAvatar ? (
+                <StaticAvatar
+                  ref={staticAvatarRef}
+                  isListening={isListening}
+                  isSpeaking={isSpeaking}
+                  onAvatarReady={handleAvatarReady}
+                  onAvatarError={handleAvatarError}
+                  onAvatarStartTalking={handleAvatarStartTalking}
+                  onAvatarStopTalking={handleAvatarStopTalking}
+                />
+              ) : (
+                <HeyGenAvatar
+                  ref={streamingAvatarRef}
+                  isListening={isListening}
+                  isSpeaking={isSpeaking}
+                  onAvatarReady={handleAvatarReady}
+                  onAvatarError={handleAvatarError}
+                  onAvatarStartTalking={handleAvatarStartTalking}
+                  onAvatarStopTalking={handleAvatarStopTalking}
+                />
+              )}
             </div>
 
-             {avatarError && (
+            {/* Error Display */}
+            {avatarError && (
               <div className="avatar-error-message">
                 <p>⚠️ Avatar connection issue</p>
                 <small>{avatarError}</small>
