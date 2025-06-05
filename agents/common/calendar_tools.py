@@ -91,17 +91,17 @@ def calendar_authenticate(tool_context=None) -> str:
     else:
         return "Failed to authenticate with Calendar. Please try again."
 
-def calendar_list_events(tool_context=None, time_min: Optional[str] = None, time_max: Optional[str] = None, 
-                        max_results: int = 10, single_events: bool = True) -> Dict[str, Any]:
+def calendar_list_events(time_min: Optional[str] = None, time_max: Optional[str] = None, 
+                        max_results: int = 10, single_events: bool = True, tool_context=None) -> Dict[str, Any]:
     """
     List Calendar events.
     
     Args:
-        tool_context: The tool context containing session information
         time_min: Start time for events (ISO format)
         time_max: End time for events (ISO format)
         max_results: Maximum number of results to return
         single_events: Whether to expand recurring events
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: List of events
@@ -166,13 +166,13 @@ def calendar_list_events(tool_context=None, time_min: Optional[str] = None, time
         logger.error(f"Error listing Calendar events: {e}")
         return {"error": f"Failed to list Calendar events: {str(e)}"}
 
-def calendar_get_event(tool_context=None, event_id: str = "") -> Dict[str, Any]:
+def calendar_get_event(event_id: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Get a Calendar event.
     
     Args:
-        tool_context: The tool context containing session information
         event_id: Event ID
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Event details
@@ -213,20 +213,20 @@ def calendar_get_event(tool_context=None, event_id: str = "") -> Dict[str, Any]:
         logger.error(f"Error getting Calendar event: {e}")
         return {"error": f"Failed to get Calendar event: {str(e)}"}
 
-def calendar_create_event(tool_context=None, summary: str = "", start_time: str = "", end_time: str = "",
+def calendar_create_event(summary: str = "", start_time: str = "", end_time: str = "",
                          description: Optional[str] = None, location: Optional[str] = None,
-                         attendees: Optional[List[str]] = None) -> Dict[str, Any]:
+                         attendees: Optional[List[str]] = None, tool_context=None) -> Dict[str, Any]:
     """
     Create a Calendar event.
     
     Args:
-        tool_context: The tool context containing session information
         summary: Event summary/title
         start_time: Start time (ISO format)
         end_time: End time (ISO format)
         description: Event description
         location: Event location
         attendees: List of attendee email addresses
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Created event details
@@ -289,15 +289,14 @@ def calendar_create_event(tool_context=None, summary: str = "", start_time: str 
         logger.error(f"Error creating Calendar event: {e}")
         return {"error": f"Failed to create Calendar event: {str(e)}"}
 
-def calendar_update_event(tool_context=None, event_id: str = "", summary: Optional[str] = None,
+def calendar_update_event(event_id: str = "", summary: Optional[str] = None,
                          start_time: Optional[str] = None, end_time: Optional[str] = None,
                          description: Optional[str] = None, location: Optional[str] = None,
-                         attendees: Optional[List[str]] = None) -> Dict[str, Any]:
+                         attendees: Optional[List[str]] = None, tool_context=None) -> Dict[str, Any]:
     """
     Update a Calendar event.
     
     Args:
-        tool_context: The tool context containing session information
         event_id: Event ID
         summary: Event summary/title
         start_time: Start time (ISO format)
@@ -305,6 +304,7 @@ def calendar_update_event(tool_context=None, event_id: str = "", summary: Option
         description: Event description
         location: Event location
         attendees: List of attendee email addresses
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Updated event details
@@ -377,16 +377,16 @@ def calendar_update_event(tool_context=None, event_id: str = "", summary: Option
         logger.error(f"Error updating Calendar event: {e}")
         return {"error": f"Failed to update Calendar event: {str(e)}"}
 
-def calendar_delete_event(tool_context=None, event_id: str = "") -> Dict[str, Any]:
+def calendar_delete_event(event_id: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Delete a Calendar event.
     
     Args:
-        tool_context: The tool context containing session information
         event_id: Event ID
+        tool_context: The tool context containing session information
         
     Returns:
-        Dict[str, Any]: Status
+        Dict[str, Any]: Deletion status
     """
     logger.info(f"Deleting Calendar event: {event_id}")
     

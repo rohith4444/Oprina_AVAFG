@@ -1,8 +1,7 @@
 """
 Calendar Agent for ADK Integration
 
-This module provides a calendar agent that handles Calendar operations using direct API tools
-instead of the MCP client.
+This module provides a calendar agent that handles Calendar operations using MCP tools.
 """
 
 import os
@@ -71,10 +70,6 @@ except ImportError:
             if self.func:
                 return self.func(*args, **kwargs)
             return {"error": "Function not implemented"}
-
-# Import direct tools
-from agents.common.calendar_tools import calendar_tools
-from agents.common.gmail_tools import gmail_tools
 
 class ProcessableCalendarAgent:
     """
@@ -203,99 +198,93 @@ class CalendarAgent:
                 )
         return {"error": "calendar_delete_event tool not found"}
 
-def create_calendar_agent():
+async def create_calendar_agent_with_mcp():
     """
-    Create a calendar agent with ADK integration.
+    Create the Calendar Agent with proper ADK MCP integration.
+    
+    This function demonstrates the correct ADK MCP pattern using StdioServerParameters
+    to automatically discover and load MCP tools.
     
     Returns:
-        CalendarAgent: The calendar agent
+        CalendarAgent: Configured calendar agent with MCP tools
     """
-    logger.info("Creating calendar agent with ADK integration")
+    print("--- Creating Calendar Agent with ADK MCP Integration ---")
     
-    # Create model
-    if ADK_AVAILABLE:
-        model = LiteLlm(
-            model=settings.ADK_MODEL,
-            temperature=0.7,
-            max_tokens=1000
+    try:
+        # Import ADK MCP tools
+        from google.adk.tools.mcp import MCPToolset
+        from google.adk.tools.mcp.server_parameters import StdioServerParameters
+        
+        # ADK automatically discovers and loads MCP tools
+        mcp_toolset = await MCPToolset.from_server(
+            StdioServerParameters(
+                command="python",
+                args=["mcp_server/run_server.py"],
+                env=os.environ.copy()
+            )
         )
-    else:
-        model = LiteLlm()
-    
-    # Create calendar agent
-    calendar_agent = CalendarAgent(
-        model=model,
-        tools=calendar_tools
-    )
-    
-    return calendar_agent
+        
+        # Filter for calendar tools
+        calendar_tools = [tool for tool in mcp_toolset.tools if tool.name.startswith("calendar_")]
+        
+        # Create the Calendar Agent with MCP tools
+        agent_instance = CalendarAgent(tools=calendar_tools)
+        
+        print(f"Created Calendar Agent with {len(calendar_tools)} MCP tools")
+        return agent_instance
+        
+    except ImportError:
+        print("ADK MCP tools not available, falling back to direct tools")
+        return CalendarAgent()
+    except Exception as e:
+        print(f"Error creating Calendar Agent with MCP: {e}")
+        return CalendarAgent()
 
-# Helper functions for session management
 def _extract_session(event):
     """Extract session from event."""
-    if not event:
-        return None
-    
-    # Try to get session from event
-    session = event.get("session", {})
-    
-    # If session is empty, try to get from context
-    if not session and "context" in event:
-        session = event["context"].get("session", {})
-    
-    return session
+    return event.get("session", {})
 
 def _extract_app_name_and_user_id(event):
     """Extract app name and user ID from event."""
-    if not event:
-        return None, None
-    
-    # Try to get app name and user ID from event
-    app_name = event.get("app_name")
-    user_id = event.get("user_id")
-    
-    # If not found, try to get from context
-    if not app_name and "context" in event:
-        app_name = event["context"].get("app_name")
-    
-    if not user_id and "context" in event:
-        user_id = event["context"].get("user_id")
-    
+    session = _extract_session(event)
+    app_name = session.get("app_name", "default")
+    user_id = session.get("user_id", "default")
     return app_name, user_id
 
 def _ensure_session(event):
     """Ensure session exists in event."""
-    if not event:
-        return event
-    
-    # If session doesn't exist, create it
     if "session" not in event:
         event["session"] = {}
-    
     return event
 
-# Test function
-def test_calendar_agent_adk_integration():
-    """Test calendar agent ADK integration."""
-    # Create calendar agent
-    calendar_agent = create_calendar_agent()
+# Update the main function to use the MCP agent
+async def main():
+    """Main function to run the calendar agent."""
+    # Create the calendar agent with MCP integration
+    calendar_agent = await create_calendar_agent_with_mcp()
     
-    # Create test event
-    test_event = {
-        "intent": {
-            "name": "calendar_list_events",
-            "parameters": {
-                "time_min": "2023-01-01T00:00:00Z",
-                "time_max": "2023-12-31T23:59:59Z",
-                "max_results": 5
-            }
-        },
-        "session": {
-            "id": "test_session_id",
-            "user_id": "test_user_id",
-            "app_name": "test_app"
-        }
-    }
+    # Create a processable agent
+    processable_agent = ProcessableCalendarAgent(calendar_agent)
     
-    # Run test event
-    asyncio.run(calendar_agent.process(test_event))
+    # Run the agent
+    if ADK_AVAILABLE:
+        # Create an ADK agent
+        model = LiteLlm(
+            model=settings.CALENDAR_MODEL,
+            api_key=settings.GOOGLE_API_KEY
+        )
+        
+        adk_agent = LlmAgent(
+            name="calendar_agent",
+            description="Calendar operations agent",
+            model=model,
+            tools=calendar_agent.tools
+        )
+        
+        # Run the ADK agent
+        await adk_agent.run()
+    else:
+        print("ADK not available, running in fallback mode")
+
+if __name__ == "__main__":
+    asyncio.run(main())

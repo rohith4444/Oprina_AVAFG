@@ -48,19 +48,8 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             pass
 
-# Import the MCP integration
-from .mcp_integration import get_content_mcp_tools, get_content_mcp_tools_sync
-
-# Import the content tools
-from agents.common.content_tools import (
-    summarize_email_content,
-    summarize_email_list,
-    generate_email_reply,
-    analyze_email_sentiment,
-    extract_action_items,
-    optimize_for_voice,
-    create_voice_summary
-)
+# Import settings
+from config.settings import settings
 
 class ProcessableContentAgent:
     """
@@ -166,7 +155,7 @@ class ContentAgent:
             content = params.get('content', '')
             detail_level = params.get('detail_level', 'moderate')
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'summarize_email_content':
                     result = await tool.call(content=content, detail_level=detail_level)
@@ -175,11 +164,10 @@ class ContentAgent:
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = summarize_email_content(content, detail_level)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No summarize_email_content tool found'
             }
         except Exception as e:
             logger.error(f"Error summarizing email content: {e}")
@@ -201,10 +189,10 @@ class ContentAgent:
         try:
             # Extract the parameters
             params = event.get('intent', {}).get('parameters', {})
-            emails = params.get('emails', [])
+            emails = params.get('emails', '')
             max_emails = params.get('max_emails', 5)
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'summarize_email_list':
                     result = await tool.call(emails=emails, max_emails=max_emails)
@@ -213,11 +201,10 @@ class ContentAgent:
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = summarize_email_list(emails, max_emails)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No summarize_email_list tool found'
             }
         except Exception as e:
             logger.error(f"Error summarizing email list: {e}")
@@ -239,24 +226,27 @@ class ContentAgent:
         try:
             # Extract the parameters
             params = event.get('intent', {}).get('parameters', {})
-            content = params.get('content', '')
-            reply_intent = params.get('reply_intent', 'clarify')
+            original_email = params.get('original_email', '')
+            reply_intent = params.get('reply_intent', '')
             style = params.get('style', 'professional')
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'generate_email_reply':
-                    result = await tool.call(content=content, reply_intent=reply_intent, style=style)
+                    result = await tool.call(
+                        original_email=original_email,
+                        reply_intent=reply_intent,
+                        style=style
+                    )
                     return {
                         'status': 'success',
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = generate_email_reply(content, reply_intent, style)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No generate_email_reply tool found'
             }
         except Exception as e:
             logger.error(f"Error generating email reply: {e}")
@@ -280,7 +270,7 @@ class ContentAgent:
             params = event.get('intent', {}).get('parameters', {})
             content = params.get('content', '')
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'analyze_email_sentiment':
                     result = await tool.call(content=content)
@@ -289,11 +279,10 @@ class ContentAgent:
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = analyze_email_sentiment(content)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No analyze_email_sentiment tool found'
             }
         except Exception as e:
             logger.error(f"Error analyzing email sentiment: {e}")
@@ -317,7 +306,7 @@ class ContentAgent:
             params = event.get('intent', {}).get('parameters', {})
             content = params.get('content', '')
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'extract_action_items':
                     result = await tool.call(content=content)
@@ -326,11 +315,10 @@ class ContentAgent:
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = extract_action_items(content)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No extract_action_items tool found'
             }
         except Exception as e:
             logger.error(f"Error extracting action items: {e}")
@@ -353,9 +341,9 @@ class ContentAgent:
             # Extract the parameters
             params = event.get('intent', {}).get('parameters', {})
             content = params.get('content', '')
-            max_length = params.get('max_length', 500)
+            max_length = params.get('max_length', 200)
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'optimize_for_voice':
                     result = await tool.call(content=content, max_length=max_length)
@@ -364,11 +352,10 @@ class ContentAgent:
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = optimize_for_voice(content, max_length)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No optimize_for_voice tool found'
             }
         except Exception as e:
             logger.error(f"Error optimizing for voice: {e}")
@@ -391,23 +378,20 @@ class ContentAgent:
             # Extract the parameters
             params = event.get('intent', {}).get('parameters', {})
             content = params.get('content', '')
-            detail_level = params.get('detail_level', 'moderate')
-            max_length = params.get('max_length', 500)
             
-            # Use the MCP tool if available
+            # Use the MCP tool
             for tool in self.tools:
                 if tool.name == 'create_voice_summary':
-                    result = await tool.call(content=content, detail_level=detail_level, max_length=max_length)
+                    result = await tool.call(content=content)
                     return {
                         'status': 'success',
                         'result': result
                     }
             
-            # Fallback to direct function call
-            result = create_voice_summary(content, detail_level, max_length)
+            # No tool found
             return {
-                'status': 'success',
-                'result': result
+                'status': 'error',
+                'message': 'No create_voice_summary tool found'
             }
         except Exception as e:
             logger.error(f"Error creating voice summary: {e}")
@@ -416,47 +400,67 @@ class ContentAgent:
                 'message': str(e)
             }
 
-def create_content_agent() -> ContentAgent:
+async def create_content_agent_with_mcp():
     """
-    Create a content agent.
+    Create the Content Agent with proper ADK MCP integration.
+    
+    This function demonstrates the correct ADK MCP pattern using StdioServerParameters
+    to automatically discover and load MCP tools.
     
     Returns:
-        ContentAgent: The content agent
+        ContentAgent: Configured content agent with MCP tools
     """
-    # Get the content MCP tools
-    content_tools = get_content_mcp_tools_sync()
+    print("--- Creating Content Agent with ADK MCP Integration ---")
     
-    # Create the content agent
-    content_agent = ContentAgent(tools=content_tools)
-    
-    return content_agent
+    try:
+        # Import ADK MCP tools
+        from google.adk.tools.mcp import MCPToolset
+        from google.adk.tools.mcp.server_parameters import StdioServerParameters
+        
+        # ADK automatically discovers and loads MCP tools
+        mcp_toolset = await MCPToolset.from_server(
+            StdioServerParameters(
+                command="python",
+                args=["mcp_server/run_server.py"],
+                env=os.environ.copy()
+            )
+        )
+        
+        # Filter for content tools
+        content_tools = [tool for tool in mcp_toolset.tools if tool.name in [
+            'summarize_email_content',
+            'summarize_email_list',
+            'generate_email_reply',
+            'analyze_email_sentiment',
+            'extract_action_items',
+            'optimize_for_voice',
+            'create_voice_summary'
+        ]]
+        
+        # Create the Content Agent with MCP tools
+        agent_instance = ContentAgent(tools=content_tools)
+        
+        print(f"Created Content Agent with {len(content_tools)} MCP tools")
+        return agent_instance
+        
+    except ImportError:
+        print("ADK MCP tools not available, falling back to direct tools")
+        return ContentAgent()
+    except Exception as e:
+        print(f"Error creating Content Agent with MCP: {e}")
+        return ContentAgent()
 
-# Test function
-def test_content_agent_mcp_integration():
-    """
-    Test the content agent MCP integration.
-    """
-    # Create the content agent
-    content_agent = create_content_agent()
+# Update the main function to use the MCP agent
+async def main():
+    """Main function to run the content agent."""
+    # Create the content agent with MCP integration
+    content_agent = await create_content_agent_with_mcp()
     
-    # Create a test event
-    test_event = {
-        'intent': {
-            'name': 'summarize_email_content',
-            'parameters': {
-                'content': 'This is a test email content. It contains some information that needs to be summarized.',
-                'detail_level': 'moderate'
-            }
-        }
-    }
-    
-    # Process the test event
-    result = asyncio.run(content_agent.processable.process(test_event))
-    
-    # Print the result
-    print(f"Test result: {result}")
-    
-    return result
+    # Run the agent
+    if content_agent.adk_agent:
+        await content_agent.adk_agent.run()
+    else:
+        print("ADK agent not available")
 
 if __name__ == "__main__":
-    test_content_agent_mcp_integration()
+    asyncio.run(main())

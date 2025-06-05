@@ -1,103 +1,92 @@
 """
-Authentication manager for the Oprina MCP server.
+MCP Authentication Manager
 
-This module handles authentication with Google services (Gmail, Calendar).
+This module provides authentication management for the MCP server.
+It uses the original auth service to avoid duplication.
 """
 
 import os
 import json
-import asyncio
-from typing import Optional, Dict, Any
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
+import logging
+from typing import Dict, Any, Optional, Tuple
 
-# Import the local config
-from mcp_server.config import config
+# Import the original auth service to avoid duplication
+from services.google_cloud.gmail_auth import GmailAuthService
+from services.google_cloud.auth_utils import get_credentials_path
 
-class AuthManager:
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class MCPAuthManager:
     """
-    Authentication manager for Google services.
-    
-    This class handles authentication with Google services (Gmail, Calendar)
-    and provides methods to check authentication status and get service instances.
+    Authentication manager for the MCP server.
+    Uses the original auth service to avoid duplication.
     """
     
     def __init__(self):
-        """Initialize the authentication manager."""
-        self.gmail_service = None
-        self.calendar_service = None
-        self.credentials = None
+        """Initialize the auth manager with the original auth service."""
+        self.auth_service = GmailAuthService()
+        self.credentials_path = get_credentials_path()
+        self._ensure_credentials_exist()
     
-    async def check_auth(self) -> bool:
+    def _ensure_credentials_exist(self) -> None:
+        """Ensure that credentials exist."""
+        if not os.path.exists(self.credentials_path):
+            logger.warning(f"Credentials not found at {self.credentials_path}")
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.credentials_path), exist_ok=True)
+            # Create empty credentials file
+            with open(self.credentials_path, 'w') as f:
+                json.dump({}, f)
+    
+    def get_credentials(self) -> Dict[str, Any]:
         """
-        Check if the user is authenticated with Google services.
+        Get the credentials from the original auth service.
+        
+        Returns:
+            Dict[str, Any]: The credentials
+        """
+        return self.auth_service.get_credentials()
+    
+    def is_authenticated(self) -> bool:
+        """
+        Check if the user is authenticated using the original auth service.
         
         Returns:
             bool: True if authenticated, False otherwise
         """
-        return await self.get_credentials() is not None
+        return self.auth_service.is_authenticated()
     
-    async def get_credentials(self) -> Optional[Credentials]:
+    def get_auth_url(self) -> str:
         """
-        Get the Google credentials.
+        Get the authentication URL from the original auth service.
         
         Returns:
-            Optional[Credentials]: Google credentials if authenticated, None otherwise
+            str: The authentication URL
         """
-        if not self.credentials:
-            token_file = config.get("google_token_file", 'credentials/gmail_token.json')
-            print(f"[DEBUG] Looking for token file at: {os.path.abspath(token_file)}")
-            print(f"[DEBUG] File exists: {os.path.exists(token_file)}")
-            if os.path.exists(token_file):
-                try:
-                    self.credentials = Credentials.from_authorized_user_file(token_file, [
-                        'https://www.googleapis.com/auth/gmail.modify',
-                        'https://www.googleapis.com/auth/calendar',
-                        'https://www.googleapis.com/auth/userinfo.profile',
-                        'https://www.googleapis.com/auth/userinfo.email',
-                        'openid'
-                    ])
-                    if self.credentials and self.credentials.valid:
-                        return self.credentials
-                except Exception as e:
-                    print(f"Error loading credentials from {token_file}: {e}")
-        return self.credentials
+        return self.auth_service.get_auth_url()
     
-    async def get_gmail_service(self):
+    def handle_auth_callback(self, code: str) -> Tuple[bool, str]:
         """
-        Get the Gmail service.
+        Handle the authentication callback using the original auth service.
+        
+        Args:
+            code (str): The authorization code
+            
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        return self.auth_service.handle_auth_callback(code)
+    
+    def refresh_token(self) -> bool:
+        """
+        Refresh the token using the original auth service.
         
         Returns:
-            The Gmail service
+            bool: True if successful, False otherwise
         """
-        if not self.gmail_service:
-            credentials = await self.get_credentials()
-            if credentials:
-                self.gmail_service = build('gmail', 'v1', credentials=credentials)
-        return self.gmail_service
-    
-    async def get_calendar_service(self):
-        """
-        Get the Calendar service.
-        
-        Returns:
-            The Calendar service
-        """
-        if not self.calendar_service:
-            credentials = await self.get_credentials()
-            if credentials:
-                self.calendar_service = build('calendar', 'v3', credentials=credentials)
-        return self.calendar_service
-    
-    async def get_user_profile(self) -> Dict[str, Any]:
-        """
-        Get the user's Google profile.
-        
-        Returns:
-            Dict[str, Any]: User profile information
-        """
-        service = await self.get_gmail_service()
-        profile = service.users().getProfile(userId='me').execute()
-        return profile 
+        return self.auth_service.refresh_token()
+
+# Create a singleton instance
+auth_manager = MCPAuthManager() 

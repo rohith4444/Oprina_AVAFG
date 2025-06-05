@@ -21,6 +21,26 @@ from config.settings import settings
 from services.google_cloud.gmail_auth import get_gmail_service, check_gmail_connection
 from services.logging.logger import setup_logger
 
+# Import additional Gmail tools
+from agents.common.gmail_tools_additional import (
+    gmail_mark_as_important,
+    gmail_mark_as_not_important,
+    gmail_star_message,
+    gmail_unstar_message,
+    gmail_move_to_spam,
+    gmail_remove_from_spam,
+    gmail_get_user_profile,
+    gmail_get_labels,
+    gmail_create_label,
+    gmail_apply_label,
+    gmail_remove_label,
+    gmail_get_thread,
+    gmail_modify_thread,
+    gmail_get_attachment,
+    gmail_save_attachment,
+    gmail_additional_tools
+)
+
 # Configure logging
 logger = setup_logger("gmail_tools", console_output=True)
 
@@ -90,14 +110,14 @@ def gmail_authenticate(tool_context=None) -> str:
     else:
         return "Failed to authenticate with Gmail. Please try again."
 
-def gmail_list_messages(tool_context=None, query: str = "", max_results: int = 10) -> Dict[str, Any]:
+def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=None) -> Dict[str, Any]:
     """
     List Gmail messages.
     
     Args:
-        tool_context: The tool context containing session information
         query: Gmail search query
         max_results: Maximum number of results to return
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: List of messages
@@ -160,13 +180,13 @@ def gmail_list_messages(tool_context=None, query: str = "", max_results: int = 1
         logger.error(f"Error listing Gmail messages: {e}")
         return {"error": f"Failed to list Gmail messages: {str(e)}"}
 
-def gmail_get_message(tool_context=None, message_id: str) -> Dict[str, Any]:
+def gmail_get_message(message_id: str, tool_context=None) -> Dict[str, Any]:
     """
     Get a Gmail message.
     
     Args:
-        tool_context: The tool context containing session information
         message_id: Message ID
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Message details
@@ -220,14 +240,14 @@ def gmail_get_message(tool_context=None, message_id: str) -> Dict[str, Any]:
         logger.error(f"Error getting Gmail message: {e}")
         return {"error": f"Failed to get Gmail message: {str(e)}"}
 
-def gmail_search_messages(tool_context=None, query: str = "", max_results: int = 10) -> Dict[str, Any]:
+def gmail_search_messages(query: str = "", max_results: int = 10, tool_context=None) -> Dict[str, Any]:
     """
     Search Gmail messages.
     
     Args:
-        tool_context: The tool context containing session information
         query: Gmail search query
         max_results: Maximum number of results to return
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: List of messages
@@ -235,20 +255,20 @@ def gmail_search_messages(tool_context=None, query: str = "", max_results: int =
     logger.info(f"Searching Gmail messages with query: {query}, max_results: {max_results}")
     
     # This is essentially the same as list_messages with a query
-    return gmail_list_messages(tool_context, query, max_results)
+    return gmail_list_messages(query, max_results, tool_context)
 
-def gmail_send_message(tool_context=None, to: str = "", subject: str = "", body: str = "", 
-                      cc: Optional[str] = None, bcc: Optional[str] = None) -> Dict[str, Any]:
+def gmail_send_message(to: str = "", subject: str = "", body: str = "", 
+                      cc: Optional[str] = None, bcc: Optional[str] = None, tool_context=None) -> Dict[str, Any]:
     """
     Send a Gmail message.
     
     Args:
-        tool_context: The tool context containing session information
         to: Recipient email address
         subject: Email subject
         body: Email body
         cc: CC recipients (comma-separated)
         bcc: BCC recipients (comma-separated)
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Send status
@@ -291,14 +311,14 @@ def gmail_send_message(tool_context=None, to: str = "", subject: str = "", body:
         logger.error(f"Error sending Gmail message: {e}")
         return {"error": f"Failed to send Gmail message: {str(e)}"}
 
-def gmail_reply_to_message(tool_context=None, message_id: str = "", reply_text: str = "") -> Dict[str, Any]:
+def gmail_reply_to_message(message_id: str = "", reply_text: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Reply to a Gmail message.
     
     Args:
-        tool_context: The tool context containing session information
         message_id: Message ID to reply to
         reply_text: Reply text
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Reply status
@@ -362,13 +382,13 @@ def gmail_reply_to_message(tool_context=None, message_id: str = "", reply_text: 
         logger.error(f"Error replying to Gmail message: {e}")
         return {"error": f"Failed to reply to Gmail message: {str(e)}"}
 
-def gmail_mark_as_read(tool_context=None, message_id: str = "") -> Dict[str, Any]:
+def gmail_mark_as_read(message_id: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Mark a Gmail message as read.
     
     Args:
-        tool_context: The tool context containing session information
         message_id: Message ID
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Status
@@ -395,13 +415,13 @@ def gmail_mark_as_read(tool_context=None, message_id: str = "") -> Dict[str, Any
         logger.error(f"Error marking Gmail message as read: {e}")
         return {"error": f"Failed to mark Gmail message as read: {str(e)}"}
 
-def gmail_archive_message(tool_context=None, message_id: str = "") -> Dict[str, Any]:
+def gmail_archive_message(message_id: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Archive a Gmail message.
     
     Args:
-        tool_context: The tool context containing session information
         message_id: Message ID
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Status
@@ -428,13 +448,13 @@ def gmail_archive_message(tool_context=None, message_id: str = "") -> Dict[str, 
         logger.error(f"Error archiving Gmail message: {e}")
         return {"error": f"Failed to archive Gmail message: {str(e)}"}
 
-def gmail_delete_message(tool_context=None, message_id: str = "") -> Dict[str, Any]:
+def gmail_delete_message(message_id: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Delete a Gmail message.
     
     Args:
-        tool_context: The tool context containing session information
         message_id: Message ID
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Status
@@ -566,6 +586,9 @@ if ADK_AVAILABLE:
         gmail_archive_message_tool,
         gmail_delete_message_tool
     ]
+    
+    # Add additional tools
+    gmail_tools.extend(gmail_additional_tools)
 else:
     # Fallback tools
     gmail_tools = [
@@ -579,4 +602,7 @@ else:
         gmail_mark_as_read,
         gmail_archive_message,
         gmail_delete_message
-    ] 
+    ]
+    
+    # Add additional tools
+    gmail_tools.extend(gmail_additional_tools) 

@@ -412,5 +412,14 @@ def test_email_agent_adk_integration():
     # Run test
     asyncio.run(run_test())
 
+# Update the main function to use the MCP agent
+async def main():
+    """Main function to run the email agent."""
+    # Create the email agent with MCP integration
+    email_agent = await create_email_agent_with_mcp()
+    
+    # Run the agent
+    await email_agent.run()
+
 if __name__ == "__main__":
-    test_email_agent_adk_integration()
+    asyncio.run(main())

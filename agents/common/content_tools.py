@@ -43,14 +43,14 @@ except ImportError:
                 return self.func(*args, **kwargs)
             return {"error": "Function not implemented"}
 
-def summarize_email_content(tool_context=None, content: str = "", detail_level: str = "moderate") -> Dict[str, Any]:
+def summarize_email_content(content: str = "", detail_level: str = "moderate", tool_context=None) -> Dict[str, Any]:
     """
     Summarize email content.
     
     Args:
-        tool_context: The tool context containing session information
         content: Email content to summarize
         detail_level: Detail level (brief, moderate, detailed)
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Summary
@@ -92,14 +92,14 @@ def summarize_email_content(tool_context=None, content: str = "", detail_level: 
         logger.error(f"Error summarizing email content: {e}")
         return {"error": f"Failed to summarize email content: {str(e)}"}
 
-def summarize_email_list(tool_context=None, emails: str = "", max_emails: int = 5) -> Dict[str, Any]:
+def summarize_email_list(emails: str = "", max_emails: int = 5, tool_context=None) -> Dict[str, Any]:
     """
     Summarize a list of emails.
     
     Args:
-        tool_context: The tool context containing session information
         emails: List of emails to summarize
         max_emails: Maximum number of emails to include in summary
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Summary
@@ -137,15 +137,15 @@ def summarize_email_list(tool_context=None, emails: str = "", max_emails: int = 
         logger.error(f"Error summarizing email list: {e}")
         return {"error": f"Failed to summarize email list: {str(e)}"}
 
-def generate_email_reply(tool_context=None, original_email: str = "", reply_intent: str = "", style: str = "professional") -> Dict[str, Any]:
+def generate_email_reply(original_email: str = "", reply_intent: str = "", style: str = "professional", tool_context=None) -> Dict[str, Any]:
     """
     Generate an email reply.
     
     Args:
-        tool_context: The tool context containing session information
         original_email: Original email content
         reply_intent: Intent of the reply (e.g., "accept", "decline", "clarify")
         style: Reply style (e.g., "professional", "casual", "formal")
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Generated reply
@@ -204,13 +204,13 @@ def generate_email_reply(tool_context=None, original_email: str = "", reply_inte
         logger.error(f"Error generating email reply: {e}")
         return {"error": f"Failed to generate email reply: {str(e)}"}
 
-def analyze_email_sentiment(tool_context=None, content: str = "") -> Dict[str, Any]:
+def analyze_email_sentiment(content: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Analyze email sentiment.
     
     Args:
-        tool_context: The tool context containing session information
         content: Email content to analyze
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Sentiment analysis
@@ -249,13 +249,13 @@ def analyze_email_sentiment(tool_context=None, content: str = "") -> Dict[str, A
         logger.error(f"Error analyzing email sentiment: {e}")
         return {"error": f"Failed to analyze email sentiment: {str(e)}"}
 
-def extract_action_items(tool_context=None, content: str = "") -> Dict[str, Any]:
+def extract_action_items(content: str = "", tool_context=None) -> Dict[str, Any]:
     """
     Extract action items from email content.
     
     Args:
-        tool_context: The tool context containing session information
         content: Email content to analyze
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Action items
@@ -294,14 +294,14 @@ def extract_action_items(tool_context=None, content: str = "") -> Dict[str, Any]
         logger.error(f"Error extracting action items: {e}")
         return {"error": f"Failed to extract action items: {str(e)}"}
 
-def optimize_for_voice(tool_context=None, content: str = "", max_length: int = 200) -> Dict[str, Any]:
+def optimize_for_voice(content: str = "", max_length: int = 200, tool_context=None) -> Dict[str, Any]:
     """
-    Optimize content for voice reading.
+    Optimize content for voice.
     
     Args:
-        tool_context: The tool context containing session information
         content: Content to optimize
         max_length: Maximum length of optimized content
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Optimized content
@@ -335,13 +335,13 @@ def optimize_for_voice(tool_context=None, content: str = "", max_length: int = 2
         logger.error(f"Error optimizing content for voice: {e}")
         return {"error": f"Failed to optimize content for voice: {str(e)}"}
 
-def create_voice_summary(tool_context=None, content: str = "") -> Dict[str, Any]:
+def create_voice_summary(content: str = "", tool_context=None) -> Dict[str, Any]:
     """
-    Create a voice-friendly summary of content.
+    Create a voice summary of content.
     
     Args:
-        tool_context: The tool context containing session information
         content: Content to summarize
+        tool_context: The tool context containing session information
         
     Returns:
         Dict[str, Any]: Voice summary
@@ -353,7 +353,7 @@ def create_voice_summary(tool_context=None, content: str = "") -> Dict[str, Any]
         # In a real implementation, this would use a language model
         
         # First summarize the content
-        summary_result = summarize_email_content(tool_context, content, "brief")
+        summary_result = summarize_email_content(content, "brief", tool_context)
         
         if "error" in summary_result:
             return summary_result
@@ -361,7 +361,7 @@ def create_voice_summary(tool_context=None, content: str = "") -> Dict[str, Any]
         summary = summary_result["summary"]
         
         # Then optimize for voice
-        voice_result = optimize_for_voice(tool_context, summary, 150)
+        voice_result = optimize_for_voice(summary, 150, tool_context)
         
         if "error" in voice_result:
             return voice_result
