@@ -7,6 +7,8 @@ import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import ContactPage from './pages/ContactPage';
 import SettingsPage from './pages/SettingsPage';
+import EmailConfirmationPending from './pages/EmailConfirmationPending';
+import ThankYou from './pages/ThankYou';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -18,6 +20,8 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/email-confirmation" element={<EmailConfirmationPending />} />
+          <Route path="/thank-you" element={<ThankYou />} />
           <Route 
             path="/dashboard" 
             element={

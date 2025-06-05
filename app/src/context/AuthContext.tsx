@@ -1,4 +1,3 @@
-// ✅ FIXED AuthContext.tsx
 import { supabase } from '../supabaseClient';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
@@ -36,18 +35,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const restoreSession = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getUser();
 
-      if (error) console.error('Session error:', error);
-      const user = session?.user;
-
-      if (user) {
+      if (error || !data.user) {
+        setUser(null);
+        localStorage.removeItem('user');
+      } else {
         const restoredUser: User = {
-          uid: user.id,
-          email: user.email ?? null,
+          uid: data.user.id,
+          email: data.user.email ?? null,
         };
         setUser(restoredUser);
         localStorage.setItem('user', JSON.stringify(restoredUser));
@@ -76,12 +72,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signup = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/thank-you`,
+        },
+      });
       if (error) throw error;
-
-      const newUser = { uid: data.user?.id || '', email: data.user?.email || null };
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
     } finally {
       setLoading(false);
     }

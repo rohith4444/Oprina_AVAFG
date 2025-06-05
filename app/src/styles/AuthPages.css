@@ -22,6 +22,12 @@
   padding: 2rem;
 }
 
+.confirmation-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
 .auth-title {
   font-size: 1.75rem;
   font-weight: 600;

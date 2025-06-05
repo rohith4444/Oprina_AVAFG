@@ -1,4 +1,3 @@
-// ✅ FIXED LoginPage.tsx
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
@@ -40,7 +39,7 @@ const SignupPage: React.FC = () => {
       setError('');
       setLoading(true);
       await signup(email, password);
-      navigate('/dashboard');
+      navigate('/email-confirmation');
     } catch (err) {
       setError('Failed to create an account. Email might already be in use.');
       console.error(err);
