@@ -12,6 +12,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 import traceback
 import secrets
 import time
+from memory.adk_memory_manager import get_adk_memory_manager
 
 app = FastAPI(title="Gmail MCP API")
 
@@ -37,6 +38,11 @@ auth_states = {}
 
 # In production, use a proper domain
 REDIRECT_URI = os.environ.get("GMAIL_REDIRECT_URI")
+
+class ToolContext:
+    def __init__(self, session, invocation_id):
+        self.session = session
+        self.invocation_id = invocation_id
 
 @app.get("/")
 async def root():
@@ -198,41 +204,71 @@ async def connect_gmail():
     }
 
 @app.get("/list_emails")
-async def list_emails(q: str = ""):
+async def list_emails(q: str = "", user_id: str = "test_user", session_id: str = "test_session"):
     try:
-        result = mcp_discovery.run_tool("gmail_list_messages", query=q)
+        memory_manager = get_adk_memory_manager()
+        session = await memory_manager.get_session(user_id, session_id)
+        if not session:
+            session_id = await memory_manager.create_session(user_id)
+            session = await memory_manager.get_session(user_id, session_id)
+        tool_context = ToolContext(session, invocation_id="list_emails")
+        result = mcp_discovery.run_tool("gmail_list_messages", query=q, tool_context=tool_context)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/get_email/{msg_id}")
-async def get_email(msg_id: str):
+async def get_email(msg_id: str, user_id: str = "test_user", session_id: str = "test_session"):
     try:
-        result = mcp_discovery.run_tool("gmail_get_message", msg_id=msg_id)
+        memory_manager = get_adk_memory_manager()
+        session = await memory_manager.get_session(user_id, session_id)
+        if not session:
+            session_id = await memory_manager.create_session(user_id)
+            session = await memory_manager.get_session(user_id, session_id)
+        tool_context = ToolContext(session, invocation_id="get_email")
+        result = mcp_discovery.run_tool("gmail_get_message", msg_id=msg_id, tool_context=tool_context)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/search_emails")
-async def search_emails(q: str):
+async def search_emails(q: str, user_id: str = "test_user", session_id: str = "test_session"):
     try:
-        result = mcp_discovery.run_tool("gmail_search", query=q)
+        memory_manager = get_adk_memory_manager()
+        session = await memory_manager.get_session(user_id, session_id)
+        if not session:
+            session_id = await memory_manager.create_session(user_id)
+            session = await memory_manager.get_session(user_id, session_id)
+        tool_context = ToolContext(session, invocation_id="search_emails")
+        result = mcp_discovery.run_tool("gmail_search", query=q, tool_context=tool_context)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/get_thread/{thread_id}")
-async def get_thread(thread_id: str):
+async def get_thread(thread_id: str, user_id: str = "test_user", session_id: str = "test_session"):
     try:
-        result = mcp_discovery.run_tool("gmail_read_thread", thread_id=thread_id)
+        memory_manager = get_adk_memory_manager()
+        session = await memory_manager.get_session(user_id, session_id)
+        if not session:
+            session_id = await memory_manager.create_session(user_id)
+            session = await memory_manager.get_session(user_id, session_id)
+        tool_context = ToolContext(session, invocation_id="get_thread")
+        result = mcp_discovery.run_tool("gmail_read_thread", thread_id=thread_id, tool_context=tool_context)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/get_attachment/{msg_id}/{attachment_id}")
-async def get_attachment(msg_id: str, attachment_id: str):
+async def get_attachment(msg_id: str, attachment_id: str, user_id: str = "test_user", session_id: str = "test_session"):
     try:
-        attachments = mcp_discovery.run_tool("gmail_get_attachments", msg_id=msg_id)
+        memory_manager = get_adk_memory_manager()
+        session = await memory_manager.get_session(user_id, session_id)
+        if not session:
+            session_id = await memory_manager.create_session(user_id)
+            session = await memory_manager.get_session(user_id, session_id)
+        tool_context = ToolContext(session, invocation_id="get_attachment")
+        attachments = mcp_discovery.run_tool("gmail_get_attachments", msg_id=msg_id, tool_context=tool_context)
         result = None
         for att in attachments:
             if att['filename'] and att['data']:
@@ -249,10 +285,16 @@ async def get_attachment(msg_id: str, attachment_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/ask_agent")
-async def ask_agent(query: str):
+async def ask_agent(query: str, user_id: str = "test_user", session_id: str = "test_session"):
     from adk_agent.agent import run_agent
     try:
-        result = await run_agent(query)
+        memory_manager = get_adk_memory_manager()
+        session = await memory_manager.get_session(user_id, session_id)
+        if not session:
+            session_id = await memory_manager.create_session(user_id)
+            session = await memory_manager.get_session(user_id, session_id)
+        tool_context = ToolContext(session, invocation_id="ask_agent")
+        result = await run_agent(query, tool_context=tool_context)
         return result
     except Exception as e:
         print("Exception in /ask_agent:", e)

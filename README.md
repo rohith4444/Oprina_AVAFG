@@ -1,107 +1,107 @@
-# Oprina - Voice-Powered Gmail Assistant
+# Oprina Voice Assistant
 
-Oprina is an AI-powered voice assistant that allows users to manage their Gmail inbox using natural spoken language. It features an animated avatar with lip-sync capabilities and provides a seamless hands-free email experience.
+Oprina is a voice-powered Gmail assistant with ADK-native memory services. It allows users to manage their email, calendar, and content using natural language.
 
-## 🎯 Project Overview
+## Project Overview
 
-- **Voice-First Interface**: Interact with Gmail using natural speech
-- **Animated Avatar**: Real-time lip-sync and visual feedback
-- **Multi-Agent Architecture**: Specialized AI agents for different tasks
-- **Gmail Integration**: Secure OAuth-based Gmail API access
-- **Chat Interface**: Visual conversation history
+Oprina is built on the ADK (Agent Development Kit) platform and uses the MCP (Model Context Protocol) for communication between agents and external services. It provides a voice interface for managing Gmail, Google Calendar, and content processing.
 
-## 🏗️ Architecture
+## Architecture
 
-```
-Voice Agent (Root) → Coordinator Agent → [Email Agent, Content Agent]
-```
+The Oprina Voice Assistant consists of the following components:
 
-- **Voice Agent**: Handles STT/TTS and avatar animation
-- **Coordinator Agent**: Orchestrates task routing and workflow
-- **Email Agent**: Manages Gmail API operations via MCP
-- **Content Agent**: Processes email content and generates responses
+### Agents
 
-## 🚀 Quick Start
+- **Coordinator Agent**: Routes user requests to the appropriate sub-agent based on the intent.
+- **Email Agent**: Handles email-related operations such as listing messages, reading messages, and sending messages.
+- **Calendar Agent**: Handles calendar-related operations such as listing events, creating events, and updating events.
+- **Content Agent**: Handles content processing operations such as summarizing email content and extracting information.
+
+### Services
+
+- **MCP Integration Layer**: Provides utilities for connecting to the MCP server, loading tools, and executing tools.
+- **MCP Server**: Implements the Model Context Protocol (MCP) server that handles requests from ADK and provides access to Gmail, Calendar, and Content tools.
+
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.9+
-- Node.js 18+
-- Redis server
-- Google Cloud account with Speech-to-Text and Text-to-Speech APIs
-- Firebase project
-- Gmail API credentials
+- Python 3.9 or higher
+- Google Cloud Platform account
+- Gmail account
+- Google Calendar account
 
 ### Installation
 
 1. Clone the repository:
-```bash
-git clone <repository-url>
-cd {project_name}
-```
+   ```
+   git clone https://github.com/yourusername/oprina-voice-assistant.git
+   cd oprina-voice-assistant
+   ```
 
-2. Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
 
 3. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your API keys and configuration
-```
+   ```
+   cp config/.env.example .env
+   ```
+   Edit the `.env` file and fill in your actual values.
 
-4. Start Redis server:
-```bash
-redis-server
-```
+4. Run the MCP server:
+   ```
+   python mcp_server/run_server.py
+   ```
 
-5. Run the development setup:
-```bash
-python scripts/setup_env.py
-```
+5. Run the voice assistant:
+   ```
+   python main.py
+   ```
 
-6. Start the backend:
-```bash
-python -m agents.voice  # Start voice agent
-python backend/main.py  # Start FastAPI backend
-```
+## MCP Integration
 
-7. Start the frontend (Bolt.new):
-```bash
-cd app
-# Follow Bolt.new setup instructions
-```
+The MCP integration layer provides utilities for connecting to the MCP server, loading tools, and executing tools. It is used by the agents to communicate with the MCP server.
 
-## 📁 Project Structure
+### Configuration
 
-```
-{project_name}/
-├── agents/          # AI Agents (Voice, Coordinator, Email, Content)
-├── app/            # Frontend (Bolt.new)
-├── backend/        # FastAPI Backend
-├── memory/         # Memory Management
-├── mcp/           # Model Context Protocol for Gmail
-├── services/      # External Services Integration
-├── config/        # Configuration Management
-└── tests/         # Testing Suite
-```
+The MCP integration layer uses environment variables for configuration. The following environment variables are used:
 
+- `MCP_SERVER_HOST`: The host of the MCP server (default: "localhost").
+- `MCP_SERVER_PORT`: The port of the MCP server (default: 8765).
+- `MCP_CONNECTION_TYPE`: The connection type ("stdio" or "sse") (default: "stdio").
+- `MCP_SERVER_URL`: The URL of the MCP server (required for SSE connection).
+- `MCP_SERVER_API_KEY`: The API key for the MCP server (required for SSE connection).
 
-## 📚 Documentation
+These environment variables should be set in the `.env` file. See the `.env.example` file for an example configuration.
 
-- [Architecture Documentation](docs/architecture.md)
-- [API Documentation](docs/api.md)
-- [Setup Guide](docs/setup.md)
+### Usage
 
+The MCP integration layer is used by the agents to communicate with the MCP server. Each agent has its own MCP integration module that provides utilities for integrating the agent with the MCP server.
 
-## 📄 License
+For example, the Email Agent has an MCP integration module at `agents/voice/sub_agents/coordinator/sub_agents/email/mcp_integration.py` that provides utilities for integrating the Email Agent with the MCP server.
 
-This project is licensed under the MIT License.
+## ADK Integration
 
-## 👥 Team
+The Oprina Voice Assistant is built on the ADK (Agent Development Kit) platform. It uses ADK for agent development, memory services, and session management.
 
-- Bharath Kumar (@abharathkumarr)
-- Hieu Hoang Calvin (@calvinhoang203)
-- Rohith Reddy Mandala (@rohith4444)
-"""
+### Configuration
+
+The ADK integration uses environment variables for configuration. The following environment variables are used:
+
+- `ADK_APP_NAME`: The name of the ADK application (default: "oprina").
+- `ADK_MODEL`: The model to use for ADK (default: "gemini-2.5-flash-preview-05-20").
+- `ADK_TEMPERATURE`: The temperature to use for ADK (default: 0.7).
+- `ADK_MAX_TOKENS`: The maximum number of tokens to use for ADK (default: 1024).
+- `ADK_SESSION_TTL_SECONDS`: The TTL for ADK sessions in seconds (default: 86400).
+
+These environment variables should be set in the `.env` file. See the `.env.example` file for an example configuration.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

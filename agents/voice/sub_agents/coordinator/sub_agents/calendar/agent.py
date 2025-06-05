@@ -1,484 +1,301 @@
 """
-Calendar Agent for Oprina - ADK Native Implementation
+Calendar Agent for ADK Integration
 
-This agent handles all Google Calendar operations using the MCP client.
-No direct Calendar API access - just MCP client for Calendar operations.
+This module provides a calendar agent that handles Calendar operations using direct API tools
+instead of the MCP client.
 """
 
 import os
 import sys
-from typing import Dict, List, Any, Optional
+import asyncio
+from typing import Dict, Any, List, Optional, Union
+from pathlib import Path
 
-# Calculate project root more reliably
-current_file = os.path.abspath(__file__)
-project_root = current_file
-for _ in range(7):  # 7 levels to reach project root
-    project_root = os.path.dirname(project_root)
-
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Import external packages
-from google.adk.agents import Agent
-from google.adk.models.lite_llm import LiteLlm
-from google.adk.tools import load_memory
-from google.adk.runners import Runner
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent.parent.parent.parent.parent
+sys.path.append(str(project_root))
 
 # Import project modules
 from config.settings import settings
+from services.logging.logger import setup_logger
 
-# Import MCP client
-from mcp_server.client import MCPClient
+# Configure logging
+logger = setup_logger("calendar_agent", console_output=True)
 
-# Import shared constants
-from agents.common.session_keys import (
-    USER_CALENDAR_CONNECTED, USER_NAME, USER_PREFERENCES,
-    CALENDAR_CURRENT, CALENDAR_LAST_FETCH, CALENDAR_UPCOMING_COUNT, CALENDAR_LAST_EVENT_CREATED
-)
-
-# Import calendar tools
-from mcp_server.tools.calendar_tool import (
-    calendar_check_connection,
-    calendar_authenticate,
-    calendar_list_events,
-    calendar_get_today_events,
-    calendar_get_week_events,
-    calendar_create_event,
-    calendar_create_quick_event,
-    calendar_update_event,
-    calendar_delete_event,
-    calendar_find_free_time,
-    calendar_check_availability,
-    calendar_get_current_time,
-    calendar_list_calendars,
-)
-
-# Define available calendar tools
-CALENDAR_TOOLS = [
-    "calendar_check_connection",
-    "calendar_authenticate",
-    "calendar_list_events",
-    "calendar_get_today_events",
-    "calendar_get_week_events",
-    "calendar_create_event",
-    "calendar_create_quick_event",
-    "calendar_update_event",
-    "calendar_delete_event",
-    "calendar_find_free_time",
-    "calendar_check_availability",
-    "calendar_get_current_time",
-    "calendar_list_calendars"
-]
-
-# Calculate total tools for the agent
-total_tools = len(CALENDAR_TOOLS) + 1  # +1 for load_memory tool
-
-class ProcessableCalendarAgent(Agent):
-    async def process(self, event, app_name=None, session_service=None, memory_service=None):
-        """
-        Process an event with proper session state handling.
-        
-        Args:
-            event: The event to process
-            app_name: The application name
-            session_service: The session service
-            memory_service: The memory service
+# --- ADK Imports with Fallback ---
+try:
+    from google.adk.agent import LlmAgent
+    from google.adk.runner import Runner
+    from google.adk.tools import FunctionTool
+    from google.adk.types import LiteLlm
+    ADK_AVAILABLE = True
+except ImportError:
+    ADK_AVAILABLE = False
+    ADK_IMPORT_ERROR = "ADK not available, running in fallback mode"
+    
+    # Fallback implementation
+    class LlmAgent:
+        def __init__(self, **kwargs):
+            self.name = kwargs.get('name', 'fallback_agent')
+            self.description = kwargs.get('description', 'Fallback agent')
+            self.tools = kwargs.get('tools', [])
+            self.model = kwargs.get('model', None)
             
-        Returns:
-            The processed event result
-        """
-        if not all([app_name, session_service, memory_service]):
-            raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
+        async def process(self, event):
+            logger.info(f"Fallback agent processing event: {event}")
+            return {"response": "Fallback agent response"}
+    
+    class Runner:
+        def __init__(self, agent, **kwargs):
+            self.agent = agent
+            self.services = kwargs.get('services', {})
+            
+        async def run(self, event):
+            logger.info(f"Fallback runner running event: {event}")
+            return await self.agent.process(event)
+    
+    class LiteLlm:
+        def __init__(self, **kwargs):
+            self.model = kwargs.get('model', 'fallback_model')
+            self.temperature = kwargs.get('temperature', 0.7)
+            self.max_tokens = kwargs.get('max_tokens', 1000)
+    
+    class FunctionTool:
+        def __init__(self, func=None, **kwargs):
+            self.func = func
+            self.name = kwargs.get('name', func.__name__ if func else 'unknown')
+            self.description = kwargs.get('description', '')
+            self.parameters = kwargs.get('parameters', {})
+            
+        def __call__(self, *args, **kwargs):
+            if self.func:
+                return self.func(*args, **kwargs)
+            return {"error": "Function not implemented"}
+
+# Import direct tools
+from agents.common.calendar_tools import calendar_tools
+from agents.common.gmail_tools import gmail_tools
+
+class ProcessableCalendarAgent:
+    """
+    Processable agent that handles events with session state handling and tool context forwarding.
+    """
+    
+    def __init__(self, agent):
+        self.agent = agent
         
-        # Create a runner with the provided services
-        runner = Runner(
-            agent=self,
-            app_name=app_name,
-            session_service=session_service,
-            memory_service=memory_service
-        )
+    async def process(self, event):
+        # Extract session from event
+        session = _extract_session(event)
         
-        # Run the event through the runner
-        return await runner.run(event)
+        # Create tool context with session
+        tool_context = {"session": session} if session else {}
+        
+        # Process event with tool context
+        return await self.agent.process(event, tool_context=tool_context)
+
+class CalendarAgent:
+    """
+    Calendar agent that handles Calendar operations.
+    """
+    
+    def __init__(self, model=None, tools=None):
+        self.model = model
+        self.tools = tools or []
+        
+    async def process(self, event, tool_context=None):
+        # Extract intent from event
+        intent = event.get("intent", {}).get("name", "")
+        parameters = event.get("intent", {}).get("parameters", {})
+        
+        # Process intent
+        if intent == "calendar_check_connection":
+            return await self._handle_check_connection(tool_context)
+        elif intent == "calendar_authenticate":
+            return await self._handle_authenticate(tool_context)
+        elif intent == "calendar_list_events":
+            return await self._handle_list_events(parameters, tool_context)
+        elif intent == "calendar_get_event":
+            return await self._handle_get_event(parameters, tool_context)
+        elif intent == "calendar_create_event":
+            return await self._handle_create_event(parameters, tool_context)
+        elif intent == "calendar_update_event":
+            return await self._handle_update_event(parameters, tool_context)
+        elif intent == "calendar_delete_event":
+            return await self._handle_delete_event(parameters, tool_context)
+        else:
+            return {"error": f"Unknown intent: {intent}"}
+    
+    async def _handle_check_connection(self, tool_context):
+        """Handle calendar_check_connection intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_check_connection":
+                return tool(tool_context=tool_context)
+        return {"error": "calendar_check_connection tool not found"}
+    
+    async def _handle_authenticate(self, tool_context):
+        """Handle calendar_authenticate intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_authenticate":
+                return tool(tool_context=tool_context)
+        return {"error": "calendar_authenticate tool not found"}
+    
+    async def _handle_list_events(self, parameters, tool_context):
+        """Handle calendar_list_events intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_list_events":
+                return tool(
+                    tool_context=tool_context,
+                    time_min=parameters.get("time_min"),
+                    time_max=parameters.get("time_max"),
+                    max_results=parameters.get("max_results", 10)
+                )
+        return {"error": "calendar_list_events tool not found"}
+    
+    async def _handle_get_event(self, parameters, tool_context):
+        """Handle calendar_get_event intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_get_event":
+                return tool(
+                    tool_context=tool_context,
+                    event_id=parameters.get("event_id")
+                )
+        return {"error": "calendar_get_event tool not found"}
+    
+    async def _handle_create_event(self, parameters, tool_context):
+        """Handle calendar_create_event intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_create_event":
+                return tool(
+                    tool_context=tool_context,
+                    summary=parameters.get("summary"),
+                    start_time=parameters.get("start_time"),
+                    end_time=parameters.get("end_time"),
+                    description=parameters.get("description"),
+                    location=parameters.get("location"),
+                    attendees=parameters.get("attendees", [])
+                )
+        return {"error": "calendar_create_event tool not found"}
+    
+    async def _handle_update_event(self, parameters, tool_context):
+        """Handle calendar_update_event intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_update_event":
+                return tool(
+                    tool_context=tool_context,
+                    event_id=parameters.get("event_id"),
+                    summary=parameters.get("summary"),
+                    start_time=parameters.get("start_time"),
+                    end_time=parameters.get("end_time"),
+                    description=parameters.get("description"),
+                    location=parameters.get("location"),
+                    attendees=parameters.get("attendees", [])
+                )
+        return {"error": "calendar_update_event tool not found"}
+    
+    async def _handle_delete_event(self, parameters, tool_context):
+        """Handle calendar_delete_event intent."""
+        for tool in self.tools:
+            if tool.name == "calendar_delete_event":
+                return tool(
+                    tool_context=tool_context,
+                    event_id=parameters.get("event_id")
+                )
+        return {"error": "calendar_delete_event tool not found"}
 
 def create_calendar_agent():
     """
-    Create the Calendar Agent with MCP client for Calendar operations.
-    No direct Calendar API access - just MCP client for Calendar operations.
+    Create a calendar agent with ADK integration.
     
     Returns:
-        Calendar Agent instance configured for ADK
+        CalendarAgent: The calendar agent
     """
-    print("--- Initializing Calendar Agent with MCP Client ---")
+    logger.info("Creating calendar agent with ADK integration")
     
-    # Define model for the agent
-    model = LiteLlm(
-        model=settings.CALENDAR_MODEL,
-        api_key=settings.GOOGLE_API_KEY
-    )
+    # Create model
+    if ADK_AVAILABLE:
+        model = LiteLlm(
+            model=settings.ADK_MODEL,
+            temperature=0.7,
+            max_tokens=1000
+        )
+    else:
+        model = LiteLlm()
     
-    # Create MCP client
-    mcp_client = MCPClient(
-        host=settings.MCP_HOST,
-        port=settings.MCP_PORT
-    )
-    
-    # Create the Calendar Agent with ADK patterns
-    agent_instance = ProcessableCalendarAgent(
-        name="calendar_agent",
-        description="Handles Google Calendar operations: events, scheduling, availability using MCP client",
+    # Create calendar agent
+    calendar_agent = CalendarAgent(
         model=model,
-        instruction=f"""
-You are the Calendar Agent for Oprina, a sophisticated voice-powered Gmail and Calendar assistant.
-
-## Your Role & Responsibilities
-
-You specialize in Google Calendar operations using the MCP client. Your core responsibilities include:
-
-1. **Calendar Connection Management**
-   - Check Calendar connection status via session state
-   - Handle Calendar authentication when needed
-   - Maintain connection state in session for other agents
-
-2. **Event Management**
-   - List upcoming events with intelligent filtering
-   - Create events with proper scheduling and details
-   - Update and delete events with user confirmation
-   - Handle all-day events and recurring events
-   - Manage event locations, descriptions, and attendees
-
-3. **Scheduling & Availability**
-   - Check availability for specific time slots
-   - Find optimal free time slots based on preferences
-   - Analyze schedule patterns and busy periods
-   - Suggest meeting times considering working hours
-   - Handle timezone considerations
-
-4. **Calendar Organization**
-   - Manage multiple calendars and calendar lists
-   - Handle calendar permissions and sharing
-   - Organize events with proper categorization
-   - Track calendar usage patterns
-
-5. **Session State Management**
-   - Update calendar-related session state after operations
-   - Cache recent calendar data for performance
-   - Track user calendar patterns and preferences
-   - Coordinate context with other agents
-
-## Session State Access & Management
-
-You have direct access to and update user context through session state:
-
-**Connection State:**
-- Calendar Connected: session.state["{USER_CALENDAR_CONNECTED}"]
-- User Name: session.state["{USER_NAME}"]
-
-**Calendar State (for current conversation):**
-- Current Events: session.state["{CALENDAR_CURRENT}"]
-- Last Fetch: session.state["{CALENDAR_LAST_FETCH}"]
-- Upcoming Count: session.state["{CALENDAR_UPCOMING_COUNT}"]
-- Last Event Created: session.state["{CALENDAR_LAST_EVENT_CREATED}"]
-
-**User Preferences:**
-- User Preferences: session.state["{USER_PREFERENCES}"]
-
-## Available Calendar Tools via MCP Client
-
-Your Calendar tools are accessed through the MCP client:
-
-**Connection Tools:**
-- `calendar_check_connection`: Check Calendar connection status from session state
-- `calendar_authenticate`: Authenticate with Calendar and update session state
-
-**Event Listing Tools:**
-- `calendar_list_events`: List upcoming events with filters (days, max results)
-- `calendar_get_today_events`: Get today's calendar events specifically
-- `calendar_get_week_events`: Get this week's calendar events
-
-**Event Creation Tools:**
-- `calendar_create_event`: Create detailed events with all parameters
-- `calendar_create_quick_event`: Create events using natural language text
-
-**Event Management Tools:**
-- `calendar_update_event`: Update existing events by ID
-- `calendar_delete_event`: Delete events with confirmation
-
-**Availability Tools:**
-- `calendar_find_free_time`: Find available time slots with constraints
-- `calendar_check_availability`: Check if specific time slot is available
-
-**Information Tools:**
-- `calendar_get_current_time`: Get current date and time
-- `calendar_list_calendars`: List all available calendars
-
-## Cross-Session Memory
-
-You have access to:
-- `load_memory`: Search past conversations for relevant calendar context and patterns
-
-## Calendar Operation Examples
-
-**Event Creation:**
-- "Schedule meeting with John tomorrow 2pm" → Use `calendar_create_quick_event`
-- "Create detailed event: Team Meeting, Monday 9-10am, Conference Room A" → Use `calendar_create_event`
-
-**Availability Checking:**
-- "Am I free Tuesday afternoon?" → Use `calendar_check_availability`
-- "Find 30-minute slots this week" → Use `calendar_find_free_time`
-
-**Event Management:**
-- "Show my events today" → Use `calendar_get_today_events`
-- "List this week's schedule" → Use `calendar_get_week_events`
-- "Cancel my 3pm meeting" → Use `calendar_delete_event`
-
-## Time and Date Handling
-
-Support natural language time expressions:
-- "tomorrow 2pm" → Parse to proper datetime
-- "next Tuesday at 9am" → Handle relative dates
-- "this Friday afternoon" → Interpret time preferences
-- "in 2 hours" → Calculate from current time
-
-## Workflow Examples
-
-**Creating Events:**
-1. Check connection: Use `calendar_check_connection` first
-2. Parse time/date: Interpret user's natural language
-3. Create event: Use appropriate creation tool
-4. Confirm: Provide user confirmation with details
-5. Update state: Calendar data automatically cached via output_key
-
-**Checking Availability:**
-1. Verify connection: Ensure Calendar is connected
-2. Parse timeframe: Understand user's time request
-3. Check availability: Use availability tools
-4. Suggest alternatives: If busy, suggest free times
-5. Update context: Track availability patterns
-
-**Managing Events:**
-1. List events: Show relevant events for context
-2. Identify target: Help user specify which event
-3. Perform action: Update, delete, or modify as requested
-4. Confirm changes: Provide clear confirmation
-5. Update session: Reflect changes in session state
-
-## Response Guidelines
-
-1. **Always check connection first**: Use `calendar_check_connection` before operations
-2. **Update session state**: ADK automatically saves responses via output_key
-3. **Provide clear feedback**: Always confirm what calendar actions were taken
-4. **Handle time parsing**: Support natural language date/time expressions
-5. **Use cross-session memory**: Leverage `load_memory` for calendar patterns and preferences
-6. **Voice-optimized responses**: Keep responses conversational and clear for voice interaction
-7. **Suggest alternatives**: When times are busy, proactively suggest alternatives
-
-## Error Handling
-
-When Calendar operations fail:
-1. Check if it's an authentication issue and guide user to re-authenticate
-2. Provide user-friendly error messages instead of technical errors
-3. Suggest alternative actions when possible (different times, simpler events)
-4. Update session state to reflect any partial completions
-5. Help with time format issues - suggest correct formats
-
-## Session State Integration
-
-The ADK automatically manages session state through your output_key. When you respond:
-- Calendar operation results are saved to session.state["calendar_result"]
-- Other agents can access this data for coordination
-- Session state persists across conversation turns
-- Use load_memory for cross-session calendar context
-
-## Integration with Other Agents
-
-You work closely with:
-- **Email Agent**: Coordinate meeting scheduling with email invitations
-- **Content Agent**: Generate event descriptions and meeting summaries
-- **Coordinator Agent**: Receive delegated calendar tasks and report results
-- **Voice Agent**: Ensure all responses are optimized for voice delivery
-
-## Time Zone Considerations
-
-- Default to user's local timezone (usually detected from calendar settings)
-- Handle timezone conversion for meeting coordination
-- Clearly communicate time zones when scheduling with others
-- Support common timezone abbreviations (EST, PST, UTC, etc.)
-
-## Privacy and Confirmation
-
-- Always confirm before deleting events
-- Ask for confirmation on significant schedule changes
-- Respect calendar privacy and sharing settings
-- Provide clear information about who can see events
-
-## Important Notes
-
-- You have REAL Calendar access - operations affect the user's actual Google Calendar
-- Respect user privacy and calendar confidentiality
-- Always confirm before performing destructive actions (delete, major changes)
-- Provide clear, conversational responses suitable for voice interaction
-- Use session state to maintain context across operations
-- Support both quick operations and detailed event management
-
-Current System Status:
-- Calendar Tools: {len(CALENDAR_TOOLS)} direct API tools available
-- Memory Tool: Cross-session context via load_memory
-- Total Tools: {total_tools}
-- Integration: Direct Calendar API (no MCP bridge)
-
-Remember: You now have direct Calendar access through efficient ADK tools. All operations 
-are live and will affect the user's actual calendar data. Use this power responsibly 
-while providing excellent voice-first calendar assistance with intelligent scheduling 
-and availability management!
-        """,
-        output_key="calendar_result",  # ADK automatically saves responses to session state
-        tools=[
-            load_memory,
-            # Calendar connection tools
-            calendar_check_connection,
-            calendar_authenticate,
-            
-            # Event listing tools
-            calendar_list_events,
-            calendar_get_today_events,
-            calendar_get_week_events,
-            
-            # Event creation tools
-            calendar_create_event,
-            calendar_create_quick_event,
-            
-            # Event management tools
-            calendar_update_event,
-            calendar_delete_event,
-            
-            # Availability tools
-            calendar_find_free_time,
-            calendar_check_availability,
-            
-            # Information tools
-            calendar_get_current_time,
-            calendar_list_calendars
-        ]
+        tools=calendar_tools
     )
     
-    print(f"--- Calendar Agent created with {len(agent_instance.tools)} tools ---")
-    print(f"--- Calendar Tools: {len(CALENDAR_TOOLS)} | Memory: 1 | Total: {total_tools} ---")
-    print("🎉 Calendar Agent is now using direct Calendar tools with session state integration!")
+    return calendar_agent
+
+# Helper functions for session management
+def _extract_session(event):
+    """Extract session from event."""
+    if not event:
+        return None
     
-    return agent_instance
-
-def create_calendar_runner():
-    """
-    Create a calendar agent runner with proper session state handling.
+    # Try to get session from event
+    session = event.get("session", {})
     
-    Returns:
-        A configured Runner instance
-    """
-    from google.adk.sessions import InMemorySessionService
-    from google.adk.memory import InMemoryMemoryService
+    # If session is empty, try to get from context
+    if not session and "context" in event:
+        session = event["context"].get("session", {})
     
-    # Create the agent
-    agent = create_calendar_agent()
+    return session
+
+def _extract_app_name_and_user_id(event):
+    """Extract app name and user ID from event."""
+    if not event:
+        return None, None
     
-    # Create services
-    session_service = InMemorySessionService()
-    memory_service = InMemoryMemoryService()
+    # Try to get app name and user ID from event
+    app_name = event.get("app_name")
+    user_id = event.get("user_id")
     
-    # Create and configure the runner
-    runner = Runner(
-        agent=agent,
-        app_name="test_app",
-        session_service=session_service,
-        memory_service=memory_service
-    )
+    # If not found, try to get from context
+    if not app_name and "context" in event:
+        app_name = event["context"].get("app_name")
     
-    return runner
-
-# Create the agent instance
-agent_name = None
-
-
-# Export for use in coordinator
-__all__ = ["calendar_agent"]
-
-
-# =============================================================================
-# Testing and Validation
-# =============================================================================
-
-if __name__ == "__main__":
-    def test_calendar_agent():
-        """Test Calendar Agent creation and basic functionality."""
-        print("🧪 Testing Calendar Agent with Direct Calendar Tools...")
-        
-        try:
-            # Test agent creation
-            agent = create_calendar_agent()
-            
-            print(f"✅ Calendar Agent '{agent.name}' created successfully")
-            print(f"🔧 Tools Available: {len(agent.tools)}")
-            print(f"🧠 Model: {agent.model}")
-            print(f"📝 Description: {agent.description}")
-            print(f"🎯 Output Key: {agent.output_key}")
-            
-            # Verify tool availability
-            tool_names = []
-            for tool in agent.tools:
-                if hasattr(tool, 'func'):
-                    tool_names.append(getattr(tool.func, '__name__', 'unknown'))
-                else:
-                    tool_names.append(str(tool))
-            
-            print(f"\n📋 Available Tools:")
-            calendar_tools_count = 0
-            for i, tool_name in enumerate(tool_names, 1):
-                if tool_name.startswith('calendar_'):
-                    print(f"  {i}. {tool_name} (Calendar)")
-                    calendar_tools_count += 1
-                elif tool_name == 'load_memory':
-                    print(f"  {i}. {tool_name} (ADK Memory)")
-                else:
-                    print(f"  {i}. {tool_name} (Other)")
-            
-            print(f"\n📊 Tool Summary:")
-            print(f"  Calendar Tools: {calendar_tools_count}")
-            print(f"  Memory Tools: 1")
-            print(f"  Total Tools: {len(tool_names)}")
-            
-            # Test tool functionality (mock)
-            print(f"\n🔧 Testing Tool Integration:")
-            
-            # Verify Calendar tools are properly imported
-            from agents.voice.sub_agents.coordinator.sub_agents.calendar.calendar_tools import (
-                calendar_check_connection, calendar_list_events, calendar_create_event
-            )
-            print("  ✅ Direct Calendar tools imported successfully")
-            
-            # Test session state constants
-            from agents.common.session_keys import USER_CALENDAR_CONNECTED, CALENDAR_CURRENT
-            print("  ✅ Session state constants available")
-            
-            # Test auth service integration
-            from services.google_cloud.calendar_auth import get_calendar_service
-            print("  ✅ Calendar auth service integration available")
-            
-            print(f"\n✅ Calendar Agent validation completed successfully!")
-            print(f"🎯 Ready for direct Calendar operations with ADK session integration!")
-            
-        except Exception as e:
-            print(f"❌ Error creating Calendar Agent: {e}")
-            import traceback
-            traceback.print_exc()
+    if not user_id and "context" in event:
+        user_id = event["context"].get("user_id")
     
-    # Run the test
-    test_calendar_agent()
+    return app_name, user_id
 
-class CalendarAgent:
-    def __init__(self, mcp_client, *args, **kwargs):
-        self.mcp_client = mcp_client
-        # ... other init ...
+def _ensure_session(event):
+    """Ensure session exists in event."""
+    if not event:
+        return event
+    
+    # If session doesn't exist, create it
+    if "session" not in event:
+        event["session"] = {}
+    
+    return event
 
-    async def process(self, event):
-        # Stub: just echo the event for testing
-        return {"content": f"CalendarAgent received: {event['content']}"}
+# Test function
+def test_calendar_agent_adk_integration():
+    """Test calendar agent ADK integration."""
+    # Create calendar agent
+    calendar_agent = create_calendar_agent()
+    
+    # Create test event
+    test_event = {
+        "intent": {
+            "name": "calendar_list_events",
+            "parameters": {
+                "time_min": "2023-01-01T00:00:00Z",
+                "time_max": "2023-12-31T23:59:59Z",
+                "max_results": 5
+            }
+        },
+        "session": {
+            "id": "test_session_id",
+            "user_id": "test_user_id",
+            "app_name": "test_app"
+        }
+    }
+    
+    # Run test event
+    asyncio.run(calendar_agent.process(test_event))

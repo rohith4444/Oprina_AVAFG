@@ -47,7 +47,7 @@ class AuthManager:
             Optional[Credentials]: Google credentials if authenticated, None otherwise
         """
         if not self.credentials:
-            token_file = 'credentials/gmail_token.json'
+            token_file = config.get("google_token_file", 'credentials/gmail_token.json')
             print(f"[DEBUG] Looking for token file at: {os.path.abspath(token_file)}")
             print(f"[DEBUG] File exists: {os.path.exists(token_file)}")
             if os.path.exists(token_file):

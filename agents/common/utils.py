@@ -92,6 +92,11 @@ def validate_tool_context(tool_context, function_name: str = "unknown") -> bool:
         logger.error(f"{function_name}: Session missing state")
         return False
     
+    # Ensure session state is initialized
+    if not tool_context.session.state:
+        tool_context.session.state = {}
+        logger.warning(f"{function_name}: Initialized empty session state")
+    
     return True
 
 def update_agent_activity(tool_context, agent_name: str, activity: str) -> bool:

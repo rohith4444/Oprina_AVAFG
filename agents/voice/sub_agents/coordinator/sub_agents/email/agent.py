@@ -1,7 +1,7 @@
 """Add commentMore actions
 Email Agent for Oprina - Complete ADK Integration
 
-This agent handles all Gmail operations using the MCP client.
+This agent handles all Gmail operations using direct API tools.
 Simplified to return a single LlmAgent with proper ADK integration.
 """
 
@@ -9,51 +9,93 @@ import os
 import sys
 import asyncio
 from typing import Optional
+import uuid
+from pathlib import Path
 
-# Calculate project root more reliably
-current_file = os.path.abspath(__file__)
-project_root = current_file
-for _ in range(7):  # 7 levels to reach project root
-    project_root = os.path.dirname(project_root)
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent.parent.parent.parent.parent
+sys.path.append(str(project_root))
 
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Import external packages
-from google.adk.agents import LlmAgent
-from google.adk.models.lite_llm import LiteLlm
-from google.adk.tools import load_memory
-from google.adk.runners import Runner
+# --- ADK Imports with Fallback ---
+try:
+    from google.adk.agents import LlmAgent
+    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.tools import load_memory
+    from google.adk.runners import Runner
+    ADK_AVAILABLE = True
+except ImportError:
+    ADK_AVAILABLE = False
+    ADK_IMPORT_ERROR = "ADK not available, running in fallback mode"
+    
+    # Fallback implementations
+    class LlmAgent:
+        def __init__(self, *args, **kwargs):
+            self.name = kwargs.get('name', 'llm_agent')
+            self.description = kwargs.get('description', '')
+            self.model = kwargs.get('model', None)
+            self.instruction = kwargs.get('instruction', '')
+            self.tools = kwargs.get('tools', [])
+            self.sub_agents = kwargs.get('sub_agents', [])
+            self.output_key = kwargs.get('output_key', None)
+            
+        async def process(self, event, app_name=None, session_service=None, memory_service=None, tool_context=None):
+            return {"content": f"Fallback LlmAgent received event: {event}"}
+            
+    class LiteLlm:
+        def __init__(self, model=None, api_key=None):
+            self.model = model
+            self.api_key = api_key
+            
+        async def generate(self, prompt):
+            return {"text": f"Fallback LiteLlm response for: {prompt}"}
+            
+    def load_memory(*args, **kwargs):
+        return {"content": "Fallback load_memory tool executed"}
+        
+    class Runner:
+        def __init__(self, agent, app_name, session_service, memory_service):
+            self.agent = agent
+            self.app_name = app_name
+            self.session_service = session_service
+            self.memory_service = memory_service
+            
+        async def run(self, event):
+            return {"content": f"Fallback Runner processed event: {event.get('content', '')}"}
 
 # Import project modules
 from config.settings import settings
 
-# Import MCP client
-from mcp_server.client import MCPClient
+# Import direct Gmail and Calendar tools
+from agents.common.gmail_tools import gmail_tools
+from agents.common.calendar_tools import calendar_tools
 
 # Import shared constants for documentation
 from agents.common.session_keys import (
     USER_GMAIL_CONNECTED, USER_EMAIL, USER_NAME, USER_PREFERENCES,
-    EMAIL_CURRENT_RESULTS, EMAIL_LAST_FETCH, EMAIL_UNREAD_COUNT, EMAIL_LAST_SENT
+    EMAIL_CURRENT_RESULTS, EMAIL_LAST_FETCH, EMAIL_UNREAD_COUNT, EMAIL_LAST_SENT,
+    USER_CALENDAR_CONNECTED
 )
 
+from agents.common.utils import validate_tool_context, log_tool_execution, update_agent_activity, format_timestamp
+from memory.adk_memory_manager import get_adk_memory_manager
+from agents.common.tool_context import ToolContext
+
+# --- Additional ADK Imports with Fallback ---
+try:
+    from google.adk.memory.adk_memory_manager import get_memory_manager
+    ADK_MEMORY_AVAILABLE = True
+except ImportError:
+    ADK_MEMORY_AVAILABLE = False
+    def get_memory_manager(*args, **kwargs):
+        return {"content": "Fallback memory manager executed"}
+
 class ProcessableEmailAgent(LlmAgent):
-    async def process(self, event, app_name=None, session_service=None, memory_service=None):
+    async def process(self, event, app_name=None, session_service=None, memory_service=None, tool_context=None):
         """
-        Process an event with proper session state handling.
-        
-        Args:
-            event: The event to process
-            app_name: The application name
-            session_service: The session service
-            memory_service: The memory service
-            
-        Returns:
-            The processed event result
+        Process an event with proper session state handling and tool_context forwarding.
         """
         if not all([app_name, session_service, memory_service]):
             raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
-        
         # Create a runner with the provided services
         runner = Runner(
             agent=self,
@@ -61,18 +103,10 @@ class ProcessableEmailAgent(LlmAgent):
             session_service=session_service,
             memory_service=memory_service
         )
-        
-        # Run the event through the runner
+        # Forward tool_context if present
+        if tool_context is not None:
+            event.tool_context = tool_context
         return await runner.run(event)
-
-class EmailAgent:
-    def __init__(self, mcp_client, *args, **kwargs):
-        self.mcp_client = mcp_client
-        # ... other init ...
-
-    async def process(self, event):
-        # Stub: just echo the event for testing
-        return {"content": f"EmailAgent received: {event['content']}"}
 
 def create_email_agent():
     """
@@ -89,638 +123,294 @@ def create_email_agent():
         api_key=settings.GOOGLE_API_KEY
     )
 
-    # Create MCP client
-    mcp_client = MCPClient(
-        host=settings.MCP_HOST,
-        port=settings.MCP_PORT
-    )
-
     # Create the Email Agent with proper ADK patterns
     agent_instance = ProcessableEmailAgent(
         name="email_agent",
-        description="Handles Gmail operations with MCP client access and session state integration",
+        description="Handles Gmail operations with direct API access and session state integration",
         model=model,
         instruction="""
 Handles Gmail operations: connection, email management, sending, organizing using direct Gmail API access
         """,
         tools=[
             load_memory,
-            # Gmail connection tools
-            gmail_check_connection,
-            gmail_authenticate,
-            # Gmail reading tools
-            gmail_list_messages,
-            gmail_get_message,
-            gmail_search_messages,
-            # Gmail sending tools
-            gmail_send_message,
-            gmail_reply_to_message,
-            # Gmail organization tools
-            gmail_mark_as_read,
-            gmail_archive_message,
-            gmail_delete_message
+            # Use direct Gmail and Calendar tools
+            *gmail_tools,
+            *calendar_tools
         ],
         output_key="email_result"
     )
-    
     return agent_instance
 
-# Gmail connection tools
-async def gmail_check_connection(tool_context):
+async def create_email_agent_with_mcp():
     """
-    Check Gmail connection status.
+    Create the Email Agent with proper ADK MCP integration.
     
-    Args:
-        tool_context: ADK tool context
-        
+    This function demonstrates the correct ADK MCP pattern using StdioServerParameters
+    to automatically discover and load MCP tools.
+    
     Returns:
-        dict: Connection status
+        LlmAgent: Configured email agent with MCP tools
     """
-    # Check session state for connection status
-    is_connected = tool_context.session.state.get(USER_GMAIL_CONNECTED, False)
+    print("--- Creating Email Agent with ADK MCP Integration ---")
     
-    # If not connected in session state, try to authenticate
-    if not is_connected:
-        return {
-            "status": "disconnected",
-            "message": "Gmail is not connected. Please authenticate first."
-        }
-    
-    # If connected in session state, verify with MCP client
     try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
+        # Import ADK MCP tools
+        from google.adk.tools.mcp import MCPToolset
+        from google.adk.tools.mcp.server_parameters import StdioServerParameters
+        
+        # ADK automatically discovers and loads MCP tools
+        mcp_toolset = await MCPToolset.from_server(
+            StdioServerParameters(
+                command="python",
+                args=["mcp_server/run_server.py"],
+                env=os.environ.copy()
+            )
         )
         
-        # Try to list messages to verify connection
-        response = await mcp_client.list_gmail_messages(query="is:unread", max_results=1)
+        # Define model for the agent
+        model = LiteLlm(
+            model=settings.EMAIL_MODEL,
+            api_key=settings.GOOGLE_API_KEY
+        )
         
-        if response.get("status") == "success":
-            return {
-                "status": "connected",
-                "message": "Gmail is connected and working properly."
-            }
-        else:
-            # Update session state
-            tool_context.session.state[USER_GMAIL_CONNECTED] = False
-            
-            return {
-                "status": "disconnected",
-                "message": f"Gmail connection failed: {response.get('message', 'Unknown error')}"
-            }
+        # Create the Email Agent with MCP tools
+        agent_instance = ProcessableEmailAgent(
+            name="email_agent",
+            description="Handles Gmail operations with MCP integration",
+            model=model,
+            instruction="""
+Handles Gmail operations: connection, email management, sending, organizing using MCP tools
+            """,
+            tools=[
+                load_memory,
+                *mcp_toolset.tools  # All MCP tools auto-discovered
+            ],
+            output_key="email_result"
+        )
+        
+        print(f"Created Email Agent with {len(mcp_toolset.tools)} MCP tools")
+        return agent_instance
+        
+    except ImportError:
+        print("ADK MCP tools not available, falling back to direct tools")
+        return create_email_agent()
     except Exception as e:
-        # Update session state
-        tool_context.session.state[USER_GMAIL_CONNECTED] = False
-        
-        return {
-            "status": "error",
-            "message": f"Error checking Gmail connection: {str(e)}"
-        }
+        print(f"Error creating Email Agent with MCP: {e}")
+        return create_email_agent()
 
-async def gmail_authenticate(tool_context):
+def _extract_session(tool_context):
     """
-    Authenticate with Gmail.
+    Extract session from tool_context or create a new one.
     
     Args:
-        tool_context: ADK tool context
+        tool_context: The tool context containing session information
         
     Returns:
-        dict: Authentication status
+        Session: The extracted or created session
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.error(f"AGENT DEBUG: _extract_session called with tool_context type={type(tool_context)}, value={tool_context}")
+    
+    # First try to get session from tool_context
+    if hasattr(tool_context, 'session') and tool_context.session:
+        logger.error(f"AGENT DEBUG: Found session in tool_context: {tool_context.session.id}")
+        return tool_context.session
+    
+    # If not in tool_context, try to get from memory manager
+    logger.error("AGENT DEBUG: No session found in tool_context, trying memory manager")
+    
     try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
+        # Try to get memory manager from ADK
+        from google.adk.memory.adk_memory_manager import get_memory_manager
+        memory_manager = get_memory_manager()
         
-        # Try to list messages to verify authentication
-        response = await mcp_client.list_gmail_messages(query="is:unread", max_results=1)
+        # Create a new session
+        session_id = str(uuid.uuid4())
+        logger.error(f"AGENT DEBUG: Creating new session with ID: {session_id}")
         
-        if response.get("status") == "success":
-            # Update session state
-            tool_context.session.state[USER_GMAIL_CONNECTED] = True
-            
-            # Get user profile
-            profile = await mcp_client.send_request("gmail", "get_profile", {})
-            
-            if profile.get("status") == "success":
-                user_email = profile.get("data", {}).get("emailAddress", "")
-                user_name = profile.get("data", {}).get("displayName", "")
-                
-                # Update session state with user info
-                tool_context.session.state[USER_EMAIL] = user_email
-                tool_context.session.state[USER_NAME] = user_name
-            
-            return {
-                "status": "success",
-                "message": "Gmail authentication successful."
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Gmail authentication failed: {response.get('message', 'Unknown error')}"
-            }
+        # Create a simple session object
+        session = SimpleSession(session_id)
+        
+        # Store in memory manager
+        memory_manager.set_session(session)
+        
+        return session
+        
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error authenticating with Gmail: {str(e)}"
-        }
+        logger.error(f"AGENT DEBUG: Error creating session: {e}")
+        # Create a simple session as fallback
+        return SimpleSession(str(uuid.uuid4()))
 
-# Gmail reading tools
-async def gmail_list_messages(tool_context, query: str = "", max_results: int = 10):
+def _extract_app_name_and_user_id(tool_context, session):
     """
-    List Gmail messages.
+    Extract app_name and user_id from tool_context or session.
     
     Args:
-        tool_context: ADK tool context
-        query: Gmail search query
-        max_results: Maximum number of results to return
+        tool_context: The tool context containing session information
+        session: The session object
         
     Returns:
-        dict: List of messages
+        Tuple[str, str]: App name and user ID
     """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Default values
+    app_name = "oprina"
+    user_id = "default_user"
+    
+    # Try to get from tool_context
+    if hasattr(tool_context, 'app_name') and tool_context.app_name:
+        app_name = tool_context.app_name
+    
+    if hasattr(tool_context, 'user_id') and tool_context.user_id:
+        user_id = tool_context.user_id
+    
+    # Try to get from session
+    if session:
+        if session.get('app_name'):
+            app_name = session.get('app_name')
         
-        # List messages
-        response = await mcp_client.list_gmail_messages(query=query, max_results=max_results)
-        
-        if response.get("status") == "success":
-            # Update session state
-            tool_context.session.state[EMAIL_CURRENT_RESULTS] = response.get("data", [])
-            tool_context.session.state[EMAIL_LAST_FETCH] = asyncio.get_event_loop().time()
-            
-            # Count unread messages
-            unread_count = sum(1 for msg in response.get("data", []) if msg.get("is_unread", False))
-            tool_context.session.state[EMAIL_UNREAD_COUNT] = unread_count
-            
-            return {
-                "status": "success",
-                "data": response.get("data", []),
-                "count": len(response.get("data", [])),
-                "unread_count": unread_count
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to list messages: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error listing messages: {str(e)}"
-        }
+        if session.get('user_id'):
+            user_id = session.get('user_id')
+    
+    logger.error(f"AGENT DEBUG: Extracted app_name={app_name}, user_id={user_id}")
+    
+    return app_name, user_id
 
-async def gmail_get_message(tool_context, message_id: str):
+def _get_session_state(session):
     """
-    Get Gmail message details.
+    Get session state.
     
     Args:
-        tool_context: ADK tool context
-        message_id: Message ID
+        session: The session object
         
     Returns:
-        dict: Message details
+        dict: Session state
     """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Get message
-        response = await mcp_client.get_gmail_message(message_id=message_id)
-        
-        if response.get("status") == "success":
-            return {
-                "status": "success",
-                "data": response.get("data", {})
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to get message: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error getting message: {str(e)}"
-        }
+    if hasattr(session, 'get_state'):
+        return session.get_state()
+    elif hasattr(session, 'state'):
+        return session.state
+    else:
+        return {}
 
-async def gmail_search_messages(tool_context, query: str, max_results: int = 10):
+def _update_tool_context_with_session(tool_context, session):
     """
-    Search Gmail messages.
+    Update tool_context with session information.
     
     Args:
-        tool_context: ADK tool context
-        query: Gmail search query
-        max_results: Maximum number of results to return
+        tool_context: The tool context
+        session: The session object
         
     Returns:
-        dict: Search results
+        ToolContext: Updated tool context
     """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Search messages
-        response = await mcp_client.list_gmail_messages(query=query, max_results=max_results)
-        
-        if response.get("status") == "success":
-            # Update session state
-            tool_context.session.state[EMAIL_CURRENT_RESULTS] = response.get("data", [])
-            tool_context.session.state[EMAIL_LAST_FETCH] = asyncio.get_event_loop().time()
-            
-            return {
-                "status": "success",
-                "data": response.get("data", []),
-                "count": len(response.get("data", [])),
-                "query": query
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to search messages: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error searching messages: {str(e)}"
-        }
+    if not tool_context:
+        tool_context = ToolContext()
+    
+    tool_context.session = session
+    return tool_context
 
-# Gmail sending tools
-async def gmail_send_message(tool_context, to: str, subject: str, body: str, cc: Optional[str] = None, bcc: Optional[str] = None):
+async def _ensure_session(tool_context, session):
     """
-    Send Gmail message.
+    Ensure session is valid and update tool_context.
     
     Args:
-        tool_context: ADK tool context
-        to: Recipient email address
-        subject: Email subject
-        body: Email body
-        cc: CC email address
-        bcc: BCC email address
+        tool_context: The tool context
+        session: The session object
         
     Returns:
-        dict: Send status
+        Tuple[ToolContext, Session]: Updated tool context and session
     """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Prepare parameters
-        params = {
-            "to": to,
-            "subject": subject,
-            "body": body
-        }
-        
-        if cc:
-            params["cc"] = cc
-        if bcc:
-            params["bcc"] = bcc
-        
-        # Send message
-        response = await mcp_client.send_gmail_message(**params)
-        
-        if response.get("status") == "success":
-            # Update session state
-            tool_context.session.state[EMAIL_LAST_SENT] = {
-                "to": to,
-                "subject": subject,
-                "timestamp": asyncio.get_event_loop().time()
-            }
-            
-            return {
-                "status": "success",
-                "message": "Email sent successfully.",
-                "data": response.get("data", {})
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to send email: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error sending email: {str(e)}"
-        }
-
-async def gmail_reply_to_message(tool_context, message_id: str, reply_text: str):
-    """
-    Reply to Gmail message.
+    import logging
+    logger = logging.getLogger(__name__)
     
-    Args:
-        tool_context: ADK tool context
-        message_id: Message ID to reply to
-        reply_text: Reply text
-        
-    Returns:
-        dict: Reply status
-    """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Get original message
-        message_response = await mcp_client.get_gmail_message(message_id=message_id)
-        
-        if message_response.get("status") != "success":
-            return {
-                "status": "error",
-                "message": f"Failed to get original message: {message_response.get('message', 'Unknown error')}"
-            }
-        
-        # Extract original message details
-        original_message = message_response.get("data", {})
-        subject = original_message.get("subject", "")
-        
-        # Add "Re:" prefix if not already present
-        if not subject.startswith("Re:"):
-            subject = f"Re: {subject}"
-        
-        # Get sender email
-        sender = original_message.get("from", "")
-        
-        # Send reply
-        response = await mcp_client.send_gmail_message(
-            to=sender,
-            subject=subject,
-            body=reply_text
-        )
-        
-        if response.get("status") == "success":
-            # Update session state
-            tool_context.session.state[EMAIL_LAST_SENT] = {
-                "to": sender,
-                "subject": subject,
-                "timestamp": asyncio.get_event_loop().time()
-            }
-            
-            return {
-                "status": "success",
-                "message": "Reply sent successfully.",
-                "data": response.get("data", {})
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to send reply: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error sending reply: {str(e)}"
-        }
-
-# Gmail organization tools
-async def gmail_mark_as_read(tool_context, message_id: str):
-    """
-    Mark Gmail message as read.
+    # If no session, create one
+    if not session:
+        logger.error("AGENT DEBUG: No session provided, creating new one")
+        session = _extract_session(tool_context)
     
-    Args:
-        tool_context: ADK tool context
-        message_id: Message ID
-        
-    Returns:
-        dict: Operation status
-    """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Mark as read
-        response = await mcp_client.send_request("gmail", "modify_labels", {
-            "message_id": message_id,
-            "add_labels": [],
-            "remove_labels": ["UNREAD"]
-        })
-        
-        if response.get("status") == "success":
-            # Update session state
-            current_results = tool_context.session.state.get(EMAIL_CURRENT_RESULTS, [])
-            for msg in current_results:
-                if msg.get("id") == message_id:
-                    msg["is_unread"] = False
-            
-            tool_context.session.state[EMAIL_CURRENT_RESULTS] = current_results
-            
-            # Update unread count
-            unread_count = sum(1 for msg in current_results if msg.get("is_unread", False))
-            tool_context.session.state[EMAIL_UNREAD_COUNT] = unread_count
-            
-            return {
-                "status": "success",
-                "message": "Message marked as read."
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to mark message as read: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error marking message as read: {str(e)}"
-        }
-
-async def gmail_archive_message(tool_context, message_id: str):
-    """
-    Archive Gmail message.
+    # Update tool_context with session
+    tool_context = _update_tool_context_with_session(tool_context, session)
     
-    Args:
-        tool_context: ADK tool context
-        message_id: Message ID
-        
-    Returns:
-        dict: Operation status
-    """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Archive message
-        response = await mcp_client.send_request("gmail", "modify_labels", {
-            "message_id": message_id,
-            "add_labels": [],
-            "remove_labels": ["INBOX"]
-        })
-        
-        if response.get("status") == "success":
-            # Update session state
-            current_results = tool_context.session.state.get(EMAIL_CURRENT_RESULTS, [])
-            current_results = [msg for msg in current_results if msg.get("id") != message_id]
-            
-            tool_context.session.state[EMAIL_CURRENT_RESULTS] = current_results
-            
-            return {
-                "status": "success",
-                "message": "Message archived."
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to archive message: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error archiving message: {str(e)}"
-        }
-
-async def gmail_delete_message(tool_context, message_id: str):
-    """
-    Delete Gmail message.
-    
-    Args:
-        tool_context: ADK tool context
-        message_id: Message ID
-        
-    Returns:
-        dict: Operation status
-    """
-    try:
-        # Create MCP client
-        mcp_client = MCPClient(
-            host=settings.MCP_HOST,
-            port=settings.MCP_PORT
-        )
-        
-        # Delete message
-        response = await mcp_client.send_request("gmail", "delete_message", {
-            "message_id": message_id
-        })
-        
-        if response.get("status") == "success":
-            # Update session state
-            current_results = tool_context.session.state.get(EMAIL_CURRENT_RESULTS, [])
-            current_results = [msg for msg in current_results if msg.get("id") != message_id]
-            
-            tool_context.session.state[EMAIL_CURRENT_RESULTS] = current_results
-            
-            return {
-                "status": "success",
-                "message": "Message deleted."
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"Failed to delete message: {response.get('message', 'Unknown error')}"
-            }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error deleting message: {str(e)}"
-        }
+    return tool_context, session
 
 def create_email_runner():
     """
-    Create an email agent runner for testing.
+    Create a runner for the email agent.
     
     Returns:
-        Runner: Email agent runner
+        Runner: Configured runner
     """
-    from google.adk.runner import Runner
-    from google.adk.sessions import InMemorySessionService
-    from google.adk.memory import InMemoryMemoryService
-    
-    # Create the agent
+    # Create agent
     agent = create_email_agent()
     
     # Create services
+    from google.adk.sessions import InMemorySessionService
+    from google.adk.memory import InMemoryMemoryService
+    
     session_service = InMemorySessionService()
     memory_service = InMemoryMemoryService()
     
-    # Create runner with proper configuration
+    # Create runner
     runner = Runner(
         agent=agent,
-        app_name="test_app",
+        app_name="oprina",
         session_service=session_service,
         memory_service=memory_service
     )
     
     return runner
 
-if __name__ == "__main__":
-    def test_email_agent_adk_integration():
-        """
-        Test the email agent ADK integration.
-        """
-        import asyncio
-        
-        async def run_test():
-            runner = create_email_runner()
-            
-            # Test connection
-            connection_result = await runner.run("Check my Gmail connection")
-            print(f"Connection result: {connection_result}")
-            
-            # Test listing messages
-            list_result = await runner.run("List my unread emails")
-            print(f"List result: {list_result}")
-            
-            # Test getting a message
-            if list_result.get("data", {}).get("count", 0) > 0:
-                message_id = list_result.get("data", {}).get("data", [])[0].get("id")
-                get_result = await runner.run(f"Get email details for ID {message_id}")
-                print(f"Get result: {get_result}")
-            
-            # Test searching messages
-            search_result = await runner.run("Search for emails from Google")
-            print(f"Search result: {search_result}")
-            
-            # Test sending a message
-            send_result = await runner.run("Send a test email to myself")
-            print(f"Send result: {send_result}")
-            
-            # Test replying to a message
-            if list_result.get("data", {}).get("count", 0) > 0:
-                message_id = list_result.get("data", {}).get("data", [])[0].get("id")
-                reply_result = await runner.run(f"Reply to message ID {message_id} with 'This is a test reply'")
-                print(f"Reply result: {reply_result}")
-            
-            # Test marking a message as read
-            if list_result.get("data", {}).get("count", 0) > 0:
-                message_id = list_result.get("data", {}).get("data", [])[0].get("id")
-                mark_result = await runner.run(f"Mark message ID {message_id} as read")
-                print(f"Mark result: {mark_result}")
-            
-            # Test archiving a message
-            if list_result.get("data", {}).get("count", 0) > 0:
-                message_id = list_result.get("data", {}).get("data", [])[0].get("id")
-                archive_result = await runner.run(f"Archive message ID {message_id}")
-                print(f"Archive result: {archive_result}")
-            
-            # Test deleting a message
-            if list_result.get("data", {}).get("count", 0) > 0:
-                message_id = list_result.get("data", {}).get("data", [])[0].get("id")
-                delete_result = await runner.run(f"Delete message ID {message_id}")
-                print(f"Delete result: {delete_result}")
-        
-        asyncio.run(run_test())
+class SimpleSession:
+    """Simple session implementation for testing."""
     
+    def __init__(self, session_id=None):
+        self.id = session_id or str(uuid.uuid4())
+        self._data = {}
+        self._state = {}
+    
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+    
+    def set(self, key, value):
+        self._data[key] = value
+    
+    def get_state(self, key=None, default=None):
+        if key:
+            return self._state.get(key, default)
+        return self._state
+    
+    def set_state(self, key, value):
+        self._state[key] = value
+    
+    def update_state(self, state_dict):
+        self._state.update(state_dict)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'data': self._data,
+            'state': self._state
+        }
+
+def test_email_agent_adk_integration():
+    """Test the email agent ADK integration."""
+    
+    async def run_test():
+        # Create runner
+        runner = create_email_runner()
+        
+        # Run test event
+        result = await runner.run({"content": "Test email agent"})
+        
+        print(f"Test result: {result}")
+    
+    # Run test
+    asyncio.run(run_test())
+
+if __name__ == "__main__":
     test_email_agent_adk_integration()

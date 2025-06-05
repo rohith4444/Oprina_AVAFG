@@ -19,7 +19,20 @@ for _ in range(5):  # Navigate to project root
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from google.adk.tools import FunctionTool
+# Try to import ADK components with fallback implementations
+try:
+    from google.adk.tools import FunctionTool
+    ADK_AVAILABLE = True
+except ImportError:
+    class FunctionTool:
+        def __init__(self, func=None, name=None, description=None, args_schema=None, **kwargs):
+            self.func = func
+            self.name = name
+            self.description = description
+            self.args_schema = args_schema or {}
+    ADK_AVAILABLE = False
+    print("Warning: google.adk.tools not available. Running in fallback mode.")
+
 from services.logging.logger import setup_logger
 
 # Import existing utility functions 

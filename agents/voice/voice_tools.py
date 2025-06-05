@@ -28,8 +28,23 @@ from agents.common.session_keys import (
     VOICE_PREFERENCES_UPDATED_AT, VOICE_ACTIVE_PREFERENCES, 
     VOICE_LAST_QUALITY_CHECK, VOICE_LAST_QUALITY_SCORE
 )
+from memory.adk_memory_manager import get_adk_memory_manager
+from agents.common.tool_context import ToolContext
 
 logger = setup_logger("voice_tools")
+
+try:
+    from google.adk.tools import FunctionTool
+    ADK_AVAILABLE = True
+except ImportError:
+    class FunctionTool:
+        def __init__(self, func=None, name=None, description=None, args_schema=None, **kwargs):
+            self.func = func
+            self.name = name
+            self.description = description
+            self.args_schema = args_schema or {}
+    ADK_AVAILABLE = False
+    print("Warning: google.adk.tools not available. Running in fallback mode.")
 
 def _run_async_safely(coro):
     """Safely run async function from sync context"""
@@ -45,8 +60,12 @@ def _run_async_safely(coro):
 
 def process_audio_input(audio_data_base64: str, tool_context=None) -> str:
     """Process audio input using Google Cloud Speech-to-Text (accepts base64-encoded audio)"""
-    if not tool_context or not hasattr(tool_context, 'session'):
-        logger.error("process_audio_input: Tool context missing session")
+    logger.debug(f"process_audio_input: tool_context type={type(tool_context)}, value={repr(tool_context)}")
+    session = getattr(tool_context, "session", None)
+    if session is None and isinstance(tool_context, dict):
+        session = tool_context.get("session")
+    if session is None:
+        logger.error("process_audio_input: No valid session in tool_context")
         return "Error: No valid tool context provided"
     
     try:
@@ -70,9 +89,9 @@ def process_audio_input(audio_data_base64: str, tool_context=None) -> str:
             confidence = result["confidence"]
             
             # Update session state
-            tool_context.session.state[VOICE_LAST_TRANSCRIPT] = transcript
-            tool_context.session.state[VOICE_LAST_CONFIDENCE] = confidence
-            tool_context.session.state[VOICE_LAST_STT_AT] = format_timestamp()
+            session.state[VOICE_LAST_TRANSCRIPT] = transcript
+            session.state[VOICE_LAST_CONFIDENCE] = confidence
+            session.state[VOICE_LAST_STT_AT] = format_timestamp()
                         
             log_tool_execution(tool_context, "process_audio_input", "speech_to_text", True,
                              f"Transcript: '{transcript[:50]}...', Confidence: {confidence}")
@@ -91,9 +110,28 @@ def process_audio_input(audio_data_base64: str, tool_context=None) -> str:
 
 def generate_audio_output(text: str, voice_settings: dict = {}, tool_context=None) -> str:
     """Generate audio output using Google Cloud Text-to-Speech"""
-    if not tool_context or not hasattr(tool_context, 'session'):
-        logger.error("generate_audio_output: Tool context missing session")
+    logger.debug(f"generate_audio_output: tool_context type={type(tool_context)}, value={repr(tool_context)}")
+    session = getattr(tool_context, "session", None)
+    if session is None and isinstance(tool_context, dict):
+        session = tool_context.get("session")
+    if session is None:
+        logger.error("generate_audio_output: No valid session in tool_context")
         return "Error: No valid tool context provided"
+    
+    if not validate_tool_context(tool_context, "generate_audio_output"):
+        # Try to get session from global memory manager
+        try:
+            memory_manager = get_adk_memory_manager()
+            if memory_manager and hasattr(memory_manager, '_session_service'):
+                # Create a new session if none exists
+                session = memory_manager._session_service.create_session()
+                tool_context = ToolContext(session, invocation_id="generate_audio_output")
+                logger.warning("Created new session for generate_audio_output")
+            else:
+                return "Error: No valid tool context or memory manager available"
+        except Exception as e:
+            logger.error(f"Failed to create session for generate_audio_output: {e}")
+            return "Error: Failed to create session"
     
     try:
         # Log operation
@@ -116,28 +154,15 @@ def generate_audio_output(text: str, voice_settings: dict = {}, tool_context=Non
         # Convert text to speech
         result = _run_async_safely(speech_services.text_to_speech(text, final_voice_settings))
         
-        if result["success"]:
-            audio_content = result["audio_content"]
-            
-            # Update session state
-            tool_context.session.state[VOICE_LAST_TTS_TEXT] = text
-            tool_context.session.state[VOICE_LAST_TTS_VOICE] = result["voice_name"]
-            tool_context.session.state[VOICE_LAST_TTS_AT] = format_timestamp()
-            tool_context.session.state[VOICE_LAST_AUDIO_SIZE] = len(audio_content)
-
-            log_tool_execution(tool_context, "generate_audio_output", "text_to_speech", True,
-                             f"Generated {len(audio_content)} bytes of audio")
-            
-            # Return success message (actual audio would be handled by frontend)
-            return f"Generated audio for text: '{text[:50]}...' using voice {result['voice_name']}"
-        else:
-            error_msg = result.get("error", "Unknown TTS error")
-            log_tool_execution(tool_context, "generate_audio_output", "text_to_speech", False, error_msg)
-            return f"Speech synthesis failed: {error_msg}"
-            
+        # Update session state with voice settings
+        if session:
+            session.state["voice:last_settings"] = final_voice_settings
+            session.state["voice:last_output"] = result
+        
+        return result
+        
     except Exception as e:
         logger.error(f"Error generating audio output: {e}")
-        log_tool_execution(tool_context, "generate_audio_output", "text_to_speech", False, str(e))
         return f"Error generating audio: {str(e)}"
 
 

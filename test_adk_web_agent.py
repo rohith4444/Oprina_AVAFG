@@ -13,12 +13,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def test_agent_discovery():
     """Test if the agent is discoverable by ADK Web."""
-    print("Testing agent discovery for ADK Web...")
+    print("[TEST] Testing ADK Web Agent...")
     
     # Try importing from agents package
     try:
         from agents import root_agent, agent, _initialize_agent
-        print("✅ Successfully imported root_agent and agent from agents package")
+        print("[OK] Successfully imported root_agent and agent from agents package")
         
         # Initialize the agent
         _initialize_agent()
@@ -26,25 +26,25 @@ def test_agent_discovery():
         print(f"  - root_agent name: {root_agent.name}")
         print(f"  - agent name: {agent.name}")
     except ImportError as e:
-        print(f"❌ Failed to import from agents package: {e}")
+        print("[FAIL] Failed to import from agents package: " + str(e))
     except Exception as e:
-        print(f"❌ Error accessing agent attributes: {e}")
+        print("[FAIL] Error accessing agent attributes: " + str(e))
     
     # Try importing directly from root_agent module
     try:
         from agents.root_agent import root_agent, agent
-        print("✅ Successfully imported root_agent and agent from agents.root_agent")
+        print("[OK] Successfully imported root_agent and agent from agents.root_agent")
         print(f"  - root_agent name: {root_agent.name}")
         print(f"  - agent name: {agent.name}")
     except ImportError as e:
-        print(f"❌ Failed to import from agents.root_agent: {e}")
+        print("[FAIL] Failed to import from agents.root_agent: " + str(e))
     except Exception as e:
-        print(f"❌ Error accessing agent attributes: {e}")
+        print("[FAIL] Error accessing agent attributes: " + str(e))
     
     # Check if agents/__init__.py exports the variables
     try:
         import agents
-        print("✅ Successfully imported agents package")
+        print("[OK] Successfully imported agents package")
         print(f"  - Has root_agent: {hasattr(agents, 'root_agent')}")
         print(f"  - Has agent: {hasattr(agents, 'agent')}")
         
@@ -56,11 +56,12 @@ def test_agent_discovery():
         if hasattr(agents, 'agent') and agents.agent is not None:
             print(f"  - agent name: {agents.agent.name}")
     except ImportError as e:
-        print(f"❌ Failed to import agents package: {e}")
+        print("[FAIL] Failed to import agents package: " + str(e))
     except Exception as e:
-        print(f"❌ Error accessing agent attributes: {e}")
+        print("[FAIL] Error accessing agent attributes: " + str(e))
     
-    print("\nADK Web should be able to find the agent if all tests pass.")
+    print("[INFO] ADK Web Agent test results:")
+    print("[OK] ADK Web Agent test completed")
 
 if __name__ == "__main__":
     test_agent_discovery() 

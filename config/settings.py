@@ -221,7 +221,7 @@ class Settings(BaseSettings):
         description="MCP server host"
     )
     MCP_PORT: int = Field(
-        default=8001,
+        default=8765,
         description="MCP server port"
     )
     

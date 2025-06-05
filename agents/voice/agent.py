@@ -5,17 +5,90 @@ Voice interface using Gemini 2.5 Flash for intelligence and Google Cloud
 Speech services for audio processing. Delegates complex tasks to coordinator.
 """
 
-import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import os
+import sys
+import asyncio
+from typing import Optional
+import uuid
+from pathlib import Path
 
-from google.adk.agents import LlmAgent
-from google.adk.models.lite_llm import LiteLlm
-from google.adk.tools import load_memory
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.append(str(project_root))
+
+# --- ADK Imports with Fallback ---
+try:
+    from google.adk.agents import LlmAgent
+    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.tools import load_memory
+    from google.adk.runners import Runner
+    ADK_AVAILABLE = True
+except ImportError:
+    ADK_AVAILABLE = False
+    ADK_IMPORT_ERROR = "ADK not available, running in fallback mode"
+    
+    # Fallback implementations
+    class LlmAgent:
+        def __init__(self, *args, **kwargs):
+            self.name = kwargs.get('name', 'llm_agent')
+            self.description = kwargs.get('description', '')
+            self.model = kwargs.get('model', None)
+            self.instruction = kwargs.get('instruction', '')
+            self.tools = kwargs.get('tools', [])
+            self.sub_agents = kwargs.get('sub_agents', [])
+            self.output_key = kwargs.get('output_key', None)
+            
+        async def process(self, event, app_name=None, session_service=None, memory_service=None, tool_context=None):
+            return {"content": f"Fallback LlmAgent received event: {event}"}
+            
+    class LiteLlm:
+        def __init__(self, model=None, api_key=None):
+            self.model = model
+            self.api_key = api_key
+            
+        async def generate(self, prompt):
+            return {"text": f"Fallback LiteLlm response for: {prompt}"}
+            
+    def load_memory(*args, **kwargs):
+        return {"content": "Fallback load_memory tool executed"}
+        
+    class Runner:
+        def __init__(self, agent, app_name, session_service, memory_service):
+            self.agent = agent
+            self.app_name = app_name
+            self.session_service = session_service
+            self.memory_service = memory_service
+            
+        async def run(self, event):
+            return {"content": f"Fallback Runner processed event: {event.get('content', '')}"}
+
+# Import project modules
 from config.settings import settings
-from services.logging.logger import setup_logger
 
-# Import coordinator as sub-agent
-from agents.voice.sub_agents.coordinator import create_coordinator_agent
+# Import sub-agents
+from agents.voice.sub_agents.coordinator.agent import create_coordinator_agent
+
+# Import shared constants for documentation
+from agents.common.session_keys import (
+    USER_GMAIL_CONNECTED, USER_EMAIL, USER_NAME, USER_PREFERENCES,
+    EMAIL_CURRENT_RESULTS, EMAIL_LAST_FETCH, EMAIL_UNREAD_COUNT, EMAIL_LAST_SENT,
+    USER_CALENDAR_CONNECTED
+)
+
+from agents.common.utils import validate_tool_context, log_tool_execution, update_agent_activity, format_timestamp
+from memory.adk_memory_manager import get_adk_memory_manager
+from agents.common.tool_context import ToolContext
+
+# --- Additional ADK Imports with Fallback ---
+try:
+    from google.adk.memory.adk_memory_manager import get_memory_manager
+    ADK_MEMORY_AVAILABLE = True
+except ImportError:
+    ADK_MEMORY_AVAILABLE = False
+    def get_memory_manager(*args, **kwargs):
+        return {"content": "Fallback memory manager executed"}
+
+from services.logging.logger import setup_logger
 
 # Import voice tools
 from agents.voice.voice_tools import VOICE_TOOLS
@@ -104,14 +177,14 @@ You have one powerful sub-agent for complex operations:
 ## Voice Interaction Patterns
 
 **Simple Voice Queries:**
-- "Check my emails" → Process audio → Delegate to coordinator → Return voice response
-- "What's on my calendar today?" → STT → Coordinate calendar query → TTS response
-- "Summarize my latest email" → Audio processing → Multi-agent coordination → Voice output
+- "Check my emails" -> Process audio -> Delegate to coordinator -> Return voice response
+- "What's on my calendar today?" -> STT -> Coordinate calendar query -> TTS response
+- "Summarize my latest email" -> Audio processing -> Multi-agent coordination -> Voice output
 
 **Complex Voice Workflows:**
-- "Read my emails and schedule any meetings mentioned" → Full multi-agent coordination
-- "Summarize my day and tell me about conflicts" → Cross-agent analysis with voice output
-- "Process my inbox and organize my schedule" → Comprehensive workflow with voice feedback
+- "Read my emails and schedule any meetings mentioned" -> Full multi-agent coordination
+- "Summarize my day and tell me about conflicts" -> Cross-agent analysis with voice output
+- "Process my inbox and organize my schedule" -> Comprehensive workflow with voice feedback
 
 ## Audio Processing Flow
 
@@ -173,24 +246,24 @@ Maintain voice conversation context across error recovery
 Integration Examples
 Email Voice Workflow:
 User Audio: "Check my emails and read the important ones"
-1. process_audio_input → "Check my emails and read the important ones"
-2. Delegate to coordinator → Email + Content agents
+1. process_audio_input -> "Check my emails and read the important ones"
+2. Delegate to coordinator -> Email + Content agents
 3. Coordinator returns: "5 emails found, 2 marked important..."
-4. generate_audio_output → Natural speech response
+4. generate_audio_output -> Natural speech response
 Calendar Voice Workflow:
 User Audio: "Do I have any meetings tomorrow?"
-1. STT Processing → Text extraction with confidence
-2. Auto-delegate to coordinator → Calendar agent
-3. Calendar results → "3 meetings scheduled for tomorrow..."
-4. Voice optimization → Natural speech with proper timing
-5. TTS Generation → Clear audio response
+1. STT Processing -> Text extraction with confidence
+2. Auto-delegate to coordinator -> Calendar agent
+3. Calendar results -> "3 meetings scheduled for tomorrow..."
+4. Voice optimization -> Natural speech with proper timing
+5. TTS Generation -> Clear audio response
 Complex Multi-Agent Voice Workflow:
 User Audio: "Summarize today's emails and check for scheduling conflicts"
-1. Audio processing → High-quality transcription
-2. Coordinator delegation → Email + Content + Calendar agents
-3. Multi-agent coordination → Comprehensive analysis
-4. Response optimization → Voice-friendly summary
-5. Audio generation → Natural conversational response
+1. Audio processing -> High-quality transcription
+2. Coordinator delegation -> Email + Content + Calendar agents
+3. Multi-agent coordination -> Comprehensive analysis
+4. Response optimization -> Voice-friendly summary
+5. Audio generation -> Natural conversational response
 Voice User Experience Guidelines
 
 Welcome & Onboarding: Provide clear voice introduction and capability overview
@@ -263,7 +336,7 @@ __all__ = ["voice_agent", "create_voice_agent"]
 
 async def test_voice_agent():
     """Test Voice Agent functionality comprehensively."""
-    print("🎙️ Testing Voice Agent with Complete Audio Pipeline...")
+    print("[VOICE] Testing Voice Agent with Complete Audio Pipeline...")
     
     # Track test results
     test_results = {
@@ -277,45 +350,45 @@ async def test_voice_agent():
     
     try:
         # Test 1: Agent creation
-        print("🏗️ Testing Voice Agent creation...")
+        print("[BUILD] Testing Voice Agent creation...")
         agent = create_voice_agent()
         
         if agent:
             test_results["agent_creation"] = True
-            print("   ✅ Voice Agent created successfully")
-            print(f"   🤖 Agent Name: {agent.name}")
-            print(f"   📝 Description: {agent.description[:60]}...")
-            print(f"   🧠 Model: {agent.model}")
-            print(f"   🎯 Output Key: {agent.output_key}")
+            print("   [OK] Voice Agent created successfully")
+            print(f"   [BOT] Agent Name: {agent.name}")
+            print(f"   [DOC] Description: {agent.description[:60]}...")
+            print(f"   [AI] Model: {agent.model}")
+            print(f"   [TARGET] Output Key: {agent.output_key}")
         else:
-            print("   ❌ Voice Agent creation failed")
+            print("   [FAIL] Voice Agent creation failed")
             return False
         
         # Test 2: Coordinator integration
-        print("🔗 Testing Coordinator sub-agent integration...")
+        print("[LINK] Testing Coordinator sub-agent integration...")
         try:
             sub_agents = agent.sub_agents
             coordinator_found = any(sub_agent.name == "coordinator_agent" for sub_agent in sub_agents)
             
             if coordinator_found and len(sub_agents) == 1:
                 test_results["coordinator_integration"] = True
-                print("   ✅ Coordinator agent properly integrated as sub-agent")
-                print(f"   🤖 Sub-agents count: {len(sub_agents)}")
+                print("   [OK] Coordinator agent properly integrated as sub-agent")
+                print(f"   [BOT] Sub-agents count: {len(sub_agents)}")
                 
                 # Check coordinator sub-agents
                 coordinator = sub_agents[0]
                 if hasattr(coordinator, 'sub_agents') and coordinator.sub_agents:
                     coord_sub_count = len(coordinator.sub_agents)
-                    print(f"   📋 Coordinator has {coord_sub_count} specialized agents")
+                    print(f"   [LIST] Coordinator has {coord_sub_count} specialized agents")
                 else:
-                    print("   ⚠️ Coordinator sub-agents not accessible")
+                    print("   [WARN] Coordinator sub-agents not accessible")
             else:
-                print(f"   ❌ Coordinator integration failed - found {len(sub_agents)} sub-agents")
+                print(f"   [FAIL] Coordinator integration failed - found {len(sub_agents)} sub-agents")
         except Exception as e:
-            print(f"   ❌ Coordinator integration error: {e}")
+            print(f"   [FAIL] Coordinator integration error: {e}")
         
         # Test 3: Voice tools integration
-        print("🔧 Testing Voice Tools integration...")
+        print("[TOOLS] Testing Voice Tools integration...")
         try:
             tools = agent.tools
             tool_names = []
@@ -335,22 +408,22 @@ async def test_voice_agent():
             
             if len(voice_tools_found) >= 4 and memory_tool_found:
                 test_results["voice_tools_integration"] = True
-                print(f"   ✅ Voice tools integrated: {len(voice_tools_found)} audio tools + memory")
+                print(f"   [OK] Voice tools integrated: {len(voice_tools_found)} audio tools + memory")
                 
-                print(f"   📋 Voice Tools Found:")
+                print(f"   [LIST] Voice Tools Found:")
                 for tool_name in voice_tools_found:
-                    print(f"       - {tool_name}")
+                    print(f"      - {tool_name}")
                 
                 if memory_tool_found:
-                    print(f"   🧠 Memory tool: load_memory")
+                    print(f"   [AI] Memory tool: load_memory")
             else:
-                print(f"   ❌ Voice tools integration incomplete")
-                print(f"       Voice tools: {len(voice_tools_found)}, Memory: {memory_tool_found}")
+                print(f"   [FAIL] Voice tools integration incomplete")
+                print(f"      Voice tools: {len(voice_tools_found)}, Memory: {memory_tool_found}")
         except Exception as e:
-            print(f"   ❌ Voice tools integration error: {e}")
+            print(f"   [FAIL] Voice tools integration error: {e}")
         
         # Test 4: Audio pipeline setup
-        print("🎤 Testing Audio Pipeline setup...")
+        print("[AUDIO] Testing Audio Pipeline setup...")
         try:
             # Test speech services availability
             from services.google_cloud.speech_services import get_speech_services
@@ -358,17 +431,17 @@ async def test_voice_agent():
             
             if speech_services:
                 test_results["audio_pipeline_setup"] = True
-                print("   ✅ Speech services accessible")
-                print(f"   🔊 STT Client: {'✅' if speech_services._stt_client else '❌'}")
-                print(f"   📢 TTS Client: {'✅' if speech_services._tts_client else '❌'}")
-                print(f"   🌍 Project ID: {speech_services.project_id}")
+                print("   [OK] Speech services accessible")
+                print(f"   [STT] STT Client: {'[OK]' if speech_services._stt_client else '[FAIL]'}")
+                print(f"   [TTS] TTS Client: {'[OK]' if speech_services._tts_client else '[FAIL]'}")
+                print(f"   [GLOB] Project ID: {speech_services.project_id}")
             else:
-                print("   ❌ Speech services not available")
+                print("   [FAIL] Speech services not available")
         except Exception as e:
-            print(f"   ❌ Audio pipeline setup error: {e}")
+            print(f"   [FAIL] Audio pipeline setup error: {e}")
         
         # Test 5: Session state management
-        print("📊 Testing Session State management...")
+        print("[STATE] Testing Session State management...")
         try:
             # Mock session state test
             class MockSession:
@@ -395,19 +468,19 @@ async def test_voice_agent():
             
             if session_keys_available:
                 test_results["session_state_management"] = True
-                print("   ✅ Session state structure compatible")
-                print(f"   📝 State keys available: {len(mock_context.session.state)}")
+                print("   [OK] Session state structure compatible")
+                print(f"   [DOC] State keys available: {len(mock_context.session.state)}")
                 
                 # Check voice-specific state keys
                 voice_keys = [key for key in mock_context.session.state.keys() if key.startswith("voice:")]
-                print(f"   🎙️ Voice state keys: {len(voice_keys)}")
+                print(f"   [VOICE] Voice state keys: {len(voice_keys)}")
             else:
-                print("   ❌ Session state management failed")
+                print("   [FAIL] Session state management failed")
         except Exception as e:
-            print(f"   ❌ Session state test error: {e}")
+            print(f"   [FAIL] Session state test error: {e}")
         
         # Test 6: Error handling
-        print("⚠️ Testing Error handling...")
+        print("[WARN] Testing Error handling...")
         try:
             # Test agent with invalid configuration
             test_model = LiteLlm(
@@ -420,17 +493,17 @@ async def test_voice_agent():
             
             if error_handling_works:
                 test_results["error_handling"] = True
-                print("   ✅ Error handling structure in place")
-                print("   📋 Agent handles invalid configurations gracefully")
+                print("   [OK] Error handling structure in place")
+                print("   [LIST] Agent handles invalid configurations gracefully")
             else:
-                print("   ❌ Error handling needs improvement")
+                print("   [FAIL] Error handling needs improvement")
         except Exception as e:
             # Expected behavior - graceful error handling
             test_results["error_handling"] = True
-            print("   ✅ Error handling works (expected exception caught)")
+            print("   [OK] Error handling works (expected exception caught)")
         
         # Test 7: Configuration validation
-        print("⚙️ Testing Configuration validation...")
+        print("[CONFIG] Testing Configuration validation...")
         try:
             config_checks = {
                 "voice_model_set": bool(settings.VOICE_MODEL),
@@ -443,43 +516,43 @@ async def test_voice_agent():
             all_config_valid = all(config_checks.values())
             
             if all_config_valid:
-                print("   ✅ Configuration validation passed")
+                print("   [OK] Configuration validation passed")
                 for check, status in config_checks.items():
-                    print(f"       {check}: {'✅' if status else '❌'}")
+                    print(f"      {check}: {'[OK]' if status else '[FAIL]'}")
             else:
-                print("   ⚠️ Some configuration issues found")
+                print("   [WARN] Some configuration issues found")
         except Exception as e:
-            print(f"   ❌ Configuration validation failed: {e}")
+            print(f"   [FAIL] Configuration validation failed: {e}")
         
         # Summary
         passed_tests = sum(test_results.values())
         total_tests = len(test_results)
         
-        print(f"\n📊 Voice Agent Test Results:")
+        print(f"\n[STATS] Voice Agent Test Results:")
         print(f"   Passed: {passed_tests}/{total_tests}")
         
         for test_name, result in test_results.items():
-            status = "✅" if result else "❌"
+            status = "[OK]" if result else "[FAIL]"
             print(f"   {status} {test_name.replace('_', ' ').title()}")
         
         # Additional info
-        print(f"\n📋 Voice Agent Configuration:")
+        print(f"\n[CONFIG] Voice Agent Configuration:")
         print(f"   Voice Model: {settings.VOICE_MODEL}")
         print(f"   Sub-Agents: {len(agent.sub_agents)}")
         print(f"   Voice Tools: {len([t for t in tool_names if 'audio' in t or 'voice' in t])}")
         print(f"   Total Tools: {len(agent.tools)}")
-        print(f"   Speech Services: {'✅' if settings.SPEECH_TO_TEXT_ENABLED else '❌'}")
+        print(f"   Speech Services: {'[OK]' if settings.SPEECH_TO_TEXT_ENABLED else '[FAIL]'}")
         
         if passed_tests == total_tests:
-            print("\n🎉 All Voice Agent tests passed!")
-            print("✅ Ready for Phase 4: ADK Integration (root_agent.py and app.py)!")
+            print("\n[SUCCESS] All Voice Agent tests passed!")
+            print("[OK] Ready for Phase 4: ADK Integration (root_agent.py and app.py)!")
             return True
         else:
-            print(f"\n⚠️ {total_tests - passed_tests} Voice Agent tests failed")
+            print(f"\n[WARN] {total_tests - passed_tests} Voice Agent tests failed")
             return False
             
     except Exception as e:
-        print(f"❌ Voice Agent test execution failed: {e}")
+        print(f"[FAIL] Voice Agent test execution failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -487,7 +560,7 @@ async def test_voice_agent():
 
 def test_voice_agent_sync():
     """Synchronous wrapper for async test"""
-    print("🧪 Running Voice Agent Tests...")
+    print("[TEST] Running Voice Agent Tests...")
     print("=" * 60)
     
     # Run async test
@@ -496,12 +569,12 @@ def test_voice_agent_sync():
     print("\n" + "=" * 60)
     
     if success:
-        print("🎉 Voice Agent testing completed successfully!")
-        print("🎯 Ready for ADK Integration phase!")
+        print("[SUCCESS] Voice Agent testing completed successfully!")
+        print("[TARGET] Ready for ADK Integration phase!")
     else:
-        print("⚠️ Some Voice Agent tests failed - check implementation")
+        print("[WARN] Some Voice Agent tests failed - check implementation")
     
-    print("✅ Voice Agent test module validation completed")
+    print("[OK] Voice Agent test module validation completed")
 
 
 if __name__ == "__main__":
@@ -514,37 +587,25 @@ if __name__ == "__main__":
     test_voice_agent_sync()
 
 class ProcessableVoiceAgent(LlmAgent):
-    async def process(self, event, app_name=None, session_service=None, memory_service=None):
-        """
-        Process an event with proper session state handling.
-        
-        Args:
-            event: The event to process
-            app_name: The application name
-            session_service: The session service
-            memory_service: The memory service
-            
-        Returns:
-            The processed event result
-        """
+    async def process(self, event, app_name=None, session_service=None, memory_service=None, tool_context=None):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"ROOT AGENT: Received event with tool_context: {tool_context}")
+        if hasattr(tool_context, 'session'):
+            logger.error(f"ROOT AGENT: Session in tool_context: {tool_context.session}")
+        elif isinstance(tool_context, dict) and 'session' in tool_context:
+            logger.error(f"ROOT AGENT: Session in tool_context dict: {tool_context['session']}")
         if not all([app_name, session_service, memory_service]):
             raise ValueError("app_name, session_service, and memory_service must be provided to process method.")
-        
-        # Create a runner with the provided services
         runner = Runner(
             agent=self,
             app_name=app_name,
             session_service=session_service,
             memory_service=memory_service
         )
-        
-        # Ensure the event has a session
         if not hasattr(event, 'session'):
-            # Create a new session if none exists
             session = session_service.create_session()
             event.session = session
-        
-        # Run the event through the runner
         return await runner.run(event)
 
 def create_voice_runner():

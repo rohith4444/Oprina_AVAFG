@@ -46,6 +46,16 @@ try:
 except ImportError as e:
     ADK_AVAILABLE = False
     ADK_IMPORT_ERROR = str(e)
+    # Create a simple Runner class as fallback
+    class Runner:
+        def __init__(self, agent, app_name, session_service, memory_service):
+            self.agent = agent
+            self.app_name = app_name
+            self.session_service = session_service
+            self.memory_service = memory_service
+        
+        async def run(self, event):
+            return {"content": f"Fallback Runner received: {event['content']}"}
 
 # Chat History Service (keep for UI)
 from memory.chat_history import ChatHistoryService, get_chat_history
@@ -121,12 +131,12 @@ class OprinaMemoryManager:
                 self._session_service = DatabaseSessionService(
                     db_url=self.session_config["db_url"]
                 )
-                self.logger.info("✅ DatabaseSessionService initialized with Supabase")
+                self.logger.info("DatabaseSessionService initialized with Supabase")
                 
             else:  # inmemory
                 self.logger.info("Initializing ADK InMemorySessionService...")
                 self._session_service = InMemorySessionService()
-                self.logger.info("✅ InMemorySessionService initialized")
+                self.logger.info("InMemorySessionService initialized")
                 
         except Exception as e:
             self.logger.error(f"Failed to initialize session service: {e}")
@@ -140,12 +150,12 @@ class OprinaMemoryManager:
                 self._memory_service = VertexAiRagMemoryService(
                     rag_corpus=self.memory_config["rag_corpus"]
                 )
-                self.logger.info("✅ VertexAiRagMemoryService initialized")
+                self.logger.info("VertexAiRagMemoryService initialized")
                 
             else:  # inmemory
                 self.logger.info("Initializing ADK InMemoryMemoryService...")
                 self._memory_service = InMemoryMemoryService()
-                self.logger.info("✅ InMemoryMemoryService initialized")
+                self.logger.info("InMemoryMemoryService initialized")
                 
         except Exception as e:
             self.logger.error(f"Failed to initialize memory service: {e}")
@@ -157,7 +167,7 @@ class OprinaMemoryManager:
             try:
                 self.logger.info("Initializing ChatHistoryService...")
                 self._chat_history = get_chat_history()
-                self.logger.info("✅ ChatHistoryService initialized")
+                self.logger.info("ChatHistoryService initialized")
             except Exception as e:
                 self.logger.error(f"Failed to initialize chat history: {e}")
                 self._chat_history = None
@@ -185,7 +195,7 @@ class OprinaMemoryManager:
                 memory_service=self._memory_service
             )
             
-            self.logger.info(f"✅ ADK Runner created for agent: {agent.name}")
+            self.logger.info(f"ADK Runner created for agent: {agent.name}")
             return runner
             
         except Exception as e:
@@ -353,7 +363,8 @@ class OprinaMemoryManager:
         agent, 
         user_id: str, 
         session_id: str, 
-        user_message: str
+        user_message: str,
+        tool_context=None
     ) -> List[Dict[str, Any]]:
         """
         Run agent with ADK Runner.
@@ -363,7 +374,7 @@ class OprinaMemoryManager:
             user_id: User identifier
             session_id: Session identifier
             user_message: User message
-            
+            tool_context: Tool context to pass to the event
         Returns:
             List of agent responses
         """
@@ -374,10 +385,11 @@ class OprinaMemoryManager:
             # Run agent
             self.logger.info(f"Running agent {agent.name} for user {user_id}")
             
-            # Create event
+            # Create event with tool_context
             event = Event(
                 action=EventActions.CHAT,
-                content=Content(parts=[Part(text=user_message)])
+                content=Content(parts=[Part(text=user_message)]),
+                tool_context=tool_context
             )
             
             # Process event
@@ -834,9 +846,9 @@ async def test_complete_adk_memory_manager():
         await memory_manager.delete_session(user_id, session_id)
         logger.info(f"Deleted session: {session_id}")
         
-        logger.info("✅ Complete ADK Memory Manager test passed")
+        logger.info("Complete ADK Memory Manager test passed")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Complete ADK Memory Manager test failed: {e}")
+        logger.error(f"Complete ADK Memory Manager test failed: {e}")
         return False 

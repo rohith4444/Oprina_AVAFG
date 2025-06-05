@@ -20,9 +20,39 @@ def get_config() -> Dict[str, Any]:
         Dict[str, Any]: Configuration settings
     """
     return {
+        # MCP Server settings
+        "mcp_server_host": os.environ.get("MCP_SERVER_HOST", "localhost"),
+        "mcp_server_port": int(os.environ.get("MCP_SERVER_PORT", "8765")),
+        "mcp_connection_type": os.environ.get("MCP_CONNECTION_TYPE", "stdio"),
+        "mcp_server_url": os.environ.get("MCP_SERVER_URL"),
+        "mcp_server_api_key": os.environ.get("MCP_SERVER_API_KEY"),
+        
         # Google API settings
         "google_api_key": os.environ.get("GOOGLE_API_KEY"),
+        "gmail_client_id": os.environ.get("GMAIL_CLIENT_ID"),
+        "gmail_client_secret": os.environ.get("GMAIL_CLIENT_SECRET"),
         "gmail_redirect_uri": os.environ.get("GMAIL_REDIRECT_URI"),
+        "google_client_secret_file": os.environ.get("GOOGLE_CLIENT_SECRET_FILE"),
+        "google_token_file": os.environ.get("GOOGLE_TOKEN_FILE"),
+        "google_gmail_enabled": os.environ.get("GOOGLE_GMAIL_ENABLED", "true").lower() == "true",
+        "google_cloud_project_id": os.environ.get("GOOGLE_CLOUD_PROJECT_ID"),
+        "google_cloud_location": os.environ.get("GOOGLE_CLOUD_LOCATION", "global"),
+        "google_application_credentials": os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
+        
+        # ADK settings
+        "adk_app_name": os.environ.get("ADK_APP_NAME", "oprina"),
+        "adk_model": os.environ.get("ADK_MODEL", "gemini-2.5-flash-preview-05-20"),
+        "adk_temperature": float(os.environ.get("ADK_TEMPERATURE", "0.7")),
+        "adk_max_tokens": int(os.environ.get("ADK_MAX_TOKENS", "1024")),
+        "adk_session_ttl_seconds": int(os.environ.get("ADK_SESSION_TTL_SECONDS", "86400")),
+        
+        # Memory service settings
+        "memory_service_type": os.environ.get("MEMORY_SERVICE_TYPE", "inmemory"),
+        "memory_retention_days": int(os.environ.get("MEMORY_RETENTION_DAYS", "30")),
+        
+        # Session service settings
+        "session_service_type": os.environ.get("SESSION_SERVICE_TYPE", "inmemory"),
+        "session_cleanup_interval_hours": int(os.environ.get("SESSION_CLEANUP_INTERVAL_HOURS", "6")),
         
         # Supabase settings
         "supabase_url": os.environ.get("SUPABASE_URL"),
