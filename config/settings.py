@@ -114,7 +114,7 @@ class Settings(BaseSettings):
     
     # Google OAuth Configuration
     GOOGLE_CLIENT_SECRET_FILE: str = Field(
-        default="credentials/client_secret_7774023189-5ga9j3epn8nja2aumfnmf09mh10osquh.apps.googleusercontent.com.json",
+        default="credentials/client_secret_desktop.json",  # New file
         description="Path to Google OAuth client secret file"
     )
     GOOGLE_TOKEN_FILE: str = Field(
@@ -123,15 +123,15 @@ class Settings(BaseSettings):
     )
     
     # Google API Scopes
-    GOOGLE_API_SCOPES: List[str] = Field(
-        default=[
-            "https://www.googleapis.com/auth/gmail.modify",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/userinfo.email", 
-            "openid"
-        ],
-        description="Google API OAuth scopes"
-    )
+    # GOOGLE_API_SCOPES: List[str] = Field(
+    #     default=[
+    #         "https://www.googleapis.com/auth/gmail.modify",
+    #         "https://www.googleapis.com/auth/userinfo.profile",
+    #         "https://www.googleapis.com/auth/userinfo.email", 
+    #         "openid"
+    #     ],
+    #     description="Google API OAuth scopes"
+    # )
     
     # Google API Features
     GOOGLE_GMAIL_ENABLED: bool = Field(
