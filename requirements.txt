@@ -3,14 +3,16 @@
 # =============================================================================
 
 # Core ADK (Agent Development Kit)
-google-adk
+google-adk>=0.1.0
 
 # Google AI/Cloud (minimal set to avoid conflicts)
-google-generativeai
-google-auth
-google-auth-oauthlib
+google-generativeai>=0.3.0
+google-auth>=2.0.0
+google-auth-oauthlib>=0.4.0
 google-auth-httplib2
-google-api-python-client
+google-api-python-client>=2.0.0
+google-cloud-texttospeech>=2.0.0
+google-cloud-speech>=2.0.0
 
 # LLM
 litellm
@@ -23,7 +25,7 @@ psycopg2-binary
 # Web Framework and API
 fastapi
 uvicorn
-pydantic
+pydantic>=1.8.0
 pydantic-settings
 
 # Voice Processing
@@ -39,21 +41,24 @@ aiofiles
 python-multipart
 
 # Utilities and Data Processing
-python-dotenv
+python-dotenv>=0.19.0
 python-jose
 passlib
 email-validator
 python-dateutil
 pytz
+requests>=2.25.0
+typing-extensions>=4.0.0
 
 # Logging
-structlog
+structlog>=21.1.0
 colorama
+prometheus-client>=0.11.0
 
 # Development and Testing
-pytest
+pytest>=6.2.5
 pytest-asyncio
-pytest-cov
+pytest-cov>=2.12.0
 black
 isort
 mypy

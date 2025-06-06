@@ -1,107 +1,99 @@
-# Oprina - Voice-Powered Gmail Assistant
+# Oprina - Voice-powered Gmail Assistant
 
-Oprina is an AI-powered voice assistant that allows users to manage their Gmail inbox using natural spoken language. It features an animated avatar with lip-sync capabilities and provides a seamless hands-free email experience.
+Oprina is a voice-powered Gmail assistant that helps users manage their emails, calendar, and content. It can process voice input, convert it to text, and perform various operations on Gmail, Google Calendar, and content generation. It can also convert text responses back to voice output.
 
-## 🎯 Project Overview
+## Features
 
-- **Voice-First Interface**: Interact with Gmail using natural speech
-- **Animated Avatar**: Real-time lip-sync and visual feedback
-- **Multi-Agent Architecture**: Specialized AI agents for different tasks
-- **Gmail Integration**: Secure OAuth-based Gmail API access
-- **Chat Interface**: Visual conversation history
+- **Voice Input/Output**: Process voice input and convert it to text, and convert text responses back to voice output.
+- **Email Management**: Search, read, compose, and send emails, manage email labels, handle attachments, and process email threads.
+- **Calendar Management**: Manage calendar events and schedules, handle meeting scheduling and coordination, process calendar invitations, manage calendar settings and preferences, and handle calendar conflicts and rescheduling.
+- **Content Generation**: Generate text content for emails and documents, summarize and analyze content, format and structure content, manage content templates, and handle content revisions and versions.
 
-## 🏗️ Architecture
+## Architecture
 
-```
-Voice Agent (Root) → Coordinator Agent → [Email Agent, Content Agent]
-```
+Oprina is built using a multi-agent architecture:
 
-- **Voice Agent**: Handles STT/TTS and avatar animation
-- **Coordinator Agent**: Orchestrates task routing and workflow
-- **Email Agent**: Manages Gmail API operations via MCP
-- **Content Agent**: Processes email content and generates responses
+- **Root Agent**: Orchestrates the sub-agents and handles voice input/output.
+- **Email Agent**: Handles Gmail operations.
+- **Calendar Agent**: Handles Google Calendar operations.
+- **Content Agent**: Handles content generation and management.
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.9+
-- Node.js 18+
-- Redis server
-- Google Cloud account with Speech-to-Text and Text-to-Speech APIs
-- Firebase project
-- Gmail API credentials
-
-### Installation
+## Installation
 
 1. Clone the repository:
-```bash
-git clone <repository-url>
-cd {project_name}
-```
+   ```
+   git clone https://github.com/yourusername/Oprina_AVAFG.git
+   cd Oprina_AVAFG
+   ```
 
-2. Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. Install the required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
 
-3. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your API keys and configuration
-```
+3. Set up your Google API credentials:
+   - Create a project in the Google Cloud Console
+   - Enable the Gmail API, Google Calendar API, and Google Cloud Text-to-Speech API
+   - Create a service account and download the credentials JSON file
+   - Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the path of the credentials file
 
-4. Start Redis server:
-```bash
-redis-server
-```
+## Usage
 
-5. Run the development setup:
-```bash
-python scripts/setup_env.py
-```
-
-6. Start the backend:
-```bash
-python -m agents.voice  # Start voice agent
-python backend/main.py  # Start FastAPI backend
-```
-
-7. Start the frontend (Bolt.new):
-```bash
-cd app
-# Follow Bolt.new setup instructions
-```
-
-## 📁 Project Structure
+Run the Oprina application:
 
 ```
-{project_name}/
-├── agents/          # AI Agents (Voice, Coordinator, Email, Content)
-├── app/            # Frontend (Bolt.new)
-├── backend/        # FastAPI Backend
-├── memory/         # Memory Management
-├── mcp/           # Model Context Protocol for Gmail
-├── services/      # External Services Integration
-├── config/        # Configuration Management
-└── tests/         # Testing Suite
+python -m oprina.main
 ```
 
+Command-line options:
 
-## 📚 Documentation
+- `--debug`: Enable debug logging
+- `--model`: Model to use for the agent (default: gemini-2.0-flash-001)
+- `--temperature`: Temperature for content generation (default: 0.0)
+- `--top_p`: Top-p for content generation (default: 0.5)
 
-- [Architecture Documentation](docs/architecture.md)
-- [API Documentation](docs/api.md)
-- [Setup Guide](docs/setup.md)
+## Development
 
+### Project Structure
 
-## 📄 License
+```
+oprina/
+├── main.py                  # Main entry point
+├── root_agent.py            # Root agent definition
+├── common.py                # Shared constants
+├── sub_agents/              # Sub-agent definitions
+│   ├── email/               # Email agent
+│   │   └── agent.py
+│   ├── calendar/            # Calendar agent
+│   │   └── agent.py
+│   └── content/             # Content agent
+│       └── agent.py
+└── tools/                   # Tool definitions
+    ├── memory.py            # Memory tools
+    ├── email.py             # Email tools
+    ├── calendar.py          # Calendar tools
+    └── content.py           # Content tools
+```
 
-This project is licensed under the MIT License.
+### Adding a New Sub-agent
 
-## 👥 Team
+1. Create a new directory in `oprina/sub_agents/` for your sub-agent
+2. Create an `agent.py` file in the new directory
+3. Define your sub-agent using the `Agent` class
+4. Add the sub-agent to the root agent in `oprina/root_agent.py`
 
-- Bharath Kumar (@abharathkumarr)
-- Hieu Hoang Calvin (@calvinhoang203)
-- Rohith Reddy Mandala (@rohith4444)
-"""
+### Adding a New Tool
+
+1. Create a new file in `oprina/tools/` for your tool
+2. Define your tool using the `Tool` class
+3. Add the tool to the appropriate sub-agent in `oprina/sub_agents/*/agent.py`
+
+## License
+
+This project is licensed under the Apache License, Version 2.0 - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Google ADK (Agent Development Kit)
+- Google Gemini models
+- Google Cloud APIs
