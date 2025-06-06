@@ -421,7 +421,7 @@ email_cache/
 # Development artifacts
 dev_tools/
 scripts/dev/
-tools/
+# tools/
 
 # Local configuration overrides
 local_config.py
