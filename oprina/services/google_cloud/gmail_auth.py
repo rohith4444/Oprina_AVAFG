@@ -1,4 +1,4 @@
-# services/google_cloud/gmail_auth.py
+# oprina/services/google_cloud/gmail_auth.py
 """
 Enhanced Gmail authentication and service management.
 Based on ADK Voice Agent patterns for robust connection handling.
@@ -16,6 +16,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+# FIXED: Import logging system
+from oprina.services.logging.logger import setup_logger
+
 # Gmail API scopes - comprehensive permissions
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
@@ -25,10 +28,10 @@ SCOPES = [
 ]
 
 # Credentials file paths
-OPRINA_DIR = Path(__file__).parent.parent.parent   
+OPRINA_DIR = Path(__file__).parent.parent.parent   # services/google_cloud -> services -> oprina
 CREDENTIALS_FILE = OPRINA_DIR / 'credentials.json'
 
-# Gmail-specific files (for gmail_auth.py)
+# Gmail-specific files
 TOKEN_FILE = OPRINA_DIR / 'gmail_token.pickle'
 TOKEN_INFO_FILE = OPRINA_DIR / 'gmail_token_info.json'
 
@@ -36,6 +39,9 @@ TOKEN_INFO_FILE = OPRINA_DIR / 'gmail_token_info.json'
 CONNECTION_TIMEOUT = 30
 MAX_RETRY_ATTEMPTS = 3
 TOKEN_REFRESH_THRESHOLD = timedelta(minutes=5)
+
+# FIXED: Initialize logger
+logger = setup_logger("gmail_auth", console_output=True)
 
 class GmailAuthManager:
     """Manages Gmail authentication and service connections."""
@@ -45,6 +51,13 @@ class GmailAuthManager:
         self._credentials = None
         self._last_check = None
         self._connection_status = {"connected": False, "error": None}
+        
+        # FIXED: Ensure directory exists for token storage
+        try:
+            OPRINA_DIR.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Gmail auth directory ready: {OPRINA_DIR}")
+        except Exception as e:
+            logger.error(f"Failed to create auth directory: {e}")
     
     def get_service(self, force_refresh: bool = False) -> Optional[Any]:
         """
@@ -59,11 +72,13 @@ class GmailAuthManager:
         try:
             # Check if we have a valid cached service
             if not force_refresh and self._service and self._is_service_valid():
+                logger.debug("Using cached Gmail service")
                 return self._service
             
             # Get or refresh credentials
             creds = self._get_valid_credentials(force_refresh)
             if not creds:
+                logger.error("Failed to get valid credentials")
                 return None
             
             # Create service
@@ -74,10 +89,13 @@ class GmailAuthManager:
             # Save token info for monitoring
             self._save_token_info(creds)
             
+            logger.info("Gmail service created successfully")
             return self._service
             
         except Exception as e:
-            self._connection_status = {"connected": False, "error": str(e)}
+            error_msg = f"Failed to create Gmail service: {str(e)}"
+            logger.error(error_msg)
+            self._connection_status = {"connected": False, "error": error_msg}
             self._service = None
             return None
     
@@ -91,10 +109,9 @@ class GmailAuthManager:
         try:
             service = self.get_service()
             if not service:
-                return {
-                    "connected": False, 
-                    "error": self._connection_status.get("error", "Failed to create service")
-                }
+                error_msg = self._connection_status.get("error", "Failed to create service")
+                logger.warning(f"Gmail connection check failed: {error_msg}")
+                return {"connected": False, "error": error_msg}
             
             # Test connection by getting profile
             profile = service.users().getProfile(userId='me').execute()
@@ -106,7 +123,7 @@ class GmailAuthManager:
             
             self._last_check = datetime.utcnow()
             
-            return {
+            connection_info = {
                 "connected": True,
                 "user_email": user_email,
                 "messages_total": messages_total,
@@ -116,13 +133,18 @@ class GmailAuthManager:
                 "scopes": SCOPES
             }
             
+            logger.info(f"Gmail connection verified for {user_email}")
+            return connection_info
+            
         except HttpError as e:
             error_msg = f"Gmail API error: {e.status_code} - {e.reason}"
+            logger.error(error_msg)
             self._connection_status = {"connected": False, "error": error_msg}
             return {"connected": False, "error": error_msg}
             
         except Exception as e:
             error_msg = f"Connection error: {str(e)}"
+            logger.error(error_msg)
             self._connection_status = {"connected": False, "error": error_msg}
             return {"connected": False, "error": error_msg}
     
@@ -137,28 +159,38 @@ class GmailAuthManager:
             Dict with authentication result
         """
         try:
+            logger.info(f"Starting Gmail authentication (force_reauth={force_reauth})")
+            
             if force_reauth:
+                logger.info("Clearing stored credentials for re-authentication")
                 self._clear_stored_credentials()
             
             service = self.get_service(force_refresh=True)
             if service:
                 connection_info = self.check_connection()
                 if connection_info.get("connected"):
+                    user_email = connection_info.get('user_email', 'user')
+                    success_msg = f"Gmail authenticated successfully as {user_email}"
+                    logger.info(success_msg)
+                    
                     return {
                         "success": True,
-                        "message": f"Gmail authenticated successfully as {connection_info.get('user_email', 'user')}",
-                        "user_email": connection_info.get("user_email"),
+                        "message": success_msg,
+                        "user_email": user_email,
                         "connection_info": connection_info
                     }
             
+            error_msg = self._connection_status.get("error", "Authentication failed")
+            logger.error(f"Gmail authentication failed: {error_msg}")
             return {
                 "success": False,
-                "message": self._connection_status.get("error", "Authentication failed"),
-                "error": self._connection_status.get("error")
+                "message": error_msg,
+                "error": error_msg
             }
             
         except Exception as e:
             error_msg = f"Authentication error: {str(e)}"
+            logger.error(error_msg)
             return {"success": False, "message": error_msg, "error": error_msg}
     
     def _get_valid_credentials(self, force_refresh: bool = False) -> Optional[Credentials]:
@@ -166,27 +198,32 @@ class GmailAuthManager:
         creds = None
         
         # Load existing token if not forcing refresh
-        if not force_refresh and os.path.exists(TOKEN_FILE):
+        if not force_refresh and TOKEN_FILE.exists():
             try:
                 with open(TOKEN_FILE, 'rb') as token:
                     creds = pickle.load(token)
+                logger.debug("Loaded existing Gmail credentials")
             except Exception as e:
-                print(f"Error loading token: {e}")
+                logger.warning(f"Error loading Gmail token: {e}")
                 creds = None
         
         # Check if credentials need refresh
         if creds and not creds.valid:
             if creds.expired and creds.refresh_token:
                 try:
+                    logger.info("Refreshing Gmail credentials")
                     creds.refresh(Request())
+                    logger.info("Gmail credentials refreshed successfully")
                 except Exception as e:
-                    print(f"Error refreshing token: {e}")
+                    logger.error(f"Error refreshing Gmail token: {e}")
                     creds = None
             else:
+                logger.warning("Gmail credentials invalid and cannot be refreshed")
                 creds = None
         
         # Get new credentials if needed
         if not creds:
+            logger.info("Getting new Gmail credentials")
             creds = self._get_new_credentials()
         
         # Save valid credentials
@@ -198,30 +235,38 @@ class GmailAuthManager:
     def _get_new_credentials(self) -> Optional[Credentials]:
         """Get new credentials through OAuth flow."""
         if not CREDENTIALS_FILE.exists():
-            raise FileNotFoundError(
-                f"Gmail credentials file '{CREDENTIALS_FILE}' not found. "
-                "Download from Google Cloud Console."
-            )
+            error_msg = f"Gmail credentials file '{CREDENTIALS_FILE}' not found. Download from Google Cloud Console."
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
         
         try:
+            logger.info("Starting Gmail OAuth flow")
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
+            logger.info("Gmail OAuth flow completed successfully")
             return creds
         except Exception as e:
-            print(f"Error in OAuth flow: {e}")
+            logger.error(f"Error in Gmail OAuth flow: {e}")
             return None
     
     def _save_credentials(self, creds: Credentials):
         """Save credentials to file."""
         try:
+            # FIXED: Ensure directory exists before saving
+            TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(TOKEN_FILE, 'wb') as token:
                 pickle.dump(creds, token)
+            logger.debug("Gmail credentials saved successfully")
         except Exception as e:
-            print(f"Error saving credentials: {e}")
+            logger.error(f"Error saving Gmail credentials: {e}")
     
     def _save_token_info(self, creds: Credentials):
         """Save token metadata for monitoring."""
         try:
+            # FIXED: Ensure directory exists before saving
+            TOKEN_INFO_FILE.parent.mkdir(parents=True, exist_ok=True)
+            
             token_info = {
                 "valid": creds.valid,
                 "expired": creds.expired,
@@ -232,9 +277,11 @@ class GmailAuthManager:
             
             with open(TOKEN_INFO_FILE, 'w') as f:
                 json.dump(token_info, f, indent=2)
+            
+            logger.debug("Gmail token info saved successfully")
                 
         except Exception as e:
-            print(f"Error saving token info: {e}")
+            logger.warning(f"Error saving Gmail token info: {e}")
     
     def _is_service_valid(self) -> bool:
         """Check if current service is still valid."""
@@ -243,12 +290,14 @@ class GmailAuthManager:
         
         # Check if credentials are still valid
         if not self._credentials.valid:
+            logger.debug("Gmail credentials no longer valid")
             return False
         
         # Check if token is expiring soon
         if self._credentials.expiry:
             time_until_expiry = self._credentials.expiry - datetime.utcnow()
             if time_until_expiry < TOKEN_REFRESH_THRESHOLD:
+                logger.debug("Gmail token expiring soon, will refresh")
                 return False
         
         return True
@@ -262,15 +311,17 @@ class GmailAuthManager:
     def _clear_stored_credentials(self):
         """Clear stored credentials for re-authentication."""
         for file_path in [TOKEN_FILE, TOKEN_INFO_FILE]:
-            if os.path.exists(file_path):
+            if file_path.exists():
                 try:
-                    os.remove(file_path)
+                    file_path.unlink()
+                    logger.debug(f"Removed {file_path}")
                 except Exception as e:
-                    print(f"Error removing {file_path}: {e}")
+                    logger.warning(f"Error removing {file_path}: {e}")
         
         self._service = None
         self._credentials = None
         self._connection_status = {"connected": False, "error": None}
+        logger.info("Gmail stored credentials cleared")
 
 # Global instance
 _gmail_auth_manager = GmailAuthManager()
@@ -296,9 +347,9 @@ def get_gmail_auth_status() -> Dict[str, Any]:
         "connection_status": _gmail_auth_manager._connection_status.copy(),
         "last_check": _gmail_auth_manager._last_check.isoformat() if _gmail_auth_manager._last_check else None,
         "token_files_exist": {
-            "credentials": os.path.exists(CREDENTIALS_FILE),
-            "token": os.path.exists(TOKEN_FILE),
-            "token_info": os.path.exists(TOKEN_INFO_FILE)
+            "credentials": CREDENTIALS_FILE.exists(),
+            "token": TOKEN_FILE.exists(),
+            "token_info": TOKEN_INFO_FILE.exists()
         }
     }
 

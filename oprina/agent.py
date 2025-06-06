@@ -5,7 +5,7 @@ from oprina import prompt
 from oprina.sub_agents.email.agent import email_agent
 from oprina.sub_agents.content.agent import content_agent
 from oprina.sub_agents.calendar.agent import calendar_agent
-from oprina.tools.connection_tools import CONNECTION_TOOLS
+ 
 # from oprina.tools.memory import load_user_profile
 
 root_agent = Agent(
@@ -17,6 +17,5 @@ root_agent = Agent(
         email_agent,
         content_agent,
         calendar_agent,
-    ],
-    tools=CONNECTION_TOOLS,  # This gives users access to overall connection management
+    ]  # This gives users access to overall connection management
 )

@@ -1,11 +1,16 @@
 """
 Enhanced utility functions for ADK integration across all agents.
-No ADK abstractions - just improved helpers with proper ADK support.
+Cleaned up version with auth-related functions removed and proper session key usage.
 """
 
 from datetime import datetime
 from typing import Dict, Any, Optional
 import logging
+
+# Import session key constants
+from oprina.common.session_keys import (
+    USER_ID, USER_NAME, USER_EMAIL, USER_PREFERENCES, USER_LAST_ACTIVITY
+)
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -33,7 +38,7 @@ def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> st
     return text[:max_length - len(suffix)] + suffix
 
 def extract_user_info_from_session(tool_context) -> Dict[str, Any]:
-    """Extract comprehensive user info from ADK session."""
+    """Extract comprehensive user info from ADK session using session key constants."""
     if not tool_context or not hasattr(tool_context, 'session'):
         return {
             "user_id": "unknown", 
@@ -43,30 +48,29 @@ def extract_user_info_from_session(tool_context) -> Dict[str, Any]:
     
     state = tool_context.session.state
     return {
-        # Core identification
-        "user_id": state.get("user:id", "unknown"),
+        # Core identification - using session key constants
+        "user_id": state.get(USER_ID, "unknown"),
         "session_id": getattr(tool_context.session, 'id', 'unknown'),
         "invocation_id": getattr(tool_context, 'invocation_id', 'unknown'),
         
-        # User information
-        "user_name": state.get("user:name", ""),
-        "user_email": state.get("user:email", ""),
+        # User information - using session key constants
+        "user_name": state.get(USER_NAME, ""),
+        "user_email": state.get(USER_EMAIL, ""),
         
-        # Connection status
-        "gmail_connected": state.get("user:gmail_connected", False),
-        "calendar_connected": state.get("user:calendar_connected", False),
-        
-        # User preferences
-        "preferences": state.get("user:preferences", {}),
+        # User preferences - using session key constants
+        "preferences": state.get(USER_PREFERENCES, {}),
         
         # Session metadata
         "conversation_active": state.get("conversation_active", False),
         "last_agent_used": state.get("last_agent_used", ""),
-        "app_version": state.get("app:version", "unknown")
+        "app_version": state.get("app:version", "unknown"),
+        
+        # Last activity - using session key constants
+        "last_activity": state.get(USER_LAST_ACTIVITY, "")
     }
 
 # =============================================================================
-# NEW ADK-Specific Utility Functions
+# ADK-Specific Utility Functions
 # =============================================================================
 
 def validate_tool_context(tool_context, function_name: str = "unknown") -> bool:
@@ -118,8 +122,8 @@ def update_agent_activity(tool_context, agent_name: str, activity: str) -> bool:
         tool_context.session.state[f"{service_name}:last_activity"] = activity
         tool_context.session.state[f"{service_name}:last_activity_time"] = format_timestamp()
         
-        # Update user's last activity timestamp
-        tool_context.session.state["user:last_activity"] = format_timestamp()
+        # Update user's last activity timestamp using session key constant
+        tool_context.session.state[USER_LAST_ACTIVITY] = format_timestamp()
         
         return True
         
@@ -141,7 +145,8 @@ def get_user_preferences(tool_context, default_prefs: Optional[Dict[str, Any]] =
     if not validate_tool_context(tool_context, "get_user_preferences"):
         return default_prefs or {}
     
-    return tool_context.session.state.get("user:preferences", default_prefs or {})
+    # Use session key constant
+    return tool_context.session.state.get(USER_PREFERENCES, default_prefs or {})
 
 def update_user_preferences(tool_context, preferences: Dict[str, Any]) -> bool:
     """
@@ -158,120 +163,16 @@ def update_user_preferences(tool_context, preferences: Dict[str, Any]) -> bool:
         return False
     
     try:
-        current_prefs = tool_context.session.state.get("user:preferences", {})
+        # Use session key constant
+        current_prefs = tool_context.session.state.get(USER_PREFERENCES, {})
         current_prefs.update(preferences)
-        tool_context.session.state["user:preferences"] = current_prefs
-        tool_context.session.state["user:preferences_updated"] = format_timestamp()
+        tool_context.session.state[USER_PREFERENCES] = current_prefs
         
         return True
         
     except Exception as e:
         logger.error(f"Failed to update user preferences: {e}")
         return False
-
-def get_service_connection_status(tool_context, service_name: str) -> Dict[str, Any]:
-    """
-    Get connection status for a specific service (gmail, calendar, etc.).
-    
-    Args:
-        tool_context: ADK tool context
-        service_name: Service name ('gmail', 'calendar', etc.)
-        
-    Returns:
-        Dict with connection status information
-    """
-    if not validate_tool_context(tool_context, "get_service_connection_status"):
-        return {"connected": False, "error": "No tool context"}
-    
-    state = tool_context.session.state
-    
-    return {
-        "connected": state.get(f"user:{service_name}_connected", False),
-        "user_email": state.get("user:email", ""),
-        "last_activity": state.get(f"{service_name}:last_activity_time", ""),
-        "last_check": state.get(f"{service_name}:last_connection_check", "")
-    }
-
-def update_service_connection_status(tool_context, service_name: str, connected: bool, 
-                                   user_email: str = "", additional_info: Dict[str, Any] = None) -> bool:
-    """
-    Update connection status for a service.
-    
-    Args:
-        tool_context: ADK tool context
-        service_name: Service name ('gmail', 'calendar', etc.)
-        connected: Whether service is connected
-        user_email: User's email for this service
-        additional_info: Additional service-specific information
-        
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    if not validate_tool_context(tool_context, "update_service_connection_status"):
-        return False
-    
-    try:
-        # Update connection status
-        tool_context.session.state[f"user:{service_name}_connected"] = connected
-        tool_context.session.state[f"{service_name}:last_connection_check"] = format_timestamp()
-        
-        # Update user email if provided
-        if user_email:
-            tool_context.session.state["user:email"] = user_email
-        
-        # Update additional service-specific info
-        if additional_info:
-            for key, value in additional_info.items():
-                tool_context.session.state[f"{service_name}:{key}"] = value
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Failed to update {service_name} connection status: {e}")
-        return False
-
-def get_session_summary(tool_context) -> Dict[str, Any]:
-    """
-    Get a comprehensive summary of the current session state.
-    Useful for debugging and monitoring.
-    
-    Args:
-        tool_context: ADK tool context
-        
-    Returns:
-        Dict with session summary
-    """
-    if not validate_tool_context(tool_context, "get_session_summary"):
-        return {"error": "No valid tool context"}
-    
-    state = tool_context.session.state
-    
-    # Count state keys by prefix
-    prefixes = {"user": 0, "email": 0, "calendar": 0, "content": 0, "app": 0, "temp": 0, "other": 0}
-    
-    for key in state.keys():
-        if ":" in key:
-            prefix = key.split(":")[0]
-            if prefix in prefixes:
-                prefixes[prefix] += 1
-            else:
-                prefixes["other"] += 1
-        else:
-            prefixes["other"] += 1
-    
-    return {
-        "session_id": getattr(tool_context.session, 'id', 'unknown'),
-        "user_id": state.get("user:id", "unknown"),
-        "conversation_active": state.get("conversation_active", False),
-        "last_agent_used": state.get("last_agent_used", ""),
-        "service_connections": {
-            "gmail": state.get("user:gmail_connected", False),
-            "calendar": state.get("user:calendar_connected", False)
-        },
-        "state_key_counts": prefixes,
-        "total_state_keys": len(state),
-        "last_activity": state.get("user:last_activity", "")
-    }
 
 def log_tool_execution(tool_context, tool_name: str, operation: str, 
                       success: bool, details: str = "") -> None:

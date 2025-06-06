@@ -1,8 +1,8 @@
 """
-Direct Gmail Tools for ADK - Complete ADK Integration
+Simplified Gmail Tools for ADK - Direct Service Access
 
-Simple ADK-compatible tools that use Gmail API directly through existing auth services.
-Now with proper tool_context validation, session state management, and comprehensive logging.
+Simple ADK-compatible tools that use Gmail API directly through auth_utils.
+No complex connection state management - each tool checks service availability directly.
 """
 
 import os
@@ -20,15 +20,19 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from google.adk.tools import FunctionTool
-from oprina.tools.auth_utils import ensure_gmail_connection
-from services.logging.logger import setup_logger
+from oprina.services.logging.logger import setup_logger
 
+# Import simplified auth utils
+from oprina.tools.auth_utils import get_gmail_service
+
+# Import ADK utility functions
 from oprina.common.utils import (
     validate_tool_context, update_agent_activity, log_tool_execution
 )
 
+# Import session state constants
 from oprina.common.session_keys import (
-    USER_GMAIL_CONNECTED, USER_EMAIL,
+    USER_EMAIL,
     EMAIL_CURRENT_RESULTS, EMAIL_LAST_FETCH, EMAIL_LAST_QUERY, 
     EMAIL_RESULTS_COUNT, EMAIL_LAST_SENT_TO, EMAIL_LAST_SENT,
     EMAIL_LAST_MESSAGE_VIEWED, EMAIL_LAST_MESSAGE_VIEWED_AT,
@@ -38,62 +42,16 @@ from oprina.common.session_keys import (
     EMAIL_LAST_ARCHIVED, EMAIL_LAST_ARCHIVED_AT,
     EMAIL_LAST_DELETED, EMAIL_LAST_DELETED_AT
 )
+
 logger = setup_logger("gmail_tools", console_output=True)
-
-
-def gmail_check_connection(tool_context=None) -> str:
-    """Check Gmail connection status - UPDATED VERSION."""
-    if not validate_tool_context(tool_context, "gmail_check_connection"):
-        return "Error: No valid tool context provided"
-    
-    try:
-        log_tool_execution(tool_context, "gmail_check_connection", "status_check", True, "Checking Gmail connection")
-        update_agent_activity(tool_context, "email_agent", "checking_connection")
-        
-        # NEW PATTERN - Use central auth utils
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_check_connection")
-        
-        if success:
-            
-            return f"Gmail connected successfully. {message}"
-        else:
-            return f"Gmail connection issue: {message}"
-            
-    except Exception as e:
-        logger.error(f"Error checking Gmail connection: {e}")
-        return f"Error checking Gmail connection: {str(e)}"
-
-def gmail_authenticate(tool_context=None) -> str:
-    """Authenticate with Gmail - UPDATED VERSION."""
-    if not validate_tool_context(tool_context, "gmail_authenticate"):
-        return "Error: No valid tool context provided"
-    
-    try:
-        log_tool_execution(tool_context, "gmail_authenticate", "authenticate", True, "Starting Gmail authentication")
-        update_agent_activity(tool_context, "email_agent", "authenticating")
-        
-        # NEW PATTERN - Use central auth utils instead of direct service calls
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_authenticate")
-        
-        if success:
-            log_tool_execution(tool_context, "gmail_authenticate", "authenticate", True, "Gmail authenticated successfully")
-            return f"Gmail authentication successful! {message}"
-        else:
-            log_tool_execution(tool_context, "gmail_authenticate", "authenticate", False, message)
-            return f"Gmail authentication failed: {message}"
-            
-    except Exception as e:
-        logger.error(f"Gmail authentication error: {e}")
-        return f"Gmail authentication failed: {str(e)}"
-
 
 # =============================================================================
 # Gmail Email Reading Tools
 # =============================================================================
 
 def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=None) -> str:
-    """List Gmail messages with optional search query and full ADK integration."""
-    if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
+    """List Gmail messages with optional search query."""
+    if not validate_tool_context(tool_context, "gmail_list_messages"):
         return "Error: No valid tool context provided"
     
     try:
@@ -104,12 +62,10 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "listing_messages")
         
-        
         # Get Gmail service
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_list_messages", "list_messages", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # List messages
         result = service.users().messages().list(
@@ -183,7 +139,7 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
 
 
 def gmail_get_message(message_id: str, tool_context=None) -> str:
-    """Get detailed content of a specific Gmail message with ADK integration."""
+    """Get detailed content of a specific Gmail message."""
     if not validate_tool_context(tool_context, "gmail_get_message"):
         return "Error: No valid tool context provided"
     
@@ -194,13 +150,10 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "getting_message")
         
-        if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
-            return "Gmail not connected. Please authenticate first."
-        
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_send_messages")
+        # Get Gmail service
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_get_message", "get_message", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Get full message
         message = service.users().messages().get(
@@ -239,8 +192,8 @@ Content:
 
 
 def gmail_search_messages(search_query: str, max_results: int = 10, tool_context=None) -> str:
-    """Search Gmail messages using Gmail search syntax with ADK integration."""
-    if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
+    """Search Gmail messages using Gmail search syntax."""
+    if not validate_tool_context(tool_context, "gmail_search_messages"):
         return "Error: No valid tool context provided"
     
     try:
@@ -249,8 +202,6 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "searching_messages")
-        
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_search_messages")
         
         # Use the list_messages function with search query
         return gmail_list_messages(query=search_query, max_results=max_results, tool_context=tool_context)
@@ -266,7 +217,7 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
 # =============================================================================
 
 def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str = "", tool_context=None) -> str:
-    """Send a Gmail message with comprehensive ADK integration."""
+    """Send a Gmail message."""
     if not validate_tool_context(tool_context, "gmail_send_message"):
         return "Error: No valid tool context provided"
     
@@ -278,13 +229,10 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "sending_message")
         
-        if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
-            return "Gmail not connected. Please authenticate first."
-        
-        success, message1, service = ensure_gmail_connection(tool_context, "gmail_send_messages")
+        # Get Gmail service
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_send_message", "send_message", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Get sender email from session or profile
         sender_email = tool_context.session.state.get(USER_EMAIL, "")
@@ -292,7 +240,7 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
             try:
                 profile = service.users().getProfile(userId='me').execute()
                 sender_email = profile.get('emailAddress', '')
-                tool_context.session.state["user:email"] = sender_email
+                tool_context.session.state[USER_EMAIL] = sender_email
             except:
                 sender_email = "me"
         
@@ -335,7 +283,7 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
 
 
 def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) -> str:
-    """Reply to a specific Gmail message with ADK integration."""
+    """Reply to a specific Gmail message."""
     if not validate_tool_context(tool_context, "gmail_reply_to_message"):
         return "Error: No valid tool context provided"
     
@@ -347,13 +295,10 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "replying_to_message")
         
-        if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
-            return "Gmail not connected. Please authenticate first."
-        
-        success, message1, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
+        # Get Gmail service
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Get original message
         original = service.users().messages().get(
@@ -408,7 +353,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
 # =============================================================================
 
 def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
-    """Mark a Gmail message as read with ADK integration."""
+    """Mark a Gmail message as read."""
     if not validate_tool_context(tool_context, "gmail_mark_as_read"):
         return "Error: No valid tool context provided"
     
@@ -419,13 +364,10 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "marking_read")
         
-        if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
-            return "Gmail not connected. Please authenticate first."
-        
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
+        # Get Gmail service
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_mark_as_read", "mark_read", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Remove UNREAD label
         service.users().messages().modify(
@@ -448,7 +390,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
 
 
 def gmail_archive_message(message_id: str, tool_context=None) -> str:
-    """Archive a Gmail message with ADK integration."""
+    """Archive a Gmail message."""
     if not validate_tool_context(tool_context, "gmail_archive_message"):
         return "Error: No valid tool context provided"
     
@@ -459,13 +401,10 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "archiving_message")
         
-        if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
-            return "Gmail not connected. Please authenticate first."
-        
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
+        # Get Gmail service
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_archive_message", "archive", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Remove INBOX label
         service.users().messages().modify(
@@ -488,7 +427,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
 
 
 def gmail_delete_message(message_id: str, tool_context=None) -> str:
-    """Delete a Gmail message with ADK integration."""
+    """Delete a Gmail message."""
     if not validate_tool_context(tool_context, "gmail_delete_message"):
         return "Error: No valid tool context provided"
     
@@ -499,13 +438,10 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "deleting_message")
         
-        if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
-            return "Gmail not connected. Please authenticate first."
-        
-        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
+        # Get Gmail service
+        service = get_gmail_service()
         if not service:
-            log_tool_execution(tool_context, "gmail_delete_message", "delete", False, "Gmail service unavailable")
-            return "Unable to connect to Gmail service"
+            return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Move to trash
         service.users().messages().trash(
@@ -560,10 +496,6 @@ def _extract_message_body(payload: Dict[str, Any]) -> str:
 # Create ADK Function Tools
 # =============================================================================
 
-# Connection tools
-gmail_check_connection_tool = FunctionTool(func=gmail_check_connection)
-gmail_authenticate_tool = FunctionTool(func=gmail_authenticate)
-
 # Reading tools
 gmail_list_messages_tool = FunctionTool(func=gmail_list_messages)
 gmail_get_message_tool = FunctionTool(func=gmail_get_message)
@@ -580,8 +512,6 @@ gmail_delete_message_tool = FunctionTool(func=gmail_delete_message)
 
 # Gmail tools collection
 GMAIL_TOOLS = [
-    gmail_check_connection_tool,
-    gmail_authenticate_tool,
     gmail_list_messages_tool,
     gmail_get_message_tool,
     gmail_search_messages_tool,
@@ -594,8 +524,6 @@ GMAIL_TOOLS = [
 
 # Export for easy access
 __all__ = [
-    "gmail_check_connection",
-    "gmail_authenticate", 
     "gmail_list_messages",
     "gmail_get_message",
     "gmail_search_messages",

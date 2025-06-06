@@ -1,6 +1,6 @@
 """
 Session state key constants for consistent access across all agents.
-Enhanced with coordination-specific keys for multi-agent workflow management.
+Cleaned up version with connection state management removed.
 """
 
 # =============================================================================
@@ -9,8 +9,6 @@ Enhanced with coordination-specific keys for multi-agent workflow management.
 USER_ID = "user:id"
 USER_NAME = "user:name"
 USER_EMAIL = "user:email"
-USER_GMAIL_CONNECTED = "user:gmail_connected"
-USER_CALENDAR_CONNECTED = "user:calendar_connected"
 USER_PREFERENCES = "user:preferences"
 USER_LAST_ACTIVITY = "user:last_activity"
 
@@ -26,8 +24,8 @@ EMAIL_CURRENT_RESULTS = "email:current_results"
 EMAIL_LAST_QUERY = "email:last_query"
 EMAIL_RESULTS_COUNT = "email:results_count"
 EMAIL_LAST_SENT_TO = "email:last_sent_to"
-EMAIL_CONNECTION_STATUS = "email:connection_status"
-# Additional email constants you might need
+
+# Email message operations
 EMAIL_LAST_MESSAGE_VIEWED = "email:last_message_viewed"
 EMAIL_LAST_MESSAGE_VIEWED_AT = "email:last_message_viewed_at"
 EMAIL_LAST_SENT_SUBJECT = "email:last_sent_subject"
@@ -46,40 +44,33 @@ EMAIL_LAST_DELETED_AT = "email:last_deleted_at"
 # =============================================================================
 # Calendar State (current conversation)
 # =============================================================================
-CALENDAR_CURRENT = "calendar:current_events"
+# Event listing
+CALENDAR_CURRENT = "calendar:current_events"           
 CALENDAR_LAST_FETCH = "calendar:last_fetch"
-CALENDAR_UPCOMING_COUNT = "calendar:upcoming_count"
-CALENDAR_LAST_EVENT_CREATED = "calendar:last_event_created"
+CALENDAR_LAST_LIST_START_DATE = "calendar:last_list_start_date"   # NEW
+CALENDAR_LAST_LIST_DAYS = "calendar:last_list_days"              # NEW  
+CALENDAR_LAST_LIST_COUNT = "calendar:last_list_count"            # NEW
 
-# Calendar event management
-CALENDAR_LAST_QUERY_DAYS = "calendar:last_query_days"
+# Event creation
+CALENDAR_LAST_EVENT_CREATED = "calendar:last_event_created"
 CALENDAR_LAST_EVENT_CREATED_AT = "calendar:last_event_created_at"
 CALENDAR_LAST_CREATED_EVENT_ID = "calendar:last_created_event_id"
-CALENDAR_LAST_QUICK_EVENT = "calendar:last_quick_event"
-CALENDAR_LAST_QUICK_EVENT_AT = "calendar:last_quick_event_at"
 
-# Calendar event updates and deletions
+# Event updates
 CALENDAR_LAST_UPDATED_EVENT = "calendar:last_updated_event"
 CALENDAR_LAST_EVENT_UPDATED_AT = "calendar:last_event_updated_at"
+
+# Event deletion  
 CALENDAR_LAST_DELETED_EVENT = "calendar:last_deleted_event"
-
-# Calendar availability and free time
-CALENDAR_LAST_FREE_TIME_SEARCH = "calendar:last_free_time_search"
-CALENDAR_LAST_FREE_SLOTS = "calendar:last_free_slots"
-CALENDAR_LAST_AVAILABILITY_CHECK = "calendar:last_availability_check"
-
-# Calendar information
-CALENDAR_LAST_TIME_REQUEST = "calendar:last_time_request"
-CALENDAR_AVAILABLE_CALENDARS = "calendar:available_calendars"
-CALENDAR_CALENDARS_LIST_AT = "calendar:calendars_list_at"
-CALENDAR_CALENDARS_COUNT = "calendar:calendars_count"
-
+CALENDAR_LAST_DELETED_ID = "calendar:last_deleted_id"            # NEW
+CALENDAR_LAST_DELETED_AT = "calendar:last_deleted_at"            # NEW
 # =============================================================================
 # Content State (current conversation)
 # =============================================================================
 CONTENT_LAST_SUMMARY = "content:last_summary"
 CONTENT_LAST_ANALYSIS = "content:last_analysis"
 CONTENT_PROCESSING_STATUS = "content:processing_status"
+
 # Content summarization keys
 CONTENT_LAST_SUMMARY_AT = "content:last_summary_at"
 CONTENT_LAST_SUMMARY_LENGTH = "content:last_summary_length"
@@ -111,5 +102,3 @@ CONTENT_LAST_VOICE_ORIGINAL_LENGTH = "content:last_voice_original_length"
 CONTENT_LAST_VOICE_OPTIMIZED_LENGTH = "content:last_voice_optimized_length"
 CONTENT_LAST_VOICE_SUMMARY = "content:last_voice_summary"
 CONTENT_LAST_VOICE_SUMMARY_AT = "content:last_voice_summary_at"
-
- 
