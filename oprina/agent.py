@@ -5,7 +5,8 @@ from oprina import prompt
 from oprina.sub_agents.email.agent import email_agent
 from oprina.sub_agents.content.agent import content_agent
 from oprina.sub_agents.calendar.agent import calendar_agent
-from oprina.tools.memory import load_user_profile
+from oprina.tools.connection_tools import CONNECTION_TOOLS
+# from oprina.tools.memory import load_user_profile
 
 root_agent = Agent(
     model="gemini-2.0-flash-001",  # Multimodal model
@@ -17,5 +18,5 @@ root_agent = Agent(
         content_agent,
         calendar_agent,
     ],
-    before_agent_callback=load_user_profile,
+    tools=CONNECTION_TOOLS,  # This gives users access to overall connection management
 )

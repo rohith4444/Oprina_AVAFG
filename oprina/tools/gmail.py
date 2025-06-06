@@ -20,12 +20,11 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from google.adk.tools import FunctionTool
-from services.google_cloud.gmail_auth import get_gmail_service, check_gmail_connection
+from oprina.tools.auth_utils import ensure_gmail_connection
 from services.logging.logger import setup_logger
 
 from oprina.common.utils import (
-    validate_tool_context, update_agent_activity, get_service_connection_status,
-    update_service_connection_status, log_tool_execution
+    validate_tool_context, update_agent_activity, log_tool_execution
 )
 
 from oprina.common.session_keys import (
@@ -42,96 +41,49 @@ from oprina.common.session_keys import (
 logger = setup_logger("gmail_tools", console_output=True)
 
 
-# =============================================================================
-# Gmail Connection Tools
-# =============================================================================
-
 def gmail_check_connection(tool_context=None) -> str:
-    """Check Gmail connection status with comprehensive ADK integration."""
+    """Check Gmail connection status - UPDATED VERSION."""
     if not validate_tool_context(tool_context, "gmail_check_connection"):
         return "Error: No valid tool context provided"
     
     try:
-        # Log the operation
         log_tool_execution(tool_context, "gmail_check_connection", "status_check", True, "Checking Gmail connection")
-        
-        # Update agent activity
         update_agent_activity(tool_context, "email_agent", "checking_connection")
         
-        # Check session state first
-        gmail_connected = tool_context.session.state.get(USER_GMAIL_CONNECTED, False)
+        # NEW PATTERN - Use central auth utils
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_check_connection")
         
-        if gmail_connected:
-            # Verify actual connection
-            connection_status = check_gmail_connection()
-            if connection_status.get("connected", False):
-                user_email = connection_status.get("user_email", "unknown")
-                
-                # Update session state
-                update_service_connection_status(
-                    tool_context, "gmail", True, user_email,
-                    {"last_check": datetime.utcnow().isoformat(), "status": "connected"}
-                )
-                
-                return f"Gmail connected as {user_email}"
-            else:
-                error_msg = connection_status.get('error', 'Unknown error')
-                log_tool_execution(tool_context, "gmail_check_connection", "status_check", False, error_msg)
-                
-                # Update session state with error
-                update_service_connection_status(
-                    tool_context, "gmail", False, "",
-                    {"last_error": error_msg, "last_check": datetime.utcnow().isoformat()}
-                )
-                
-                return f"Gmail connection issue: {error_msg}"
+        if success:
+            
+            return f"Gmail connected successfully. {message}"
         else:
-            return "Gmail not connected. Please authenticate with Gmail first."
+            return f"Gmail connection issue: {message}"
             
     except Exception as e:
         logger.error(f"Error checking Gmail connection: {e}")
-        log_tool_execution(tool_context, "gmail_check_connection", "status_check", False, str(e))
         return f"Error checking Gmail connection: {str(e)}"
 
-
 def gmail_authenticate(tool_context=None) -> str:
-    """Authenticate with Gmail and update session state."""
+    """Authenticate with Gmail - UPDATED VERSION."""
     if not validate_tool_context(tool_context, "gmail_authenticate"):
         return "Error: No valid tool context provided"
     
     try:
-        # Log the operation
         log_tool_execution(tool_context, "gmail_authenticate", "authenticate", True, "Starting Gmail authentication")
-        
-        # Update agent activity
         update_agent_activity(tool_context, "email_agent", "authenticating")
         
-        # Test Gmail service creation
-        service = get_gmail_service()
+        # NEW PATTERN - Use central auth utils instead of direct service calls
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_authenticate")
         
-        if service:
-            # Get user profile to confirm connection
-            profile = service.users().getProfile(userId='me').execute()
-            user_email = profile.get('emailAddress', 'unknown')
-            
-            # Update session state with successful authentication
-            update_service_connection_status(
-                tool_context, "gmail", True, user_email,
-                {
-                    "authenticated_at": datetime.utcnow().isoformat(),
-                    "profile_id": profile.get('messagesTotal', 0)
-                }
-            )
-            
-            log_tool_execution(tool_context, "gmail_authenticate", "authenticate", True, f"Authenticated as {user_email}")
-            return f"Gmail authentication successful for {user_email}"
+        if success:
+            log_tool_execution(tool_context, "gmail_authenticate", "authenticate", True, "Gmail authenticated successfully")
+            return f"Gmail authentication successful! {message}"
         else:
-            log_tool_execution(tool_context, "gmail_authenticate", "authenticate", False, "Service creation failed")
-            return "Gmail authentication failed. Please check your credentials."
+            log_tool_execution(tool_context, "gmail_authenticate", "authenticate", False, message)
+            return f"Gmail authentication failed: {message}"
             
     except Exception as e:
         logger.error(f"Gmail authentication error: {e}")
-        log_tool_execution(tool_context, "gmail_authenticate", "authenticate", False, str(e))
         return f"Gmail authentication failed: {str(e)}"
 
 
@@ -152,12 +104,9 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "listing_messages")
         
-        # Check Gmail connection
-        if not tool_context.session.state.get("user:gmail_connected", False):
-            return "Gmail not connected. Please authenticate first."
         
         # Get Gmail service
-        service = get_gmail_service()
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_list_messages", "list_messages", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"
@@ -248,7 +197,7 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
             return "Gmail not connected. Please authenticate first."
         
-        service = get_gmail_service()
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_send_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_get_message", "get_message", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"
@@ -301,8 +250,7 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "searching_messages")
         
-        if not tool_context.session.state.get("user:gmail_connected", False):
-            return "Gmail not connected. Please authenticate first."
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_search_messages")
         
         # Use the list_messages function with search query
         return gmail_list_messages(query=search_query, max_results=max_results, tool_context=tool_context)
@@ -333,7 +281,7 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
             return "Gmail not connected. Please authenticate first."
         
-        service = get_gmail_service()
+        success, message1, service = ensure_gmail_connection(tool_context, "gmail_send_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_send_message", "send_message", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"
@@ -402,7 +350,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
             return "Gmail not connected. Please authenticate first."
         
-        service = get_gmail_service()
+        success, message1, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"
@@ -474,7 +422,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
             return "Gmail not connected. Please authenticate first."
         
-        service = get_gmail_service()
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_mark_as_read", "mark_read", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"
@@ -514,7 +462,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
             return "Gmail not connected. Please authenticate first."
         
-        service = get_gmail_service()
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_archive_message", "archive", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"
@@ -554,7 +502,7 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         if not tool_context.session.state.get(USER_GMAIL_CONNECTED, False):
             return "Gmail not connected. Please authenticate first."
         
-        service = get_gmail_service()
+        success, message, service = ensure_gmail_connection(tool_context, "gmail_list_messages")
         if not service:
             log_tool_execution(tool_context, "gmail_delete_message", "delete", False, "Gmail service unavailable")
             return "Unable to connect to Gmail service"

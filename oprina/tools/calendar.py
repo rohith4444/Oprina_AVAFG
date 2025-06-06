@@ -20,13 +20,12 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from google.adk.tools import FunctionTool
-from services.google_cloud.calendar_auth import get_calendar_service, check_calendar_connection
+from oprina.tools.auth_utils import ensure_calendar_connection
 from services.logging.logger import setup_logger
 
 # Import ADK utility functions
 from oprina.common.utils import (
-    validate_tool_context, update_agent_activity, get_user_preferences,
-    update_service_connection_status, get_service_connection_status, log_tool_execution
+    validate_tool_context, update_agent_activity, log_tool_execution
 )
 
 # Import session state constants
@@ -48,99 +47,53 @@ logger = setup_logger("calendar_tools", console_output=True)
 # =============================================================================
 
 def calendar_check_connection(tool_context=None) -> str:
-    """Check Calendar connection status with comprehensive ADK integration."""
+    """Check Calendar connection status - UPDATED VERSION."""
     if not validate_tool_context(tool_context, "calendar_check_connection"):
         return "Error: No valid tool context provided"
     
     try:
-        # Log operation
         log_tool_execution(tool_context, "calendar_check_connection", "status_check", True, "Checking Calendar connection")
-        
-        # Update agent activity
         update_agent_activity(tool_context, "calendar_agent", "checking_connection")
         
-        # Check session state first using constants
-        calendar_connected = tool_context.session.state.get(USER_CALENDAR_CONNECTED, False)
+        # NEW PATTERN - Use central auth utils
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_check_connection")
         
-        if calendar_connected:
-            # Verify actual connection
-            connection_status = check_calendar_connection()
-            if connection_status.get("connected", False):
-                calendar_count = connection_status.get("calendar_count", 0)
-                
-                # Update session state
-                update_service_connection_status(
-                    tool_context, "calendar", True, "",
-                    {"last_check": datetime.utcnow().isoformat(), "calendar_count": calendar_count}
-                )
-                
-                return f"Calendar connected with access to {calendar_count} calendars"
-            else:
-                error_msg = connection_status.get('error', 'Unknown error')
-                log_tool_execution(tool_context, "calendar_check_connection", "status_check", False, error_msg)
-                
-                # Update session state with error
-                update_service_connection_status(
-                    tool_context, "calendar", False, "",
-                    {"last_error": error_msg, "last_check": datetime.utcnow().isoformat()}
-                )
-                
-                return f"Calendar connection issue: {error_msg}"
+        if success:
+            # Get additional connection details
+            from services.google_cloud.calendar_auth import get_calendar_auth_status
+            auth_status = get_calendar_auth_status()
+            calendar_count = auth_status.get("cached_calendars", 0)
+            
+            return f"Calendar connected successfully with {calendar_count} calendars. {message}"
         else:
-            return "Calendar not connected. Please authenticate with Google Calendar first."
+            return f"Calendar connection issue: {message}"
             
     except Exception as e:
         logger.error(f"Error checking Calendar connection: {e}")
-        log_tool_execution(tool_context, "calendar_check_connection", "status_check", False, str(e))
         return f"Error checking Calendar connection: {str(e)}"
 
-
 def calendar_authenticate(tool_context=None) -> str:
-    """Authenticate with Calendar and update session state."""
+    """Authenticate with Calendar - UPDATED VERSION."""
     if not validate_tool_context(tool_context, "calendar_authenticate"):
         return "Error: No valid tool context provided"
     
     try:
-        # Log operation
         log_tool_execution(tool_context, "calendar_authenticate", "authenticate", True, "Starting Calendar authentication")
-        
-        # Update agent activity
         update_agent_activity(tool_context, "calendar_agent", "authenticating")
         
-        # Test Calendar service creation
-        service = get_calendar_service()
+        # NEW PATTERN - Use central auth utils
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_authenticate")
         
-        if service:
-            # Get calendar list to confirm connection
-            calendar_list = service.calendarList().list().execute()
-            calendars = calendar_list.get('items', [])
-            
-            primary_calendar = next(
-                (cal['summary'] for cal in calendars if cal.get('primary')), 
-                'Primary Calendar'
-            )
-            
-            # Update session state with successful authentication
-            update_service_connection_status(
-                tool_context, "calendar", True, "",
-                {
-                    "authenticated_at": datetime.utcnow().isoformat(),
-                    "calendar_count": len(calendars),
-                    "primary_calendar": primary_calendar
-                }
-            )
-            
-            log_tool_execution(tool_context, "calendar_authenticate", "authenticate", True, f"Authenticated with {len(calendars)} calendars")
-            return f"Calendar authentication successful. Primary calendar: {primary_calendar}"
+        if success:
+            log_tool_execution(tool_context, "calendar_authenticate", "authenticate", True, "Calendar authenticated successfully")
+            return f"Calendar authentication successful! {message}"
         else:
-            log_tool_execution(tool_context, "calendar_authenticate", "authenticate", False, "Service creation failed")
-            return "Calendar authentication failed. Please check your credentials."
+            log_tool_execution(tool_context, "calendar_authenticate", "authenticate", False, message)
+            return f"Calendar authentication failed: {message}"
             
     except Exception as e:
         logger.error(f"Calendar authentication error: {e}")
-        log_tool_execution(tool_context, "calendar_authenticate", "authenticate", False, str(e))
         return f"Calendar authentication failed: {str(e)}"
-
 
 # =============================================================================
 # Calendar Event Listing Tools
@@ -167,7 +120,7 @@ def calendar_list_events(
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_list_events")
         if not service:
             log_tool_execution(tool_context, "calendar_list_events", "list_events", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -297,7 +250,7 @@ def calendar_create_event(
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_create_events")
         if not service:
             log_tool_execution(tool_context, "calendar_create_event", "create_event", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -383,7 +336,7 @@ def calendar_create_quick_event(event_text: str, tool_context=None) -> str:
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_quick_events")
         if not service:
             log_tool_execution(tool_context, "calendar_create_quick_event", "quick_create", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -450,7 +403,7 @@ def calendar_update_event(
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_update_events")
         if not service:
             log_tool_execution(tool_context, "calendar_update_event", "update_event", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -540,7 +493,7 @@ def calendar_delete_event(event_id: str, calendar_id: str = "primary", tool_cont
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_delete_events")
         if not service:
             log_tool_execution(tool_context, "calendar_delete_event", "delete_event", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -598,7 +551,7 @@ def calendar_find_free_time(
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_free_events")
         if not service:
             log_tool_execution(tool_context, "calendar_find_free_time", "find_free_time", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -716,7 +669,7 @@ def calendar_check_availability(date: str, start_time: str, end_time: str, tool_
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_check_events")
         if not service:
             log_tool_execution(tool_context, "calendar_check_availability", "check_availability", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
@@ -822,7 +775,7 @@ def calendar_list_calendars(tool_context=None) -> str:
         if not tool_context.session.state.get(USER_CALENDAR_CONNECTED, False):
             return "Calendar not connected. Please authenticate first."
         
-        service = get_calendar_service()
+        success, message, service = ensure_calendar_connection(tool_context, "calendar_list_events")
         if not service:
             log_tool_execution(tool_context, "calendar_list_calendars", "list_calendars", False, "Calendar service unavailable")
             return "Unable to connect to Calendar service"
