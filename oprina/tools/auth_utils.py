@@ -27,6 +27,9 @@ from oprina.common.session_keys import (
     USER_GMAIL_CONNECTED, USER_CALENDAR_CONNECTED, USER_EMAIL
 )
 
+from oprina.services.google_cloud.gmail_auth import get_gmail_service, check_gmail_connection
+from oprina.services.google_cloud.calendar_auth import get_calendar_service, check_calendar_connection
+
 logger = setup_logger("auth_utils", console_output=True)
 
 # Service connection timeout (in seconds)

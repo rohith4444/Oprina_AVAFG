@@ -9,7 +9,7 @@ from oprina.tools.connection_tools import CONNECTION_TOOLS
 # from oprina.tools.memory import load_user_profile
 
 root_agent = Agent(
-    model="gemini-2.0-flash-001",  # Multimodal model
+    model="gemini-2.5-flash-exp-native-audio-thinking-dialog",  # Multimodal model
     name="oprina_root_agent",
     description="Multimodal voice-enabled Gmail and Calendar assistant",
     instruction=prompt.ROOT_AGENT_INSTR,

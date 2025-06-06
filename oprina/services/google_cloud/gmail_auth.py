@@ -7,6 +7,7 @@ Based on ADK Voice Agent patterns for robust connection handling.
 import os
 import pickle
 import json
+from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from google.auth.transport.requests import Request
@@ -24,9 +25,12 @@ SCOPES = [
 ]
 
 # Credentials file paths
-CREDENTIALS_FILE = 'credentials.json'
-TOKEN_FILE = 'gmail_token.pickle'
-TOKEN_INFO_FILE = 'gmail_token_info.json'
+OPRINA_DIR = Path(__file__).parent.parent.parent   
+CREDENTIALS_FILE = OPRINA_DIR / 'credentials.json'
+
+# Gmail-specific files (for gmail_auth.py)
+TOKEN_FILE = OPRINA_DIR / 'gmail_token.pickle'
+TOKEN_INFO_FILE = OPRINA_DIR / 'gmail_token_info.json'
 
 # Connection settings
 CONNECTION_TIMEOUT = 30
@@ -193,7 +197,7 @@ class GmailAuthManager:
     
     def _get_new_credentials(self) -> Optional[Credentials]:
         """Get new credentials through OAuth flow."""
-        if not os.path.exists(CREDENTIALS_FILE):
+        if not CREDENTIALS_FILE.exists():
             raise FileNotFoundError(
                 f"Gmail credentials file '{CREDENTIALS_FILE}' not found. "
                 "Download from Google Cloud Console."

@@ -13,7 +13,7 @@ from datetime import datetime
 # Add project root to path
 current_file = os.path.abspath(__file__)
 project_root = current_file
-for _ in range(7):
+for _ in range(3):
     project_root = os.path.dirname(project_root)
 
 if project_root not in sys.path:

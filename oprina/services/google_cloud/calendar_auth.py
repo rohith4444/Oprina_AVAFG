@@ -7,6 +7,7 @@ Based on ADK Voice Agent patterns for robust connection handling.
 import os
 import pickle
 import json
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from google.auth.transport.requests import Request
@@ -23,9 +24,10 @@ SCOPES = [
 ]
 
 # Credentials file paths (shared with Gmail)
-CREDENTIALS_FILE = 'credentials.json'
-CALENDAR_TOKEN_FILE = 'calendar_token.pickle'
-CALENDAR_TOKEN_INFO_FILE = 'calendar_token_info.json'
+OPRINA_DIR = Path(__file__).parent.parent.parent  # oprina/services/google_cloud/ -> oprina/
+CREDENTIALS_FILE = OPRINA_DIR / 'credentials.json'
+CALENDAR_TOKEN_FILE = OPRINA_DIR / 'calendar_token.pickle'
+CALENDAR_TOKEN_INFO_FILE = OPRINA_DIR / 'calendar_token_info.json'
 
 # Connection settings
 CONNECTION_TIMEOUT = 30
@@ -224,7 +226,7 @@ class CalendarAuthManager:
     
     def _get_new_credentials(self) -> Optional[Credentials]:
         """Get new credentials through OAuth flow."""
-        if not os.path.exists(CREDENTIALS_FILE):
+        if not CREDENTIALS_FILE.exists():
             raise FileNotFoundError(
                 f"Calendar credentials file '{CREDENTIALS_FILE}' not found. "
                 "Download from Google Cloud Console."
