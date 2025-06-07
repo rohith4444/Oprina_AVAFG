@@ -777,7 +777,7 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
 # Helper Functions
 # =============================================================================
 
-def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None) -> tuple:
+def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None):
     """Parse AI-generated email content into subject and body components."""
     validate_tool_context(tool_context, "gmail_parse_email_content")
     

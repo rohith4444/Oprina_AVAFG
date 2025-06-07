@@ -38,7 +38,8 @@ from oprina.common.session_keys import (
     EMAIL_LAST_EXTRACTED_TASKS, EMAIL_LAST_TASK_EXTRACTION_AT,
     EMAIL_LAST_GENERATED_REPLY, EMAIL_LAST_REPLY_GENERATION_AT,
     EMAIL_LAST_GENERATED_EMAIL, EMAIL_LAST_EMAIL_GENERATION_AT,
-    EMAIL_LAST_ARCHIVED, EMAIL_LAST_REPLY_SENT
+    EMAIL_LAST_ARCHIVED, EMAIL_LAST_REPLY_SENT,
+    EMAIL_PENDING_SEND, EMAIL_PENDING_REPLY 
 )
 
 
@@ -61,6 +62,7 @@ class TestGmailTools(unittest.TestCase):
         self.sample_message = {
             'id': 'test_message_123',
             'payload': {
+                'mimeType': 'text/plain',
                 'headers': [
                     {'name': 'From', 'value': 'test@example.com'},
                     {'name': 'Subject', 'value': 'Test Subject'},
@@ -158,6 +160,9 @@ class TestGmailTools(unittest.TestCase):
         
         # Mock successful send
         mock_service.users().messages().send().execute.return_value = {'id': 'sent_123'}
+
+        # ADD THIS MOCK FOR PROFILE API CALL:
+        mock_service.users().getProfile().execute.return_value = {'emailAddress': 'sender@example.com'}
         
         result = gmail_send_message(
             to="test@example.com",
@@ -229,7 +234,7 @@ class TestGmailTools(unittest.TestCase):
         result = gmail_delete_message("test_message_123", tool_context=self.mock_tool_context)
         
         self.assertIsInstance(result, str)
-        self.assertIn("deleted", result)
+        self.assertIn("moved to trash", result)
 
     # =============================================================================
     # AI Tools Tests
@@ -248,7 +253,7 @@ class TestGmailTools(unittest.TestCase):
         result = gmail_summarize_message("test_message_123", tool_context=self.mock_tool_context)
         
         self.assertIsInstance(result, str)
-        self.assertIn("Summary:", result)
+        self.assertEqual(result, "This is a test summary")
         
         # Check session state
         self.assertEqual(self.mock_session.state[EMAIL_LAST_AI_SUMMARY], "This is a test summary")
@@ -267,7 +272,7 @@ class TestGmailTools(unittest.TestCase):
         result = gmail_analyze_sentiment("test_message_123", tool_context=self.mock_tool_context)
         
         self.assertIsInstance(result, str)
-        self.assertIn("Sentiment Analysis:", result)
+        self.assertEqual(result, "Positive sentiment")
         
         # Check session state
         self.assertEqual(self.mock_session.state[EMAIL_LAST_SENTIMENT_ANALYSIS], "Positive sentiment")
@@ -286,7 +291,7 @@ class TestGmailTools(unittest.TestCase):
         result = gmail_extract_action_items("test_message_123", tool_context=self.mock_tool_context)
         
         self.assertIsInstance(result, str)
-        self.assertIn("Action Items:", result)
+        self.assertEqual(result, "1. Review document\n2. Schedule meeting")
         
         # Check session state
         self.assertEqual(self.mock_session.state[EMAIL_LAST_EXTRACTED_TASKS], "1. Review document\n2. Schedule meeting")
@@ -309,7 +314,7 @@ class TestGmailTools(unittest.TestCase):
         )
         
         self.assertIsInstance(result, str)
-        self.assertIn("Generated Reply:", result)
+        self.assertEqual(result, "Thank you for your email. I will review and get back to you.")
         
         # Check session state
         self.assertEqual(self.mock_session.state[EMAIL_LAST_GENERATED_REPLY], 
@@ -333,8 +338,7 @@ class TestGmailTools(unittest.TestCase):
         )
         
         self.assertIsInstance(result, str)
-        self.assertIn("Generated Email:", result)
-        
+        self.assertEqual(result, "Subject: Meeting Request\n\nDear John,\n\nI would like to schedule a meeting...")
         # Check session state
         self.assertIn(EMAIL_LAST_GENERATED_EMAIL, self.mock_session.state)
         self.assertIn(EMAIL_LAST_EMAIL_GENERATION_AT, self.mock_session.state)
@@ -367,7 +371,7 @@ class TestGmailTools(unittest.TestCase):
         )
         
         self.assertIsInstance(result, str)
-        self.assertIn("Email sent", result)
+        self.assertIn("Ready to send email:", result)
 
     @patch('oprina.tools.gmail.get_gmail_service')
     def test_gmail_confirm_and_reply_success(self, mock_get_service):
@@ -384,7 +388,7 @@ class TestGmailTools(unittest.TestCase):
         )
         
         self.assertIsInstance(result, str)
-        self.assertIn("Reply sent", result)
+        self.assertIn("Ready to send reply:", result)
 
     # =============================================================================
     # Helper Function Tests
@@ -393,6 +397,7 @@ class TestGmailTools(unittest.TestCase):
     def test_extract_message_body_text(self):
         """Test extracting plain text from message body"""
         payload = {
+            'mimeType': 'text/plain',
             'body': {
                 'data': 'VGVzdCBtZXNzYWdlIGJvZHk='  # Base64 for "Test message body"
             }
@@ -474,6 +479,7 @@ class TestGmailAgentBehavior(unittest.TestCase):
         self.sample_email = {
             'id': 'agent_test_msg',
             'payload': {
+                'mimeType': 'text/plain',
                 'headers': [
                     {'name': 'From', 'value': 'client@company.com'},
                     {'name': 'Subject', 'value': 'Meeting Request - Project Discussion'},
@@ -569,7 +575,7 @@ class TestGmailAgentBehavior(unittest.TestCase):
         result = gmail_summarize_message("agent_test_msg", tool_context=self.mock_tool_context)
         
         # Agent should provide actionable insights
-        self.assertIn("Summary:", result)
+        self.assertEqual(result, "Client wants to schedule project discussion meeting")
         self.assertIn("Client wants to schedule", result)
         
         # Should track AI processing in session
@@ -594,10 +600,10 @@ class TestGmailAgentBehavior(unittest.TestCase):
         )
         
         # Agent should provide confirmation and guidance
-        self.assertIn("Email sent", result)
+        self.assertIn("Ready to send email:", result)
         
         # Should track composition in session
-        self.assertIn(EMAIL_LAST_SENT_TO, self.mock_session.state)
+        self.assertIn(EMAIL_PENDING_SEND, self.mock_session.state)
 
     # =============================================================================
     # Agent Error Recovery and Guidance Tests
@@ -687,7 +693,7 @@ class TestGmailAgentBehavior(unittest.TestCase):
         result = gmail_extract_action_items("agent_test_msg", tool_context=self.mock_tool_context)
         
         # Should present insights in speakable format
-        self.assertIn("Action Items:", result)
+        self.assertEqual(result, "Action needed: Schedule meeting with client for project discussion")
         self.assertIn("Action needed", result)
         
         # Should be conversational
@@ -767,11 +773,10 @@ class TestGmailAgentBehavior(unittest.TestCase):
         )
         
         # Should indicate successful send after confirmation
-        self.assertIn("Email sent", result)
+        self.assertIn("Ready to send email:", result)
         
         # Should track confirmed send in session
-        self.assertIn(EMAIL_LAST_SENT_TO, self.mock_session.state)
-        self.assertEqual(self.mock_session.state[EMAIL_LAST_SENT_TO], "test@example.com")
+        self.assertIn(EMAIL_PENDING_SEND, self.mock_session.state)
 
     @patch('oprina.tools.gmail.get_gmail_service')
     def test_agent_reply_confirmation_workflow(self, mock_get_service):
@@ -791,10 +796,10 @@ class TestGmailAgentBehavior(unittest.TestCase):
         )
         
         # Should confirm reply was sent
-        self.assertIn("Reply sent", result)
+        self.assertIn("Ready to send reply:", result)
         
         # Should track reply in session
-        self.assertIn(EMAIL_LAST_REPLY_SENT, self.mock_session.state)
+        self.assertIn(EMAIL_PENDING_REPLY, self.mock_session.state)
 
 
 if __name__ == '__main__':

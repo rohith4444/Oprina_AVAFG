@@ -55,11 +55,11 @@ class TestSetupAndAuth(unittest.TestCase):
         """Test checking for credentials.json file"""
         # Test when credentials file exists
         mock_exists.return_value = True
-        self.assertTrue(mock_exists('./oprina/credentials.json'))
+        self.assertTrue(mock_exists('../credentials.json'))
         
         # Test when credentials file doesn't exist
         mock_exists.return_value = False
-        self.assertFalse(mock_exists('./oprina/credentials.json'))
+        self.assertFalse(mock_exists('../credentials.json'))
 
     @patch('builtins.open', new_callable=mock_open)
     @patch('os.path.exists')
@@ -69,7 +69,7 @@ class TestSetupAndAuth(unittest.TestCase):
         mock_file.return_value.read.return_value = json.dumps(self.mock_credentials_data)
         
         # This would be how the setup scripts read credentials
-        with open('./oprina/credentials.json', 'r') as f:
+        with open('../credentials.json', 'r') as f:
             credentials_data = json.loads(f.read())
         
         self.assertEqual(credentials_data['installed']['client_id'], 'test_client_id')
@@ -437,11 +437,11 @@ class TestSetupAndAuth(unittest.TestCase):
         mock_exists.return_value = True
         
         # This simulates checking for credentials in the expected location
-        credentials_exists = mock_exists('./oprina/credentials.json')
+        credentials_exists = mock_exists('../credentials.json')
         self.assertTrue(credentials_exists)
         
         # Verify the function was called with the right path
-        mock_exists.assert_called_with('./oprina/credentials.json')
+        mock_exists.assert_called_with('../credentials.json')
 
     # =============================================================================
     # Integration with Oprina Structure Tests
