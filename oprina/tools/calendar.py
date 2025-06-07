@@ -123,7 +123,7 @@ def calendar_create_event(
         end_formatted = end_dt.strftime('%I:%M %p')
         
         # Update session state with rich data
-        tool_context.session.state[CALENDAR_LAST_EVENT_CREATED] = {
+        tool_context.state[CALENDAR_LAST_EVENT_CREATED] = {
             "id": event.get("id"),
             "summary": summary,
             "start": start_dt.isoformat(),
@@ -135,8 +135,8 @@ def calendar_create_event(
             "event_link": event.get("htmlLink", ""),
             "timezone": timezone_id
         }
-        tool_context.session.state[CALENDAR_LAST_EVENT_CREATED_AT] = datetime.utcnow().isoformat()
-        tool_context.session.state[CALENDAR_LAST_CREATED_EVENT_ID] = event.get("id")
+        tool_context.state[CALENDAR_LAST_EVENT_CREATED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[CALENDAR_LAST_CREATED_EVENT_ID] = event.get("id")
         
         # Return voice-friendly string
         location_text = f" at {location}" if location else ""
@@ -211,10 +211,10 @@ def calendar_list_events(
         events = events_result.get("items", [])
         
         # Update session state
-        tool_context.session.state[CALENDAR_LAST_FETCH] = datetime.utcnow().isoformat()
-        tool_context.session.state[CALENDAR_LAST_LIST_START_DATE] = start_date if start_date else "today"
-        tool_context.session.state[CALENDAR_LAST_LIST_DAYS] = days
-        tool_context.session.state[CALENDAR_LAST_LIST_COUNT] = len(events)
+        tool_context.state[CALENDAR_LAST_FETCH] = datetime.utcnow().isoformat()
+        tool_context.state[CALENDAR_LAST_LIST_START_DATE] = start_date if start_date else "today"
+        tool_context.state[CALENDAR_LAST_LIST_DAYS] = days
+        tool_context.state[CALENDAR_LAST_LIST_COUNT] = len(events)
         
         if not events:
             days_text = "today" if days == 1 else f"the next {days} days"
@@ -243,7 +243,7 @@ def calendar_list_events(
                 "link": event.get("htmlLink", "")
             })
         
-        tool_context.session.state[CALENDAR_CURRENT] = detailed_events
+        tool_context.state[CALENDAR_CURRENT] = detailed_events
         
         # Create voice-friendly response
         days_text = "today" if days == 1 else f"the next {days} days"
@@ -350,14 +350,14 @@ def calendar_update_event(
         ).execute()
         
         # Update session state
-        tool_context.session.state[CALENDAR_LAST_UPDATED_EVENT] = {
+        tool_context.state[CALENDAR_LAST_UPDATED_EVENT] = {
             "id": event_id,
             "original_summary": original_summary,
             "new_summary": updated_event.get("summary", original_summary),
             "updated_fields": updated_fields,
             "event_link": updated_event.get("htmlLink", "")
         }
-        tool_context.session.state[CALENDAR_LAST_EVENT_UPDATED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[CALENDAR_LAST_EVENT_UPDATED_AT] = datetime.utcnow().isoformat()
         
         # Create voice-friendly response
         final_summary = updated_event.get("summary", original_summary)
@@ -418,14 +418,14 @@ def calendar_delete_event(
         service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
         
         # Update session state
-        tool_context.session.state[CALENDAR_LAST_DELETED_EVENT] = {
+        tool_context.state[CALENDAR_LAST_DELETED_EVENT] = {
             "id": event_id,
             "summary": event_summary,
             "start": event_start,
             "deleted_at": datetime.utcnow().isoformat()
         }
-        tool_context.session.state[CALENDAR_LAST_DELETED_ID] = event_id
-        tool_context.session.state[CALENDAR_LAST_DELETED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[CALENDAR_LAST_DELETED_ID] = event_id
+        tool_context.state[CALENDAR_LAST_DELETED_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "calendar_delete_event", "delete_event", True, f"Event '{event_summary}' deleted")
         return f"Event '{event_summary}' (scheduled for {event_start}) has been deleted successfully"

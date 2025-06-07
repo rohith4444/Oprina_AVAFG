@@ -46,7 +46,7 @@ def extract_user_info_from_session(tool_context) -> Dict[str, Any]:
             "error": "No tool context or session available"
         }
     
-    state = tool_context.session.state
+    state = tool_context.state
     return {
         # Core identification - using session key constants
         "user_id": state.get(USER_ID, "unknown"),
@@ -96,7 +96,7 @@ def validate_tool_context(tool_context, function_name: str = "unknown") -> bool:
         logger.info(f"{function_name}: Session missing state - creating empty state")
         # Create empty state if missing
         try:
-            tool_context.session.state = {}
+            tool_context.state = {}
             return True
         except Exception as e:
             logger.warning(f"{function_name}: Could not create session state: {e}")
@@ -126,15 +126,15 @@ def update_agent_activity(tool_context, agent_name: str, activity: str) -> bool:
             return False
         
         # Update last agent used
-        tool_context.session.state["last_agent_used"] = agent_name
+        tool_context.state["last_agent_used"] = agent_name
         
         # Update agent-specific activity (remove '_agent' suffix for cleaner keys)
         service_name = agent_name.replace('_agent', '')
-        tool_context.session.state[f"{service_name}:last_activity"] = activity
-        tool_context.session.state[f"{service_name}:last_activity_time"] = format_timestamp()
+        tool_context.state[f"{service_name}:last_activity"] = activity
+        tool_context.state[f"{service_name}:last_activity_time"] = format_timestamp()
         
         # Update user's last activity timestamp using session key constant
-        tool_context.session.state[USER_LAST_ACTIVITY] = format_timestamp()
+        tool_context.state[USER_LAST_ACTIVITY] = format_timestamp()
         
         return True
         
@@ -158,7 +158,7 @@ def get_user_preferences(tool_context, default_prefs: Optional[Dict[str, Any]] =
     
     try:
         if (tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state')):
-            return tool_context.session.state.get(USER_PREFERENCES, default_prefs or {})
+            return tool_context.state.get(USER_PREFERENCES, default_prefs or {})
     except Exception as e:
         logger.warning(f"Could not get user preferences: {e}")
     
@@ -184,9 +184,9 @@ def update_user_preferences(tool_context, preferences: Dict[str, Any]) -> bool:
             return False
         
         # Use session key constant
-        current_prefs = tool_context.session.state.get(USER_PREFERENCES, {})
+        current_prefs = tool_context.state.get(USER_PREFERENCES, {})
         current_prefs.update(preferences)
-        tool_context.session.state[USER_PREFERENCES] = current_prefs
+        tool_context.state[USER_PREFERENCES] = current_prefs
         
         return True
         
@@ -230,14 +230,14 @@ def log_tool_execution(tool_context, tool_name: str, operation: str,
         }
         
         # Store execution log in temporary session state for debugging
-        execution_logs = tool_context.session.state.get("temp:tool_execution_log", [])
+        execution_logs = tool_context.state.get("temp:tool_execution_log", [])
         execution_logs.append(log_data)
         
         # Keep only last 10 executions to avoid memory bloat
         if len(execution_logs) > 10:
             execution_logs = execution_logs[-10:]
         
-        tool_context.session.state["temp:tool_execution_log"] = execution_logs
+        tool_context.state["temp:tool_execution_log"] = execution_logs
         
     except Exception as e:
         logger.warning(f"Could not log to session state: {e}")

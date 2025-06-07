@@ -25,6 +25,8 @@ EMAIL_LAST_QUERY = "email:last_query"
 EMAIL_RESULTS_COUNT = "email:results_count"
 EMAIL_LAST_SENT_TO = "email:last_sent_to"
 
+EMAIL_MESSAGE_INDEX_MAP = "email:message_index_map"  # Maps position to message_id
+EMAIL_LAST_LISTED_MESSAGES = "email:last_listed_messages"  # Full message data with IDs
 # Email message operations
 EMAIL_LAST_MESSAGE_VIEWED = "email:last_message_viewed"
 EMAIL_LAST_MESSAGE_VIEWED_AT = "email:last_message_viewed_at"
