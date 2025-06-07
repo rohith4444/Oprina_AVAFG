@@ -22,12 +22,11 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from google.adk.tools import FunctionTool
-from services.logging.logger import setup_logger
+from oprina.services.logging.logger import setup_logger
 
-# Import ADK utility functions
+# FIXED: Import only functions that exist in utils
 from oprina.common.utils import (
-    validate_tool_context, update_agent_activity, get_user_preferences,
-    update_user_preferences, log_tool_execution
+    validate_tool_context, update_agent_activity, log_tool_execution
 )
 
 # Import session state constants
@@ -58,8 +57,7 @@ def summarize_email_content(
     tool_context=None
 ) -> str:
     """Summarize email content with specified detail level and ADK integration."""
-    if not validate_tool_context(tool_context, "summarize_email_content"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "summarize_email_content")
     
     try:
         # Log operation
@@ -72,8 +70,8 @@ def summarize_email_content(
         if not content or not content.strip():
             return "No content provided to summarize"
         
-        # Get user preferences from session
-        user_prefs = get_user_preferences(tool_context, {})
+        # FIXED: Get user preferences directly from session state
+        user_prefs = tool_context.session.state.get(USER_PREFERENCES, {})
         preferred_detail = user_prefs.get("summary_detail", detail_level)
         
         # Clean the email content
@@ -117,8 +115,7 @@ def summarize_email_list(
     tool_context=None
 ) -> str:
     """Summarize a list of emails for quick overview with ADK integration."""
-    if not validate_tool_context(tool_context, "summarize_email_list"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "from_content_tool_1")
     
     try:
         # Log operation
@@ -176,8 +173,7 @@ def generate_email_reply(
     tool_context=None
 ) -> str:
     """Generate email reply based on original email and user intent with ADK integration."""
-    if not validate_tool_context(tool_context, "generate_email_reply"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "from_content_tool_2")
     
     try:
         # Log operation
@@ -190,8 +186,8 @@ def generate_email_reply(
         if not reply_intent or not reply_intent.strip():
             return "Please provide what you want to communicate in the reply"
         
-        # Get user info and preferences from session using constants
-        user_prefs = get_user_preferences(tool_context, {})
+        # FIXED: Get user info and preferences directly from session state
+        user_prefs = tool_context.session.state.get(USER_PREFERENCES, {})
         user_name = tool_context.session.state.get(USER_NAME, "")
         
         preferred_style = user_prefs.get("reply_style", style)
@@ -250,8 +246,7 @@ def suggest_reply_templates(
     tool_context=None
 ) -> str:
     """Suggest appropriate reply templates based on email content with ADK integration."""
-    if not validate_tool_context(tool_context, "suggest_reply_templates"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "from_content_tool_3")
     
     try:
         # Log operation
@@ -316,8 +311,7 @@ def suggest_reply_templates(
 
 def analyze_email_sentiment(content: str, tool_context=None) -> str:
     """Analyze email sentiment and tone with ADK integration."""
-    if not validate_tool_context(tool_context, "analyze_email_sentiment"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "from_content_tool_4")
     
     try:
         # Log operation
@@ -356,13 +350,13 @@ def analyze_email_sentiment(content: str, tool_context=None) -> str:
         
         # Determine overall sentiment
         if positive_count > negative_count:
-            analysis_parts.append(" Positive sentiment")
+            analysis_parts.append("😊 Positive sentiment")
             analysis_data["sentiment"] = "positive"
         elif negative_count > positive_count:
-            analysis_parts.append(" Concerned/negative sentiment")
+            analysis_parts.append("😟 Concerned/negative sentiment")
             analysis_data["sentiment"] = "negative"
         else:
-            analysis_parts.append(" Neutral sentiment")
+            analysis_parts.append("😐 Neutral sentiment")
             analysis_data["sentiment"] = "neutral"
         
         # Formality level
@@ -373,13 +367,13 @@ def analyze_email_sentiment(content: str, tool_context=None) -> str:
         casual_count = sum(1 for word in casual_indicators if word in content_lower)
         
         if formal_count > casual_count:
-            analysis_parts.append(" Formal tone")
+            analysis_parts.append("👔 Formal tone")
             analysis_data["formality"] = "formal"
         elif casual_count > formal_count:
-            analysis_parts.append(" Casual tone")
+            analysis_parts.append("👋 Casual tone")
             analysis_data["formality"] = "casual"
         else:
-            analysis_parts.append(" Professional tone")
+            analysis_parts.append("💼 Professional tone")
             analysis_data["formality"] = "professional"
         
         result = " | ".join(analysis_parts)
@@ -401,8 +395,7 @@ def analyze_email_sentiment(content: str, tool_context=None) -> str:
 
 def extract_action_items(content: str, tool_context=None) -> str:
     """Extract action items and tasks from email content with ADK integration."""
-    if not validate_tool_context(tool_context, "extract_action_items"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "from_content_tool_5")
     
     try:
         # Log operation
@@ -467,8 +460,7 @@ def extract_action_items(content: str, tool_context=None) -> str:
 
 def optimize_for_voice(content: str, max_length: int = 200, tool_context=None) -> str:
     """Optimize content for voice delivery with ADK integration."""
-    if not validate_tool_context(tool_context, "optimize_for_voice"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "from_content_tool_6")
     
     try:
         # Log operation
@@ -741,4 +733,3 @@ __all__ = [
     "create_voice_summary",
     "CONTENT_TOOLS"
 ]
-

@@ -96,10 +96,4 @@ Your calendar tools support various user inputs:
 - **No free time**: Suggest alternative time periods
 - **API errors**: Provide user-friendly explanations
 
-Current user profile:
-<user_profile>
-{user_profile}
-</user_profile>
-
-Current time: {_time}
 """

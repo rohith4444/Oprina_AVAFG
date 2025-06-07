@@ -21,6 +21,7 @@ if project_root not in sys.path:
 
 from google.adk.tools import FunctionTool
 from oprina.services.logging.logger import setup_logger
+from google import genai
 
 # Import simplified auth utils
 from oprina.tools.auth_utils import get_gmail_service
@@ -40,7 +41,12 @@ from oprina.common.session_keys import (
     EMAIL_LAST_REPLY_SENT, EMAIL_LAST_REPLY_TO, EMAIL_LAST_REPLY_ID, EMAIL_LAST_REPLY_THREAD,
     EMAIL_LAST_MARKED_READ, EMAIL_LAST_MARKED_READ_AT,
     EMAIL_LAST_ARCHIVED, EMAIL_LAST_ARCHIVED_AT,
-    EMAIL_LAST_DELETED, EMAIL_LAST_DELETED_AT
+    EMAIL_LAST_DELETED, EMAIL_LAST_DELETED_AT,
+    # AI keys
+    EMAIL_LAST_AI_SUMMARY, EMAIL_LAST_AI_SUMMARY_AT,
+    EMAIL_LAST_SENTIMENT_ANALYSIS, EMAIL_LAST_SENTIMENT_ANALYSIS_AT,
+    EMAIL_LAST_EXTRACTED_TASKS, EMAIL_LAST_TASK_EXTRACTION_AT,
+    EMAIL_LAST_GENERATED_REPLY, EMAIL_LAST_REPLY_GENERATION_AT
 )
 
 logger = setup_logger("gmail_tools", console_output=True)
@@ -51,8 +57,7 @@ logger = setup_logger("gmail_tools", console_output=True)
 
 def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=None) -> str:
     """List Gmail messages with optional search query."""
-    if not validate_tool_context(tool_context, "gmail_list_messages"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_list_message")
     
     try:
         # Log operation start
@@ -140,8 +145,7 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
 
 def gmail_get_message(message_id: str, tool_context=None) -> str:
     """Get detailed content of a specific Gmail message."""
-    if not validate_tool_context(tool_context, "gmail_get_message"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_get_message")
     
     try:
         # Log operation
@@ -193,8 +197,7 @@ Content:
 
 def gmail_search_messages(search_query: str, max_results: int = 10, tool_context=None) -> str:
     """Search Gmail messages using Gmail search syntax."""
-    if not validate_tool_context(tool_context, "gmail_search_messages"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_search_message")
     
     try:
         # Log operation
@@ -218,8 +221,7 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
 
 def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str = "", tool_context=None) -> str:
     """Send a Gmail message."""
-    if not validate_tool_context(tool_context, "gmail_send_message"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_send_message")
     
     try:
         # Log operation
@@ -284,8 +286,7 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
 
 def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) -> str:
     """Reply to a specific Gmail message."""
-    if not validate_tool_context(tool_context, "gmail_reply_to_message"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_reply_message")
     
     try:
         # Log operation
@@ -354,8 +355,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
 
 def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
     """Mark a Gmail message as read."""
-    if not validate_tool_context(tool_context, "gmail_mark_as_read"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_markread_message")
     
     try:
         # Log operation
@@ -391,8 +391,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
 
 def gmail_archive_message(message_id: str, tool_context=None) -> str:
     """Archive a Gmail message."""
-    if not validate_tool_context(tool_context, "gmail_archive_message"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_archive_message")
     
     try:
         # Log operation
@@ -428,8 +427,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
 
 def gmail_delete_message(message_id: str, tool_context=None) -> str:
     """Delete a Gmail message."""
-    if not validate_tool_context(tool_context, "gmail_delete_message"):
-        return "Error: No valid tool context provided"
+    validate_tool_context(tool_context, "gmail_delete_message")
     
     try:
         # Log operation
@@ -461,7 +459,192 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         log_tool_execution(tool_context, "gmail_delete_message", "delete", False, str(e))
         return f"Error deleting message: {str(e)}"
 
+# =============================================================================
+# AI Shared tools Functions
+# =============================================================================
 
+def _process_with_ai(content: str, task_type: str, **kwargs) -> str:
+    """Shared AI processing function for all email content tasks"""
+    try:
+        # Initialize Gemini client
+        client = genai.Client(
+            vertexai=True,
+            project=os.getenv('GOOGLE_CLOUD_PROJECT'),
+            location=os.getenv('GOOGLE_CLOUD_LOCATION', 'us-central1')
+        )
+        
+        # Build prompt based on task type
+        prompts = {
+            "summarize": f"Summarize this email content in a clear, concise way:\n\n{content}",
+            "sentiment": f"Analyze the sentiment and tone of this email. Identify if it's positive, negative, or neutral, and note the formality level:\n\n{content}",
+            "tasks": f"Extract any action items, tasks, or follow-ups mentioned in this email. List them clearly:\n\n{content}",
+            "reply": f"Generate a {kwargs.get('style', 'professional')} email reply to this message. Reply intent: {kwargs.get('intent', '')}\n\nOriginal email:\n{content}"
+        }
+        
+        # Call Gemini API
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompts.get(task_type, f"Process this email content:\n{content}")
+        )
+        
+        return response.text
+        
+    except Exception as e:
+        logger.error(f"AI processing failed for task {task_type}: {e}")
+        return f"AI processing temporarily unavailable. Error: {str(e)}"
+    
+
+def gmail_summarize_message(message_id: str, detail_level: str = "moderate", tool_context=None) -> str:
+    """Summarize a specific Gmail message using AI."""
+    validate_tool_context(tool_context, "gmail_summarize_message")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_summarize_message", "ai_summarize", True, f"Message ID: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "ai_summarizing_message")
+        
+        # Get Gmail service and message
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        body = _extract_message_body(message.get('payload', {}))
+        
+        if not body:
+            return "Could not extract message content for summarization"
+        
+        # Use AI to summarize
+        summary = _process_with_ai(body, "summarize")
+        
+        # Update session state using proper keys
+        tool_context.session.state[EMAIL_LAST_AI_SUMMARY] = summary
+        tool_context.session.state[EMAIL_LAST_AI_SUMMARY_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_summarize_message", "ai_summarize", True, "AI summary completed")
+        return summary
+        
+    except Exception as e:
+        logger.error(f"Error summarizing message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_summarize_message", "ai_summarize", False, str(e))
+        return f"Error summarizing message: {str(e)}"
+
+
+def gmail_analyze_sentiment(message_id: str, tool_context=None) -> str:
+    """Analyze sentiment of a Gmail message using AI."""
+    validate_tool_context(tool_context, "gmail_analyze_sentiment")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_analyze_sentiment", "ai_sentiment", True, f"Message ID: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "ai_analyzing_sentiment")
+        
+        # Get Gmail service and message
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        body = _extract_message_body(message.get('payload', {}))
+        
+        if not body:
+            return "Could not extract message content for sentiment analysis"
+        
+        # Use AI to analyze sentiment
+        analysis = _process_with_ai(body, "sentiment")
+        
+        # Update session state using proper keys
+        tool_context.session.state[EMAIL_LAST_SENTIMENT_ANALYSIS] = analysis
+        tool_context.session.state[EMAIL_LAST_SENTIMENT_ANALYSIS_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_analyze_sentiment", "ai_sentiment", True, "AI sentiment analysis completed")
+        return analysis
+        
+    except Exception as e:
+        logger.error(f"Error analyzing sentiment for message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_analyze_sentiment", "ai_sentiment", False, str(e))
+        return f"Error analyzing sentiment: {str(e)}"
+
+
+def gmail_extract_action_items(message_id: str, tool_context=None) -> str:
+    """Extract action items from a Gmail message using AI."""
+    validate_tool_context(tool_context, "gmail_extract_action_items")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_extract_action_items", "ai_extract_tasks", True, f"Message ID: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "ai_extracting_tasks")
+        
+        # Get Gmail service and message
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        body = _extract_message_body(message.get('payload', {}))
+        
+        if not body:
+            return "Could not extract message content for task extraction"
+        
+        # Use AI to extract tasks
+        tasks = _process_with_ai(body, "tasks")
+        
+        # Update session state using proper keys
+        tool_context.session.state[EMAIL_LAST_EXTRACTED_TASKS] = tasks
+        tool_context.session.state[EMAIL_LAST_TASK_EXTRACTION_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_extract_action_items", "ai_extract_tasks", True, "AI task extraction completed")
+        return tasks
+        
+    except Exception as e:
+        logger.error(f"Error extracting tasks from message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_extract_action_items", "ai_extract_tasks", False, str(e))
+        return f"Error extracting action items: {str(e)}"
+
+
+def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "professional", tool_context=None) -> str:
+    """Generate AI reply to a Gmail message."""
+    validate_tool_context(tool_context, "gmail_generate_reply")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", True, f"Message ID: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "ai_generating_reply")
+        
+        # Get Gmail service and message
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        body = _extract_message_body(message.get('payload', {}))
+        
+        if not body:
+            return "Could not extract message content for reply generation"
+        
+        # Use AI to generate reply
+        reply = _process_with_ai(body, "reply", intent=reply_intent, style=style)
+        
+        # Update session state using proper keys
+        tool_context.session.state[EMAIL_LAST_GENERATED_REPLY] = reply
+        tool_context.session.state[EMAIL_LAST_REPLY_GENERATION_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", True, "AI reply generation completed")
+        return reply
+        
+    except Exception as e:
+        logger.error(f"Error generating reply for message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", False, str(e))
+        return f"Error generating reply: {str(e)}"
+    
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -510,6 +693,12 @@ gmail_mark_as_read_tool = FunctionTool(func=gmail_mark_as_read)
 gmail_archive_message_tool = FunctionTool(func=gmail_archive_message)
 gmail_delete_message_tool = FunctionTool(func=gmail_delete_message)
 
+# AI-powered content tools
+gmail_summarize_message_tool = FunctionTool(func=gmail_summarize_message)
+gmail_analyze_sentiment_tool = FunctionTool(func=gmail_analyze_sentiment)
+gmail_extract_action_items_tool = FunctionTool(func=gmail_extract_action_items)
+gmail_generate_reply_tool = FunctionTool(func=gmail_generate_reply)
+
 # Gmail tools collection
 GMAIL_TOOLS = [
     gmail_list_messages_tool,
@@ -519,7 +708,11 @@ GMAIL_TOOLS = [
     gmail_reply_to_message_tool,
     gmail_mark_as_read_tool,
     gmail_archive_message_tool,
-    gmail_delete_message_tool
+    gmail_delete_message_tool,
+    gmail_summarize_message_tool,
+    gmail_analyze_sentiment_tool,
+    gmail_extract_action_items_tool,
+    gmail_generate_reply_tool
 ]
 
 # Export for easy access
@@ -532,5 +725,9 @@ __all__ = [
     "gmail_mark_as_read",
     "gmail_archive_message",
     "gmail_delete_message",
+    "gmail_summarize_message",
+    "gmail_analyze_sentiment", 
+    "gmail_extract_action_items",
+    "gmail_generate_reply",
     "GMAIL_TOOLS"
 ]

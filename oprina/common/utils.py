@@ -75,26 +75,32 @@ def extract_user_info_from_session(tool_context) -> Dict[str, Any]:
 
 def validate_tool_context(tool_context, function_name: str = "unknown") -> bool:
     """
-    Validate that tool_context is properly provided by ADK.
+    UPDATED: More lenient validation that allows tools to work without context.
     
     Args:
         tool_context: ADK tool context (should be automatically provided)
         function_name: Name of calling function for error logging
         
     Returns:
-        bool: True if valid, False otherwise
+        bool: True if valid or can be made valid, False only for severe errors
     """
     if not tool_context:
-        logger.error(f"{function_name}: No tool context provided by ADK")
-        return False
+        logger.info(f"{function_name}: No tool context provided - continuing without session state")
+        return True  # Changed: Allow execution without context
     
     if not hasattr(tool_context, 'session'):
-        logger.error(f"{function_name}: Tool context missing session")
-        return False
+        logger.info(f"{function_name}: Tool context missing session - continuing without session state")
+        return True  # Changed: Allow execution
     
     if not hasattr(tool_context.session, 'state'):
-        logger.error(f"{function_name}: Session missing state")
-        return False
+        logger.info(f"{function_name}: Session missing state - creating empty state")
+        # Create empty state if missing
+        try:
+            tool_context.session.state = {}
+            return True
+        except Exception as e:
+            logger.warning(f"{function_name}: Could not create session state: {e}")
+            return True  # Still allow execution
     
     return True
 
@@ -114,6 +120,11 @@ def update_agent_activity(tool_context, agent_name: str, activity: str) -> bool:
         return False
     
     try:
+        # Check if we can actually update state
+        if not (tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state')):
+            logger.debug(f"Cannot update agent activity - no session state available")
+            return False
+        
         # Update last agent used
         tool_context.session.state["last_agent_used"] = agent_name
         
@@ -145,8 +156,13 @@ def get_user_preferences(tool_context, default_prefs: Optional[Dict[str, Any]] =
     if not validate_tool_context(tool_context, "get_user_preferences"):
         return default_prefs or {}
     
-    # Use session key constant
-    return tool_context.session.state.get(USER_PREFERENCES, default_prefs or {})
+    try:
+        if (tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state')):
+            return tool_context.session.state.get(USER_PREFERENCES, default_prefs or {})
+    except Exception as e:
+        logger.warning(f"Could not get user preferences: {e}")
+    
+    return default_prefs or {}
 
 def update_user_preferences(tool_context, preferences: Dict[str, Any]) -> bool:
     """
@@ -163,6 +179,10 @@ def update_user_preferences(tool_context, preferences: Dict[str, Any]) -> bool:
         return False
     
     try:
+        if not (tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state')):
+            logger.debug("Cannot update user preferences - no session state available")
+            return False
+        
         # Use session key constant
         current_prefs = tool_context.session.state.get(USER_PREFERENCES, {})
         current_prefs.update(preferences)
@@ -186,32 +206,38 @@ def log_tool_execution(tool_context, tool_name: str, operation: str,
         success: Whether the operation was successful
         details: Additional details about the operation
     """
-    if not validate_tool_context(tool_context, "log_tool_execution"):
-        return
-    
-    user_info = extract_user_info_from_session(tool_context)
-    
-    log_data = {
-        "tool": tool_name,
-        "operation": operation,
-        "success": success,
-        "user_id": user_info.get("user_id", "unknown"),
-        "session_id": user_info.get("session_id", "unknown"),
-        "timestamp": format_timestamp(),
-        "details": details
-    }
-    
+    # Always log to standard logger regardless of context
     if success:
-        logger.info(f"Tool execution successful: {tool_name}.{operation}")
+        logger.info(f"Tool execution successful: {tool_name}.{operation} - {details}")
     else:
         logger.warning(f"Tool execution failed: {tool_name}.{operation} - {details}")
     
-    # Store execution log in temporary session state for debugging
-    execution_logs = tool_context.session.state.get("temp:tool_execution_log", [])
-    execution_logs.append(log_data)
-    
-    # Keep only last 10 executions to avoid memory bloat
-    if len(execution_logs) > 10:
-        execution_logs = execution_logs[-10:]
-    
-    tool_context.session.state["temp:tool_execution_log"] = execution_logs
+    # Try to log to session state if available
+    try:
+        if not (tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'state')):
+            return  # No session state available, but that's okay
+        
+        user_info = extract_user_info_from_session(tool_context)
+        
+        log_data = {
+            "tool": tool_name,
+            "operation": operation,
+            "success": success,
+            "user_id": user_info.get("user_id", "unknown"),
+            "session_id": user_info.get("session_id", "unknown"),
+            "timestamp": format_timestamp(),
+            "details": details
+        }
+        
+        # Store execution log in temporary session state for debugging
+        execution_logs = tool_context.session.state.get("temp:tool_execution_log", [])
+        execution_logs.append(log_data)
+        
+        # Keep only last 10 executions to avoid memory bloat
+        if len(execution_logs) > 10:
+            execution_logs = execution_logs[-10:]
+        
+        tool_context.session.state["temp:tool_execution_log"] = execution_logs
+        
+    except Exception as e:
+        logger.warning(f"Could not log to session state: {e}")

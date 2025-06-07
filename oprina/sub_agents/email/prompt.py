@@ -81,10 +81,4 @@ Help users with Gmail's powerful search syntax:
 - **API errors**: Provide user-friendly explanations
 - **Network issues**: Suggest trying again or checking connection
 
-Current user profile:
-<user_profile>
-{user_profile}
-</user_profile>
-
-Current time: {_time}
 """

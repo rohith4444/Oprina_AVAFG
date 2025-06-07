@@ -40,6 +40,15 @@ EMAIL_LAST_ARCHIVED = "email:last_archived"
 EMAIL_LAST_ARCHIVED_AT = "email:last_archived_at"
 EMAIL_LAST_DELETED = "email:last_deleted"
 EMAIL_LAST_DELETED_AT = "email:last_deleted_at"
+# AI-powered email processing keys
+EMAIL_LAST_AI_SUMMARY = "email:last_ai_summary"
+EMAIL_LAST_AI_SUMMARY_AT = "email:last_ai_summary_at"
+EMAIL_LAST_SENTIMENT_ANALYSIS = "email:last_sentiment_analysis"
+EMAIL_LAST_SENTIMENT_ANALYSIS_AT = "email:last_sentiment_analysis_at"
+EMAIL_LAST_EXTRACTED_TASKS = "email:last_extracted_tasks"
+EMAIL_LAST_TASK_EXTRACTION_AT = "email:last_task_extraction_at"
+EMAIL_LAST_GENERATED_REPLY = "email:last_generated_reply"
+EMAIL_LAST_REPLY_GENERATION_AT = "email:last_reply_generation_at"
 
 # =============================================================================
 # Calendar State (current conversation)
@@ -64,41 +73,3 @@ CALENDAR_LAST_EVENT_UPDATED_AT = "calendar:last_event_updated_at"
 CALENDAR_LAST_DELETED_EVENT = "calendar:last_deleted_event"
 CALENDAR_LAST_DELETED_ID = "calendar:last_deleted_id"            # NEW
 CALENDAR_LAST_DELETED_AT = "calendar:last_deleted_at"            # NEW
-# =============================================================================
-# Content State (current conversation)
-# =============================================================================
-CONTENT_LAST_SUMMARY = "content:last_summary"
-CONTENT_LAST_ANALYSIS = "content:last_analysis"
-CONTENT_PROCESSING_STATUS = "content:processing_status"
-
-# Content summarization keys
-CONTENT_LAST_SUMMARY_AT = "content:last_summary_at"
-CONTENT_LAST_SUMMARY_LENGTH = "content:last_summary_length"
-CONTENT_LAST_SUMMARY_DETAIL = "content:last_summary_detail"
-CONTENT_LAST_LIST_SUMMARY = "content:last_list_summary"
-CONTENT_LAST_LIST_SUMMARY_COUNT = "content:last_list_summary_count"
-CONTENT_LAST_LIST_SUMMARY_AT = "content:last_list_summary_at"
-
-# Reply generation keys
-CONTENT_LAST_REPLY_GENERATED = "content:last_reply_generated"
-CONTENT_LAST_REPLY_STYLE = "content:last_reply_style"
-CONTENT_LAST_REPLY_AT = "content:last_reply_at"
-CONTENT_LAST_REPLY_SENDER = "content:last_reply_sender"
-CONTENT_LAST_TEMPLATES_SUGGESTED = "content:last_templates_suggested"
-CONTENT_LAST_TEMPLATES_COUNT = "content:last_templates_count"
-CONTENT_LAST_TEMPLATES_AT = "content:last_templates_at"
-
-# Analysis keys
-CONTENT_LAST_ANALYSIS_DATA = "content:last_analysis_data"
-CONTENT_LAST_ANALYSIS_AT = "content:last_analysis_at"
-CONTENT_LAST_ACTION_ITEMS = "content:last_action_items"
-CONTENT_LAST_ACTION_ITEMS_COUNT = "content:last_action_items_count"
-CONTENT_LAST_ACTION_ITEMS_AT = "content:last_action_items_at"
-
-# Voice optimization keys
-CONTENT_LAST_VOICE_OPTIMIZATION = "content:last_voice_optimization"
-CONTENT_LAST_VOICE_OPTIMIZATION_AT = "content:last_voice_optimization_at"
-CONTENT_LAST_VOICE_ORIGINAL_LENGTH = "content:last_voice_original_length"
-CONTENT_LAST_VOICE_OPTIMIZED_LENGTH = "content:last_voice_optimized_length"
-CONTENT_LAST_VOICE_SUMMARY = "content:last_voice_summary"
-CONTENT_LAST_VOICE_SUMMARY_AT = "content:last_voice_summary_at"

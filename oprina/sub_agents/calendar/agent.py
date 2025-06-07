@@ -6,7 +6,7 @@ from oprina.sub_agents.calendar import prompt
 from oprina.tools.calendar import CALENDAR_TOOLS
 
 calendar_agent = Agent(
-    model="gemini-1.5-flash",
+    model="gemini-2.0-flash",
     name="calendar_agent",
     description="Handles Google Calendar operations including events, scheduling, and availability",
     instruction=prompt.CALENDAR_AGENT_INSTR,
