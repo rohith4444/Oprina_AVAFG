@@ -172,31 +172,16 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             message = service.users().messages().get(
                 userId='me', 
                 id=actual_message_id, 
                 format='full'
             ).execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                message = service.users().messages().get(
-                    userId='me', 
-                    id=actual_message_id, 
-                    format='full'
-                ).execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Extract headers
         headers = {h['name']: h['value'] for h in message.get('payload', {}).get('headers', [])}
@@ -332,31 +317,16 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             original = service.users().messages().get(
                 userId='me', 
                 id=actual_message_id, 
                 format='full'
             ).execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                original = service.users().messages().get(
-                    userId='me', 
-                    id=actual_message_id, 
-                    format='full'
-                ).execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Extract reply information
         headers = {h['name']: h['value'] for h in original.get('payload', {}).get('headers', [])}
@@ -506,30 +476,16 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
         # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             service.users().messages().modify(
                 userId='me',
                 id=actual_message_id,
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                service.users().messages().modify(
-                    userId='me',
-                    id=actual_message_id,
-                    body={'removeLabelIds': ['UNREAD']}
-                ).execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
         tool_context.state[EMAIL_LAST_MARKED_READ] = actual_message_id
@@ -561,30 +517,16 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
         # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             service.users().messages().modify(
                 userId='me',
                 id=actual_message_id,
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                service.users().messages().modify(
-                    userId='me',
-                    id=actual_message_id,
-                    body={'removeLabelIds': ['INBOX']}
-                ).execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
         tool_context.state[EMAIL_LAST_ARCHIVED] = actual_message_id
@@ -615,28 +557,15 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
         # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             service.users().messages().trash(
                 userId='me',
                 id=actual_message_id
             ).execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                service.users().messages().trash(
-                    userId='me',
-                    id=actual_message_id
-                ).execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
         tool_context.state[EMAIL_LAST_DELETED] = actual_message_id
@@ -741,23 +670,12 @@ def gmail_summarize_message(message_id: str, detail_level: str = "moderate", too
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -797,22 +715,12 @@ def gmail_analyze_sentiment(message_id: str, tool_context=None) -> str:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
         # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -851,23 +759,12 @@ def gmail_extract_action_items(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -906,23 +803,12 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
-        actual_message_id = message_id
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
-        # If direct API call fails, try to resolve as reference
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-        except Exception as direct_error:
-            logger.debug(f"Direct message ID lookup failed, trying reference resolution: {direct_error}")
-            
-            # Try to resolve as reference (position, sender, subject)
-            resolved_id = _get_message_id_by_reference(message_id, tool_context)
-            if resolved_id:
-                logger.info(f"Resolved reference '{message_id}' to message ID '{resolved_id}'")
-                actual_message_id = resolved_id
-                message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
-            else:
-                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
