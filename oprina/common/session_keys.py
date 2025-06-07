@@ -50,6 +50,12 @@ EMAIL_LAST_TASK_EXTRACTION_AT = "email:last_task_extraction_at"
 EMAIL_LAST_GENERATED_REPLY = "email:last_generated_reply"
 EMAIL_LAST_REPLY_GENERATION_AT = "email:last_reply_generation_at"
 
+EMAIL_PENDING_SEND = "email_pending_send"
+EMAIL_PENDING_REPLY = "email_pending_reply"
+EMAIL_LAST_GENERATED_EMAIL = "email_last_generated_email"
+EMAIL_LAST_EMAIL_GENERATION_AT = "email_last_email_generation_at"
+EMAIL_LAST_GENERATED_EMAIL_TO = "email_last_generated_email_to"
+
 # =============================================================================
 # Calendar State (current conversation)
 # =============================================================================

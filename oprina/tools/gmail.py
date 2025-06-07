@@ -46,7 +46,9 @@ from oprina.common.session_keys import (
     EMAIL_LAST_AI_SUMMARY, EMAIL_LAST_AI_SUMMARY_AT,
     EMAIL_LAST_SENTIMENT_ANALYSIS, EMAIL_LAST_SENTIMENT_ANALYSIS_AT,
     EMAIL_LAST_EXTRACTED_TASKS, EMAIL_LAST_TASK_EXTRACTION_AT,
-    EMAIL_LAST_GENERATED_REPLY, EMAIL_LAST_REPLY_GENERATION_AT
+    EMAIL_LAST_GENERATED_REPLY, EMAIL_LAST_REPLY_GENERATION_AT,
+    EMAIL_PENDING_SEND, EMAIL_PENDING_REPLY,
+    EMAIL_LAST_GENERATED_EMAIL, EMAIL_LAST_EMAIL_GENERATION_AT, EMAIL_LAST_GENERATED_EMAIL_TO
 )
 
 logger = setup_logger("gmail_tools", console_output=True)
@@ -348,6 +350,92 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", False, str(e))
         return f"Error sending reply: {str(e)}"
 
+def gmail_confirm_and_send(to: str, subject: str, body: str, cc: str = "", bcc: str = "", 
+                          tool_context=None) -> str:
+    """Prepare email for confirmation before sending."""
+    validate_tool_context(tool_context, "gmail_confirm_and_send")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_confirm_and_send", "prepare_send", True, f"To: {to}")
+        
+        # Store pending email in session state for agent to handle confirmation
+        pending_email = {
+            'to': to,
+            'subject': subject, 
+            'body': body,
+            'cc': cc,
+            'bcc': bcc,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        tool_context.session.state[EMAIL_PENDING_SEND] = pending_email
+        
+        # Format confirmation message for agent
+        confirmation_text = f"""Ready to send email:
+To: {to}
+{f'CC: {cc}' if cc else ''}
+{f'BCC: {bcc}' if bcc else ''}
+Subject: {subject}
+
+Body:
+{body}
+
+[Agent should ask user for confirmation before calling gmail_send_message]"""
+        
+        log_tool_execution(tool_context, "gmail_confirm_and_send", "prepare_send", True, "Email prepared for confirmation")
+        return confirmation_text
+        
+    except Exception as e:
+        logger.error(f"Error preparing email for confirmation: {e}")
+        log_tool_execution(tool_context, "gmail_confirm_and_send", "prepare_send", False, str(e))
+        return f"Error preparing email: {str(e)}"
+
+
+def gmail_confirm_and_reply(message_id: str, reply_body: str, tool_context=None) -> str:
+    """Prepare reply for confirmation before sending."""
+    validate_tool_context(tool_context, "gmail_confirm_and_reply")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_confirm_and_reply", "prepare_reply", True, f"Message: {message_id}")
+        
+        # Get original message info for context
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+            
+        original = service.users().messages().get(userId='me', id=message_id, format='metadata').execute()
+        headers = {h['name']: h['value'] for h in original.get('payload', {}).get('headers', [])}
+        
+        # Store pending reply in session state
+        pending_reply = {
+            'message_id': message_id,
+            'reply_body': reply_body,
+            'original_from': headers.get('From', 'Unknown'),
+            'original_subject': headers.get('Subject', 'No Subject'),
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        tool_context.session.state[EMAIL_PENDING_REPLY] = pending_reply
+        
+        # Format confirmation message for agent
+        confirmation_text = f"""Ready to send reply:
+To: {headers.get('From', 'Unknown')}
+Subject: Re: {headers.get('Subject', 'No Subject')}
+
+Reply:
+{reply_body}
+
+[Agent should ask user for confirmation before calling gmail_reply_to_message]"""
+        
+        log_tool_execution(tool_context, "gmail_confirm_and_reply", "prepare_reply", True, "Reply prepared for confirmation")
+        return confirmation_text
+        
+    except Exception as e:
+        logger.error(f"Error preparing reply for confirmation: {e}")
+        log_tool_execution(tool_context, "gmail_confirm_and_reply", "prepare_reply", False, str(e))
+        return f"Error preparing reply: {str(e)}"
 
 # =============================================================================
 # Gmail Organization Tools
@@ -478,7 +566,8 @@ def _process_with_ai(content: str, task_type: str, **kwargs) -> str:
             "summarize": f"Summarize this email content in a clear, concise way:\n\n{content}",
             "sentiment": f"Analyze the sentiment and tone of this email. Identify if it's positive, negative, or neutral, and note the formality level:\n\n{content}",
             "tasks": f"Extract any action items, tasks, or follow-ups mentioned in this email. List them clearly:\n\n{content}",
-            "reply": f"Generate a {kwargs.get('style', 'professional')} email reply to this message. Reply intent: {kwargs.get('intent', '')}\n\nOriginal email:\n{content}"
+            "reply": f"Generate a {kwargs.get('style', 'professional')} email reply to this message. Reply intent: {kwargs.get('intent', '')}\n\nOriginal email:\n{content}",
+            "compose": f"Generate a {kwargs.get('style', 'professional')} email with the following requirements:\n\n{content}\n\nPlease provide both a subject line and email body. Format as:\nSubject: [subject line]\n\n[email body]"
         }
         
         # Call Gemini API
@@ -492,7 +581,46 @@ def _process_with_ai(content: str, task_type: str, **kwargs) -> str:
     except Exception as e:
         logger.error(f"AI processing failed for task {task_type}: {e}")
         return f"AI processing temporarily unavailable. Error: {str(e)}"
+
+
+def gmail_generate_email(to: str, subject_intent: str, email_intent: str, 
+                        style: str = "professional", context: str = "", tool_context=None) -> str:
+    """Generate a complete email using AI for composition (not replies)."""
+    validate_tool_context(tool_context, "gmail_generate_email")
     
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_generate_email", "ai_compose_email", True, 
+                         f"To: {to}, Intent: {email_intent}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "ai_composing_email")
+        
+        # Build composition requirements for AI
+        composition_requirements = f"""
+        Recipient: {to}
+        Subject intent: {subject_intent}
+        Email purpose: {email_intent}
+        {f'Additional context: {context}' if context else ''}
+        
+        Create an appropriate email for this communication.
+        """
+        
+        # Use AI to generate email with "compose" task type
+        email_content = _process_with_ai(composition_requirements, "compose", style=style)
+        
+        # Update session state
+        tool_context.session.state[EMAIL_LAST_GENERATED_EMAIL] = email_content
+        tool_context.session.state[EMAIL_LAST_EMAIL_GENERATION_AT] = datetime.utcnow().isoformat()
+        tool_context.session.state[EMAIL_LAST_GENERATED_EMAIL_TO] = to
+        
+        log_tool_execution(tool_context, "gmail_generate_email", "ai_compose_email", True, "Email composition completed")
+        return email_content
+        
+    except Exception as e:
+        logger.error(f"Error generating email: {e}")
+        log_tool_execution(tool_context, "gmail_generate_email", "ai_compose_email", False, str(e))
+        return f"Error generating email: {str(e)}"
 
 def gmail_summarize_message(message_id: str, detail_level: str = "moderate", tool_context=None) -> str:
     """Summarize a specific Gmail message using AI."""
@@ -649,6 +777,49 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
 # Helper Functions
 # =============================================================================
 
+def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None) -> tuple:
+    """Parse AI-generated email content into subject and body components."""
+    validate_tool_context(tool_context, "gmail_parse_email_content")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_parse_subject_and_body", "parse_content", True, "Parsing AI content")
+        
+        lines = ai_generated_content.strip().split('\n')
+        subject = ""
+        body = ""
+        
+        # Look for subject line
+        for i, line in enumerate(lines):
+            if line.lower().startswith('subject:'):
+                subject = line[8:].strip()  # Remove "Subject:" prefix
+                # Body starts after subject line (skip empty lines)
+                for j in range(i + 1, len(lines)):
+                    if lines[j].strip():  # First non-empty line after subject
+                        body = '\n'.join(lines[j:]).strip()
+                        break
+                break
+        
+        # Fallback if no "Subject:" found - treat first line as subject
+        if not subject and lines:
+            subject = lines[0].strip()
+            if len(lines) > 1:
+                body = '\n'.join(lines[1:]).strip()
+        
+        # Clean up subject and body
+        subject = subject.strip('"\'')  # Remove quotes if present
+        
+        log_tool_execution(tool_context, "gmail_parse_subject_and_body", "parse_content", True, 
+                         f"Parsed - Subject: '{subject[:50]}...', Body length: {len(body)}")
+        
+        return subject, body
+        
+    except Exception as e:
+        logger.error(f"Error parsing AI content: {e}")
+        log_tool_execution(tool_context, "gmail_parse_subject_and_body", "parse_content", False, str(e))
+        return "Email Subject", ai_generated_content  # Fallback
+
+
 def _extract_message_body(payload: Dict[str, Any]) -> str:
     """Extract text body from Gmail message payload."""
     try:
@@ -699,35 +870,69 @@ gmail_analyze_sentiment_tool = FunctionTool(func=gmail_analyze_sentiment)
 gmail_extract_action_items_tool = FunctionTool(func=gmail_extract_action_items)
 gmail_generate_reply_tool = FunctionTool(func=gmail_generate_reply)
 
+# NEW AI composition and workflow tools
+gmail_generate_email_tool = FunctionTool(func=gmail_generate_email)
+gmail_parse_subject_and_body_tool = FunctionTool(func=gmail_parse_subject_and_body)
+gmail_confirm_and_send_tool = FunctionTool(func=gmail_confirm_and_send)
+gmail_confirm_and_reply_tool = FunctionTool(func=gmail_confirm_and_reply)
+
 # Gmail tools collection
 GMAIL_TOOLS = [
+    # Reading tools
     gmail_list_messages_tool,
     gmail_get_message_tool,
     gmail_search_messages_tool,
+    
+    # Sending tools
     gmail_send_message_tool,
     gmail_reply_to_message_tool,
+    
+    # Organization tools
     gmail_mark_as_read_tool,
     gmail_archive_message_tool,
     gmail_delete_message_tool,
+    
+    # AI-powered content tools
     gmail_summarize_message_tool,
     gmail_analyze_sentiment_tool,
     gmail_extract_action_items_tool,
-    gmail_generate_reply_tool
+    gmail_generate_reply_tool,
+    
+    # NEW AI composition and workflow tools
+    gmail_generate_email_tool,
+    gmail_parse_subject_and_body_tool,
+    gmail_confirm_and_send_tool,
+    gmail_confirm_and_reply_tool
 ]
 
 # Export for easy access
 __all__ = [
+    # Reading functions
     "gmail_list_messages",
     "gmail_get_message",
     "gmail_search_messages",
+    
+    # Sending functions
     "gmail_send_message",
     "gmail_reply_to_message",
+    
+    # Organization functions
     "gmail_mark_as_read",
     "gmail_archive_message",
     "gmail_delete_message",
+    
+    # AI content processing functions
     "gmail_summarize_message",
     "gmail_analyze_sentiment", 
     "gmail_extract_action_items",
     "gmail_generate_reply",
+    
+    # NEW AI composition and workflow functions
+    "gmail_generate_email",
+    "gmail_parse_subject_and_body",
+    "gmail_confirm_and_send",
+    "gmail_confirm_and_reply",
+    
+    # Tools collection
     "GMAIL_TOOLS"
 ]
