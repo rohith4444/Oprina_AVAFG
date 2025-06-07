@@ -15,5 +15,5 @@ root_agent = Agent(
     sub_agents=[
         email_agent,
         calendar_agent
-    ]  
+    ],
 )
