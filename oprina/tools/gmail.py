@@ -826,15 +826,15 @@ def _extract_message_body(payload: Dict[str, Any]) -> str:
         # Handle multipart messages
         if 'parts' in payload:
             for part in payload['parts']:
-                if part['mimeType'] == 'text/plain':
-                    data = part['body'].get('data', '')
+                if part.get('mimeType') == 'text/plain':  # Added .get() for safety
+                    data = part.get('body', {}).get('data', '')
                     if data:
                         import base64
                         return base64.urlsafe_b64decode(data).decode('utf-8')
         
         # Handle single part messages
-        elif payload['mimeType'] == 'text/plain':
-            data = payload['body'].get('data', '')
+        elif payload.get('mimeType') == 'text/plain':  # Added .get() for safety
+            data = payload.get('body', {}).get('data', '')
             if data:
                 import base64
                 return base64.urlsafe_b64decode(data).decode('utf-8')

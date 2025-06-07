@@ -443,6 +443,7 @@ def calendar_delete_event(
 def _parse_datetime(datetime_str: str) -> Optional[datetime]:
     """Parse a datetime string into a datetime object (your logic)."""
     formats = [
+        "%Y-%m-%dT%H:%M:%S",
         "%Y-%m-%d %H:%M",
         "%Y-%m-%d %I:%M %p",
         "%Y-%m-%d",
