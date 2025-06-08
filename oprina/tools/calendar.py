@@ -58,10 +58,10 @@ def calendar_create_event(
     location: str = "",
     calendar_id: str = "primary",
     tool_context=None
-) -> str:
+) -> dict:
     """Create a new event in Google Calendar."""
     if not validate_tool_context(tool_context, "calendar_create_event"):
-        return "Error: No valid tool context provided"
+        return {"error": "No valid tool context provided"}
     
     try:
         # Log operation
@@ -74,14 +74,14 @@ def calendar_create_event(
         # Get Calendar service
         service = get_calendar_service()
         if not service:
-            return "Calendar not set up. Please run: python setup_calendar.py"
+            return {"error": "Calendar not set up. Please run: python setup_calendar.py"}
         
         # Parse times using your logic
         start_dt = _parse_datetime(start_time)
         end_dt = _parse_datetime(end_time)
         
         if not start_dt or not end_dt:
-            return "Invalid date/time format. Please use format like 'YYYY-MM-DD HH:MM' or '2024-01-15 14:00'"
+            return {"error": "Invalid date/time format. Please use format like 'YYYY-MM-DD HH:MM' or '2024-01-15 14:00'"}
         
         # Dynamically determine timezone (your logic)
         timezone_id = "America/New_York"  # Default to Eastern Time
@@ -138,16 +138,15 @@ def calendar_create_event(
         tool_context.state[CALENDAR_LAST_EVENT_CREATED_AT] = datetime.utcnow().isoformat()
         tool_context.state[CALENDAR_LAST_CREATED_EVENT_ID] = event.get("id")
         
-        # Return voice-friendly string
-        location_text = f" at {location}" if location else ""
+        # Return the actual event object (dict) for proper Google Calendar integration
         log_tool_execution(tool_context, "calendar_create_event", "create_event", True, "Event created successfully")
         
-        return f"Event '{summary}' created successfully for {start_formatted} to {end_formatted}{location_text}"
+        return event
         
     except Exception as e:
         logger.error(f"Error creating calendar event: {e}")
         log_tool_execution(tool_context, "calendar_create_event", "create_event", False, str(e))
-        return f"Error creating event: {str(e)}"
+        return {"error": f"Error creating event: {str(e)}"}
 
 
 # =============================================================================
@@ -280,10 +279,10 @@ def calendar_update_event(
     location: str = "",
     calendar_id: str = "primary",
     tool_context=None
-) -> str:
+) -> dict:
     """Edit an existing event in Google Calendar - change title and/or reschedule."""
     if not validate_tool_context(tool_context, "calendar_update_event"):
-        return "Error: No valid tool context provided"
+        return {"error": "No valid tool context provided"}
     
     try:
         # Log operation
@@ -296,13 +295,13 @@ def calendar_update_event(
         # Get Calendar service
         service = get_calendar_service()
         if not service:
-            return "Calendar not set up. Please run: python setup_calendar.py"
+            return {"error": "Calendar not set up. Please run: python setup_calendar.py"}
         
         # First get the existing event (your logic)
         try:
             event = service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         except Exception:
-            return f"Event with ID {event_id} not found in calendar."
+            return {"error": f"Event with ID {event_id} not found in calendar."}
         
         original_summary = event.get("summary", "Event")
         
@@ -330,7 +329,7 @@ def calendar_update_event(
         if start_time:
             start_dt = _parse_datetime(start_time)
             if not start_dt:
-                return "Invalid start time format. Please use YYYY-MM-DD HH:MM format."
+                return {"error": "Invalid start time format. Please use YYYY-MM-DD HH:MM format."}
             event["start"] = {"dateTime": start_dt.isoformat(), "timeZone": timezone_id}
             updated_fields.append("start time")
         
@@ -338,7 +337,7 @@ def calendar_update_event(
         if end_time:
             end_dt = _parse_datetime(end_time)
             if not end_dt:
-                return "Invalid end time format. Please use YYYY-MM-DD HH:MM format."
+                return {"error": "Invalid end time format. Please use YYYY-MM-DD HH:MM format."}
             event["end"] = {"dateTime": end_dt.isoformat(), "timeZone": timezone_id}
             updated_fields.append("end time")
         
@@ -359,21 +358,15 @@ def calendar_update_event(
         }
         tool_context.state[CALENDAR_LAST_EVENT_UPDATED_AT] = datetime.utcnow().isoformat()
         
-        # Create voice-friendly response
-        final_summary = updated_event.get("summary", original_summary)
-        if updated_fields:
-            fields_text = ", ".join(updated_fields)
-            response = f"Event '{final_summary}' updated successfully - changed {fields_text}"
-        else:
-            response = f"No changes made to event '{final_summary}'"
-        
         log_tool_execution(tool_context, "calendar_update_event", "update_event", True, "Event updated successfully")
-        return response
+        
+        # Return the actual updated event object (dict) from Google Calendar API
+        return updated_event
         
     except Exception as e:
         logger.error(f"Error updating calendar event: {e}")
         log_tool_execution(tool_context, "calendar_update_event", "update_event", False, str(e))
-        return f"Error updating event: {str(e)}"
+        return {"error": f"Error updating event: {str(e)}"}
 
 
 # =============================================================================
@@ -385,14 +378,14 @@ def calendar_delete_event(
     confirm: bool = False,
     calendar_id: str = "primary",
     tool_context=None
-) -> str:
+) -> dict:
     """Delete an event from Google Calendar."""
     if not validate_tool_context(tool_context, "calendar_delete_event"):
-        return "Error: No valid tool context provided"
+        return {"error": "No valid tool context provided"}
     
     # Safety check - require explicit confirmation (your logic)
     if not confirm:
-        return "Please confirm deletion by setting confirm=True. This action cannot be undone."
+        return {"error": "Please confirm deletion by setting confirm=True. This action cannot be undone."}
     
     try:
         # Log operation
@@ -404,7 +397,7 @@ def calendar_delete_event(
         # Get Calendar service
         service = get_calendar_service()
         if not service:
-            return "Calendar not set up. Please run: python setup_calendar.py"
+            return {"error": "Calendar not set up. Please run: python setup_calendar.py"}
         
         # Get event details before deletion for better user feedback
         try:
@@ -412,7 +405,7 @@ def calendar_delete_event(
             event_summary = event.get("summary", "Event")
             event_start = _format_event_time(event.get("start", {}))
         except Exception:
-            return f"Event with ID {event_id} not found in calendar."
+            return {"error": f"Event with ID {event_id} not found in calendar."}
         
         # Call the Calendar API to delete the event
         service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
@@ -428,12 +421,23 @@ def calendar_delete_event(
         tool_context.state[CALENDAR_LAST_DELETED_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "calendar_delete_event", "delete_event", True, f"Event '{event_summary}' deleted")
-        return f"Event '{event_summary}' (scheduled for {event_start}) has been deleted successfully"
+        
+        # Return success information as a dict
+        return {
+            "success": True,
+            "message": f"Event '{event_summary}' (scheduled for {event_start}) has been deleted successfully",
+            "deleted_event": {
+                "id": event_id,
+                "summary": event_summary,
+                "start": event_start,
+                "deleted_at": datetime.utcnow().isoformat()
+            }
+        }
         
     except Exception as e:
         logger.error(f"Error deleting calendar event: {e}")
         log_tool_execution(tool_context, "calendar_delete_event", "delete_event", False, str(e))
-        return f"Error deleting event: {str(e)}"
+        return {"error": f"Error deleting event: {str(e)}"}
 
 
 # =============================================================================
