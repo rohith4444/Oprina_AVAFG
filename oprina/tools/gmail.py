@@ -49,7 +49,8 @@ from oprina.common.session_keys import (
     EMAIL_LAST_GENERATED_REPLY, EMAIL_LAST_REPLY_GENERATION_AT,
     EMAIL_PENDING_SEND, EMAIL_PENDING_REPLY,
     EMAIL_LAST_GENERATED_EMAIL, EMAIL_LAST_EMAIL_GENERATION_AT, EMAIL_LAST_GENERATED_EMAIL_TO,
-    EMAIL_LAST_LISTED_MESSAGES, EMAIL_MESSAGE_INDEX_MAP
+    EMAIL_LAST_LISTED_MESSAGES, EMAIL_MESSAGE_INDEX_MAP,
+    EMAIL_LAST_SINGLE_RESULT
 )
 
 logger = setup_logger("gmail_tools", console_output=True)
@@ -92,6 +93,8 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
             tool_context.state[EMAIL_LAST_QUERY] = query
             tool_context.state[EMAIL_RESULTS_COUNT] = 0
             tool_context.state[EMAIL_CURRENT_RESULTS] = []
+            tool_context.state[EMAIL_MESSAGE_INDEX_MAP] = {}
+            tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = []
             
             return response
         
@@ -127,11 +130,46 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
         
         # Store message ID mapping for easy reference by agents
         message_index_map = {}
+        detailed_messages = []
+        
         for i, msg in enumerate(message_summaries, 1):
             message_index_map[str(i)] = msg['id']
+            # Store more complete message data including position
+            detailed_msg = msg.copy()
+            detailed_msg['position'] = i
+            detailed_messages.append(detailed_msg)
         
         tool_context.state[EMAIL_MESSAGE_INDEX_MAP] = message_index_map
-        tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = message_summaries
+        tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = detailed_messages
+        
+        # Store single result for confirmatory responses, clear for multiple
+        if len(message_summaries) == 1:
+            stored_id = message_summaries[0]['id']
+            tool_context.state[EMAIL_LAST_SINGLE_RESULT] = stored_id
+            logger.info(f"Stored single result ID for 'yes' responses: {stored_id}")
+            logger.debug(f"Single result details - From: {message_summaries[0]['from']}, Subject: {message_summaries[0]['subject']}")
+            
+            # Immediately test if this message ID can be retrieved
+            try:
+                test_retrieval = service.users().messages().get(
+                    userId='me', 
+                    id=stored_id, 
+                    format='minimal'
+                ).execute()
+                logger.info(f"Verification successful - message ID {stored_id} is accessible")
+            except Exception as e:
+                logger.error(f"Verification FAILED - message ID {stored_id} cannot be retrieved: {e}")
+                # Store None to prevent issues later
+                tool_context.state[EMAIL_LAST_SINGLE_RESULT] = None
+                logger.warning(f"Cleared single result due to verification failure")
+        else:
+            # Clear single result if multiple results
+            tool_context.state[EMAIL_LAST_SINGLE_RESULT] = None
+            logger.debug(f"Cleared single result (found {len(message_summaries)} messages)")
+        
+        # Debug log to ensure data is stored
+        logger.debug(f"Stored {len(message_index_map)} messages in index map")
+        logger.debug(f"First message ID: {message_index_map.get('1', 'None')}")
         
         # Format response with clean, voice-optimized display
         if len(message_summaries) == 1:
@@ -164,7 +202,11 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
         if len(message_summaries) > 5:
             response_lines.append(f"... and {len(message_summaries) - 5} more messages")
         
-        response_lines.append(f"\nTo read any email, say 'read email 1' or 'read the email from [sender name]'.")
+        # Provide context-specific guidance based on results
+        if len(message_summaries) == 1:
+            response_lines.append(f"\nWould you like to read it?")
+        else:
+            response_lines.append(f"\nJust let me know which one you'd like to read!")
         
         log_tool_execution(tool_context, "gmail_list_messages", "list_messages", True, 
                          f"Retrieved {len(message_summaries)} messages")
@@ -193,7 +235,26 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
+        # Use helper function to resolve message reference
+        logger.info(f"GET_MESSAGE: Starting resolution for '{message_id}'")
+        logger.debug(f"GET_MESSAGE: Session state available: {hasattr(tool_context, 'state') and tool_context.state is not None}")
+        
+        if tool_context and hasattr(tool_context, 'state'):
+            single_result_id = tool_context.state.get(EMAIL_LAST_SINGLE_RESULT)
+            message_index_map = tool_context.state.get(EMAIL_MESSAGE_INDEX_MAP, {})
+            last_listed_messages = tool_context.state.get(EMAIL_LAST_LISTED_MESSAGES, [])
+            
+            logger.info(f"GET_MESSAGE: Single result ID in session: {single_result_id}")
+            logger.info(f"GET_MESSAGE: Message index map has {len(message_index_map)} entries: {message_index_map}")
+            logger.info(f"GET_MESSAGE: Last listed messages: {len(last_listed_messages)} entries")
+            
+            if last_listed_messages:
+                logger.debug(f"GET_MESSAGE: First listed message: ID={last_listed_messages[0].get('id')}, From={last_listed_messages[0].get('from')}")
+        
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        logger.info(f"GET_MESSAGE: Helper resolved '{message_id}' to '{actual_message_id}'")
+        logger.info(f"GET_MESSAGE: About to retrieve message ID: {actual_message_id}")
         
         try:
             message = service.users().messages().get(
@@ -202,7 +263,11 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
                 format='full'
             ).execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            logger.error(f"Error getting Gmail message {actual_message_id}: {e}")
+            if message_id.lower() in ['yes', 'yeah', 'yep', 'sure', 'okay', 'ok', 'that one', 'it']:
+                return f"I'm having trouble accessing that email right now. Let me show you your recent emails so you can pick another one to read."
+            else:
+                return f"I couldn't find an email matching '{message_id}'. Let me show you your recent emails so you can pick which one you'd like to read."
         
         # Extract headers
         headers = {h['name']: h['value'] for h in message.get('payload', {}).get('headers', [])}
@@ -214,17 +279,37 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         tool_context.state[EMAIL_LAST_MESSAGE_VIEWED] = actual_message_id
         tool_context.state[EMAIL_LAST_MESSAGE_VIEWED_AT] = datetime.utcnow().isoformat()
         
-        # Format response
-        response = f"""Email Details:
-From: {headers.get('From', 'Unknown')}
-To: {headers.get('To', 'Unknown')}
-Subject: {headers.get('Subject', 'No Subject')}
-Date: {headers.get('Date', 'Unknown')}
+        # Clean up sender name for more natural display
+        from_sender = headers.get('From', 'Unknown')
+        if '<' in from_sender and '>' in from_sender:
+            name_part = from_sender.split('<')[0].strip().strip('"')
+            if name_part:
+                from_display = name_part
+            else:
+                from_display = from_sender.split('<')[1].split('>')[0]
+        else:
+            from_display = from_sender
+        
+        # Make response more conversational
+        subject = headers.get('Subject', 'No Subject')
+        
+        # Format response based on available content
+        if body and len(body.strip()) > 0:
+            response = f"""Here's the email from {from_display}:
 
-Content:
-{body[:500]}{'...' if len(body) > 500 else ''}
+Subject: {subject}
 
-Would you like to reply to this email, archive it, or take another action?"""
+{body[:600]}{'...' if len(body) > 600 else ''}
+
+Would you like me to reply to this, archive it, or do something else with it?"""
+        else:
+            response = f"""Here's the email from {from_display}:
+
+Subject: {subject}
+
+I was able to retrieve the email headers but had trouble accessing the full content. This sometimes happens with certain email formats.
+
+Would you like me to try replying to this email based on the subject line?"""
         
         log_tool_execution(tool_context, "gmail_get_message", "get_message", True, "Message retrieved successfully")
         return response
@@ -245,8 +330,190 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "searching_messages")
         
-        # Use the list_messages function with search query
-        return gmail_list_messages(query=search_query, max_results=max_results, tool_context=tool_context)
+        # Get Gmail service for direct search handling
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Perform search and get message IDs
+        result = service.users().messages().list(
+            userId='me', 
+            q=search_query, 
+            maxResults=max_results
+        ).execute()
+        
+        messages = result.get('messages', [])
+        
+        if not messages:
+            # Create user-friendly response instead of showing raw search query
+            if 'from:' in search_query.lower():
+                # Extract sender name from search query for friendlier response
+                sender_part = search_query.lower().replace('from:', '').strip().strip('"')
+                response = f"I couldn't find any emails from {sender_part}. You might want to check if the name is spelled correctly, or try searching for just part of the name."
+            elif 'subject:' in search_query.lower():
+                # Extract subject from search query for friendlier response  
+                subject_part = search_query.lower().replace('subject:', '').strip().strip('"')
+                response = f"I couldn't find any emails with '{subject_part}' in the subject line. Try searching for just a few key words from the subject instead."
+            elif any(term in search_query.lower() for term in ['newer_than:', 'older_than:', 'after:', 'before:']):
+                response = f"I couldn't find any emails matching your date criteria. You might want to try expanding the date range or checking a different time period."
+            else:
+                # General search
+                response = f"I couldn't find any emails matching '{search_query}'. Try using different keywords, checking the sender's name, or looking for specific words from the subject line."
+            
+            # Clear search results in session
+            tool_context.state[EMAIL_LAST_FETCH] = datetime.utcnow().isoformat()
+            tool_context.state[EMAIL_LAST_QUERY] = search_query
+            tool_context.state[EMAIL_RESULTS_COUNT] = 0
+            tool_context.state[EMAIL_CURRENT_RESULTS] = []
+            tool_context.state[EMAIL_MESSAGE_INDEX_MAP] = {}
+            tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = []
+            
+            return response
+        
+        # Get detailed info for search results and ensure IDs are captured
+        message_summaries = []
+        for msg in messages[:max_results]:
+            try:
+                logger.debug(f"Processing search result message with ID: {msg['id']}")
+                
+                # Validate the message ID before trying to get metadata
+                if not msg['id'] or len(msg['id'].strip()) < 10:
+                    logger.warning(f"Skipping message with invalid ID: {msg['id']}")
+                    continue
+                
+                msg_data = service.users().messages().get(
+                    userId='me', 
+                    id=msg['id'], 
+                    format='metadata'
+                ).execute()
+                
+                # Verify the returned message ID matches what we requested
+                returned_id = msg_data.get('id', '')
+                if returned_id != msg['id']:
+                    logger.warning(f"Message ID mismatch: requested {msg['id']}, got {returned_id}")
+                
+                headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
+                
+                summary = {
+                    "id": msg['id'],  # Use original ID from search, not from metadata response
+                    "from": headers.get('From', 'Unknown'),
+                    "subject": headers.get('Subject', 'No Subject'),
+                    "date": headers.get('Date', 'Unknown')
+                }
+                message_summaries.append(summary)
+                
+                logger.debug(f"Successfully processed message: ID={msg['id']}, From={summary['from']}, Subject={summary['subject']}")
+                
+            except Exception as e:
+                logger.error(f"Error getting search result message {msg['id']}: {e}")
+                # If we can't get metadata, let's still try to store the basic info
+                summary = {
+                    "id": msg['id'],
+                    "from": "Unknown (metadata failed)",
+                    "subject": "Unknown (metadata failed)",
+                    "date": "Unknown"
+                }
+                message_summaries.append(summary)
+                logger.warning(f"Stored basic info for message {msg['id']} despite metadata failure")
+                continue
+        
+        # Store search results in session with proper ID mapping
+        tool_context.state[EMAIL_LAST_FETCH] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_QUERY] = search_query
+        tool_context.state[EMAIL_RESULTS_COUNT] = len(message_summaries)
+        tool_context.state[EMAIL_CURRENT_RESULTS] = message_summaries
+        
+        # Create message ID mapping for easy reference resolution
+        message_index_map = {}
+        detailed_messages = []
+        
+        for i, msg in enumerate(message_summaries, 1):
+            message_index_map[str(i)] = msg['id']  # Map position to message ID
+            detailed_msg = msg.copy()
+            detailed_msg['position'] = i
+            detailed_messages.append(detailed_msg)
+        
+        tool_context.state[EMAIL_MESSAGE_INDEX_MAP] = message_index_map
+        tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = detailed_messages
+        
+        # Store single result for confirmatory responses, clear for multiple
+        if len(message_summaries) == 1:
+            stored_id = message_summaries[0]['id']
+            tool_context.state[EMAIL_LAST_SINGLE_RESULT] = stored_id
+            logger.info(f"SEARCH: Stored single result ID for 'yes' responses: {stored_id}")
+            logger.debug(f"SEARCH: Single result details - From: {message_summaries[0]['from']}, Subject: {message_summaries[0]['subject']}")
+        else:
+            # Clear single result if multiple results
+            tool_context.state[EMAIL_LAST_SINGLE_RESULT] = None
+            logger.debug(f"SEARCH: Cleared single result (found {len(message_summaries)} messages)")
+        
+        # Debug logging to verify ID storage
+        logger.debug(f"Search results stored: {len(message_index_map)} messages")
+        logger.debug(f"First message ID from search: {message_index_map.get('1', 'None')}")
+        
+        # Format search results with voice-optimized display
+        if len(message_summaries) == 1:
+            # Create user-friendly response instead of showing raw search query
+            if 'from:' in search_query.lower():
+                # Extract sender name from search query for friendlier response
+                sender_part = search_query.lower().replace('from:', '').strip().strip('"')
+                response_lines = [f"I found an email from {sender_part}:"]
+            elif 'subject:' in search_query.lower():
+                # Extract subject from search query for friendlier response  
+                subject_part = search_query.lower().replace('subject:', '').strip().strip('"')
+                response_lines = [f"I found an email with '{subject_part}' in the subject:"]
+            elif any(term in search_query.lower() for term in ['newer_than:', 'older_than:', 'after:', 'before:']):
+                response_lines = [f"I found an email from your search:"]
+            else:
+                # General search
+                response_lines = [f"I found an email matching your search:"]
+        else:
+            # Create user-friendly response for multiple results
+            if 'from:' in search_query.lower():
+                sender_part = search_query.lower().replace('from:', '').strip().strip('"')
+                response_lines = [f"I found {len(message_summaries)} emails from {sender_part}:"]
+            elif 'subject:' in search_query.lower():
+                subject_part = search_query.lower().replace('subject:', '').strip().strip('"')
+                response_lines = [f"I found {len(message_summaries)} emails with '{subject_part}' in the subject:"]
+            elif any(term in search_query.lower() for term in ['newer_than:', 'older_than:', 'after:', 'before:']):
+                response_lines = [f"I found {len(message_summaries)} emails from your search:"]
+            else:
+                response_lines = [f"I found {len(message_summaries)} emails matching your search:"]
+        
+        response_lines.append("")  # Add blank line for readability
+        
+        for i, msg in enumerate(message_summaries[:5], 1):  # Show first 5
+            # Clean up sender name for better voice readability
+            from_sender = msg['from']
+            if '<' in from_sender and '>' in from_sender:
+                name_part = from_sender.split('<')[0].strip().strip('"')
+                email_part = from_sender.split('<')[1].split('>')[0]
+                if name_part:
+                    from_display = name_part
+                else:
+                    from_display = email_part
+            else:
+                from_display = from_sender
+            
+            # Truncate for voice readability
+            from_display = from_display[:35] + "..." if len(from_display) > 35 else from_display
+            subject_display = msg['subject'][:50] + "..." if len(msg['subject']) > 50 else msg['subject']
+            
+            response_lines.append(f"From: {from_display} | Subject: {subject_display}")
+        
+        if len(message_summaries) > 5:
+            response_lines.append(f"... and {len(message_summaries) - 5} more messages")
+        
+        # Provide context-specific guidance for search results
+        if len(message_summaries) == 1:
+            response_lines.append(f"\nWould you like to read it?")
+        else:
+            response_lines.append(f"\nWhich one would you like to read?")
+        
+        log_tool_execution(tool_context, "gmail_search_messages", "search_messages", True, 
+                         f"Found {len(message_summaries)} messages matching '{search_query}'")
+        
+        return "\n".join(response_lines)
         
     except Exception as e:
         logger.error(f"Error searching Gmail: {e}")
@@ -356,6 +623,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
+        # Try to resolve message reference, fallback to direct ID
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
         try:
@@ -365,7 +633,10 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
                 format='full'
             ).execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"I couldn't find email number {message_id}. Let me check your recent emails first, then you can try replying again."
+            else:
+                return f"I couldn't find an email matching '{message_id}'. Let me show you your recent emails so you can pick which one to reply to."
         
         # Extract reply information
         headers = {h['name']: h['value'] for h in original.get('payload', {}).get('headers', [])}
@@ -468,7 +739,10 @@ def gmail_confirm_and_reply(message_id: str, reply_body: str, tool_context=None)
         try:
             original = service.users().messages().get(userId='me', id=actual_message_id, format='metadata').execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try preparing reply to email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
             
         headers = {h['name']: h['value'] for h in original.get('payload', {}).get('headers', [])}
         
@@ -521,7 +795,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
+        # Try to resolve message reference, fallback to direct ID
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
         try:
@@ -531,7 +805,10 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try marking email {message_id} as read again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
         tool_context.state[EMAIL_LAST_MARKED_READ] = actual_message_id
@@ -562,7 +839,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
+        # Try to resolve message reference, fallback to direct ID
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
         try:
@@ -572,7 +849,10 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try archiving email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
         tool_context.state[EMAIL_LAST_ARCHIVED] = actual_message_id
@@ -602,7 +882,7 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
+        # Try to resolve message reference, fallback to direct ID
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
         try:
@@ -611,7 +891,10 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
                 id=actual_message_id
             ).execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try deleting email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
         tool_context.state[EMAIL_LAST_DELETED] = actual_message_id
@@ -721,7 +1004,10 @@ def gmail_summarize_message(message_id: str, detail_level: str = "moderate", too
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try summarizing email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -760,13 +1046,16 @@ def gmail_analyze_sentiment(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # First try to use message_id directly (for actual Gmail IDs)
+        # Try to resolve message reference, fallback to direct ID
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try analyzing email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -810,7 +1099,10 @@ def gmail_extract_action_items(message_id: str, tool_context=None) -> str:
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try extracting action items from email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -854,7 +1146,10 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
         try:
             message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
         except Exception as e:
-            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+            if message_id.isdigit():
+                return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try generating reply for email {message_id} again."
+            else:
+                return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         body = _extract_message_body(message.get('payload', {}))
         
@@ -908,30 +1203,180 @@ def _is_casual_content(body: str, subject: str) -> bool:
 
 def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[str]:
     """Get message ID by user reference (position, sender, subject partial match)."""
-    # Follow the same validation pattern as other functions
-    validate_tool_context(tool_context, "_get_message_id_by_reference")
-    
     try:
-        # Log operation start (following your logging pattern)
-        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True, 
-                         f"Reference: '{reference}'")
+        # Log operation start
+        if tool_context:
+            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True, 
+                             f"Reference: '{reference}'")
         
-        # Check if tool_context and state are available (following your safety pattern)
+        # Check if tool_context and state are available - but don't fail if they're not
         if not tool_context or not hasattr(tool_context, 'state'):
-            logger.warning("No tool context or state available for message ID lookup")
-            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False, 
-                             "No tool context or state available")
+            logger.debug("No tool context or state available for message ID lookup - will return None for fallback")
+            if tool_context:
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False, 
+                                 "No tool context or state available")
             return None
             
         # Get stored message data from session state (using your session key constants)
         message_index_map = tool_context.state.get(EMAIL_MESSAGE_INDEX_MAP, {})
         last_listed_messages = tool_context.state.get(EMAIL_LAST_LISTED_MESSAGES, [])
         
+        # If no session data, try to build it with fresh email fetch
         if not message_index_map or not last_listed_messages:
-            logger.warning("No message index map or listed messages found in session state")
-            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False,
-                             "No message data in session state")
+            try:
+                # Get Gmail service for fresh fetch
+                service = get_gmail_service()
+                if service:
+                    logger.info(f"RESOLVE: No session data found, attempting fresh email fetch for reference '{reference}'")
+                    recent_result = service.users().messages().list(userId='me', maxResults=10).execute()
+                    recent_messages = recent_result.get('messages', [])
+                    
+                    # Build session index
+                    message_index_map = {}
+                    last_listed_messages = []
+                    for i, msg in enumerate(recent_messages, 1):
+                        message_index_map[str(i)] = msg['id']
+                        try:
+                            msg_data = service.users().messages().get(userId='me', id=msg['id'], format='metadata').execute()
+                            headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
+                            detailed_msg = {
+                                "id": msg['id'],
+                                "from": headers.get('From', 'Unknown'),
+                                "subject": headers.get('Subject', 'No Subject'),
+                                "date": headers.get('Date', 'Unknown'),
+                                "position": i
+                            }
+                            last_listed_messages.append(detailed_msg)
+                        except Exception:
+                            # If metadata fails, store basic info
+                            detailed_msg = {
+                                "id": msg['id'],
+                                "from": "Unknown",
+                                "subject": "Unknown", 
+                                "date": "Unknown",
+                                "position": i
+                            }
+                            last_listed_messages.append(detailed_msg)
+                            continue
+                    
+                    # Store in session for future use
+                    if tool_context and hasattr(tool_context, 'state'):
+                        tool_context.state[EMAIL_MESSAGE_INDEX_MAP] = message_index_map
+                        tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = last_listed_messages
+                        logger.info(f"RESOLVE: Built fresh index with {len(message_index_map)} messages and updated session state")
+                    else:
+                        logger.debug(f"RESOLVE: Built fresh index with {len(message_index_map)} messages but couldn't update session state")
+                
+            except Exception as e:
+                logger.warning(f"RESOLVE: Failed to fetch fresh emails for reference resolution: {e}")
+                # Continue with empty data - will return None
+        
+        # If still no data, return None
+        if not message_index_map or not last_listed_messages:
+            logger.debug("No message data available for reference resolution")
+            if tool_context:
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False,
+                                 "No message data available")
             return None
+        
+        # Define reference_lower at the start to avoid NameError
+        reference_lower = reference.lower().strip()
+        
+        logger.debug(f"Processing reference: '{reference}' -> normalized: '{reference_lower}'")
+        logger.debug(f"Available positions in message_index_map: {list(message_index_map.keys())}")
+        logger.debug(f"Number of messages in last_listed_messages: {len(last_listed_messages)}")
+        
+        # Special debug for position-based requests
+        if any(char.isdigit() for char in reference_lower):
+            logger.debug(f"Reference contains digits, checking position lookup")
+        if any(word in reference_lower for word in ['fifth', 'fifth one', 'the fifth']):
+            logger.debug(f"Reference contains 'fifth', should map to position '5'")
+            logger.debug(f"Is position '5' in message_index_map? {'5' in message_index_map}")
+            if '5' in message_index_map:
+                logger.debug(f"Position '5' maps to message ID: {message_index_map['5']}")
+            logger.debug(f"Does last_listed_messages have 5+ emails? {len(last_listed_messages) >= 5}")
+            if len(last_listed_messages) >= 5:
+                logger.debug(f"Fifth message ID from list: {last_listed_messages[4].get('id', 'None')}")
+        
+        # Handle confirmatory responses that refer to the most recent/first email
+        confirmatory_responses = ['yes', 'yeah', 'yep', 'sure', 'okay', 'ok', 'that one', 'it', 'that email', 'this one']
+        if any(phrase == reference_lower for phrase in confirmatory_responses):
+            logger.debug(f"Detected confirmatory response: '{reference_lower}'")
+            
+            # First check if there's a specific single result stored
+            single_result_id = tool_context.state.get(EMAIL_LAST_SINGLE_RESULT)
+            if single_result_id:
+                logger.info(f"RESOLVE: Found single result ID for confirmatory response: {single_result_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved confirmatory '{reference}' to single result ID {single_result_id}")
+                return single_result_id
+            else:
+                logger.warning(f"RESOLVE: No single result ID found in session state for confirmatory response '{reference_lower}'")
+            
+            # Fallback to first message in the list
+            if last_listed_messages and len(last_listed_messages) > 0:
+                resolved_id = last_listed_messages[0].get('id')
+                logger.debug(f"RESOLVE: Found message ID by confirmatory response '{reference}' from messages list: {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved confirmatory '{reference}' to first message ID {resolved_id}")
+                return resolved_id
+            # If no stored messages, try to use position 1 from index map
+            elif message_index_map and '1' in message_index_map:
+                resolved_id = message_index_map['1']
+                logger.debug(f"RESOLVE: Found message ID by confirmatory response '{reference}' from index: {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved confirmatory '{reference}' to position 1 ID {resolved_id}")
+                return resolved_id
+            else:
+                logger.debug(f"RESOLVE: Confirmatory response '{reference_lower}' detected but no messages available")
+        
+        # Handle natural language expressions for "first", "first one", etc.
+        first_indicators = ['most recent', 'latest', 'newest', 'first', 'first one', 'top', 'first email', '1st', 'number 1', 'the first', 'the first one', 'the first email']
+        if any(phrase in reference_lower for phrase in first_indicators):
+            # Return the first message in the list (most recent)
+            if last_listed_messages and len(last_listed_messages) > 0:
+                resolved_id = last_listed_messages[0].get('id')
+                logger.debug(f"Found message ID by natural language request '{reference}': {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved '{reference}' to first message ID {resolved_id}")
+                return resolved_id
+            # If no stored messages, try to use position 1 from index map
+            elif message_index_map and '1' in message_index_map:
+                resolved_id = message_index_map['1']
+                logger.debug(f"Found message ID by natural language request '{reference}' from index: {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved '{reference}' to position 1 ID {resolved_id}")
+                return resolved_id
+        
+        # Handle second, third, etc.
+        number_words = {
+            'second': '2', 'third': '3', 'fourth': '4', 'fifth': '5', 'sixth': '6', 'seventh': '7', 'eighth': '8', 'ninth': '9', 'tenth': '10',
+            '2nd': '2', '3rd': '3', '4th': '4', '5th': '5', '6th': '6', '7th': '7', '8th': '8', '9th': '9', '10th': '10',
+            'second email': '2', 'third email': '3', 'fourth email': '4', 'fifth email': '5', 'sixth email': '6',
+            'second one': '2', 'third one': '3', 'fourth one': '4', 'fifth one': '5', 'sixth one': '6',
+            'the second': '2', 'the third': '3', 'the fourth': '4', 'the fifth': '5', 'the sixth': '6',
+            'the second one': '2', 'the third one': '3', 'the fourth one': '4', 'the fifth one': '5', 'the sixth one': '6'
+        }
+        for word, position in number_words.items():
+            if word in reference_lower:
+                if position in message_index_map:
+                    resolved_id = message_index_map[position]
+                    logger.debug(f"Found message ID by number word '{word}': {resolved_id}")
+                    log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                     f"Resolved '{reference}' to position {position} ID {resolved_id}")
+                    return resolved_id
+                else:
+                    # Fallback: try to get from last_listed_messages array directly
+                    position_int = int(position)
+                    if last_listed_messages and len(last_listed_messages) >= position_int and position_int > 0:
+                        resolved_id = last_listed_messages[position_int - 1].get('id')  # Convert to 0-based index
+                        logger.debug(f"Found message ID by number word '{word}' from messages list: {resolved_id}")
+                        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                         f"Resolved '{reference}' to position {position} ID {resolved_id} via messages list")
+                        return resolved_id
+                    else:
+                        logger.debug(f"Number word '{word}' mapped to position {position} but no email at that position in messages list")
+                        break  # Found the pattern but no email at that position
         
         # Try to parse as position number (1, 2, 3, etc.)
         try:
@@ -942,11 +1387,20 @@ def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[
                 log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
                                  f"Resolved position {position} to ID {resolved_id}")
                 return resolved_id
+            else:
+                # Fallback: try to get from last_listed_messages array directly
+                if last_listed_messages and len(last_listed_messages) >= position and position > 0:
+                    resolved_id = last_listed_messages[position - 1].get('id')  # Convert to 0-based index
+                    logger.debug(f"Found message ID by position {position} from messages list: {resolved_id}")
+                    log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                     f"Resolved position {position} to ID {resolved_id} via messages list")
+                    return resolved_id
+                else:
+                    logger.debug(f"Position {position} not found in index map and not enough messages in list")
         except ValueError:
             pass  # Not a number, continue with other methods
         
         # Try to match by sender (partial match, case insensitive)
-        reference_lower = reference.lower()
         for msg in last_listed_messages:
             sender = msg.get('from', '').lower()
             if reference_lower in sender:
@@ -956,10 +1410,20 @@ def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[
                                  f"Resolved sender '{reference}' to ID {resolved_id}")
                 return resolved_id
         
-        # Try to match by subject (partial match, case insensitive)
+        # Try to match by subject (smart partial matching, case insensitive)
         for msg in last_listed_messages:
             subject = msg.get('subject', '').lower()
-            if reference_lower in subject:
+            
+            # Smart subject matching - handle common user expressions
+            if any(keyword in reference_lower for keyword in ['welcome', 'oprina']) and any(keyword in subject for keyword in ['welcome', 'oprina']):
+                resolved_id = msg.get('id')
+                logger.debug(f"Found message ID by smart subject match: {reference} -> {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved subject '{reference}' to ID {resolved_id}")
+                return resolved_id
+            
+            # Standard partial matching
+            elif reference_lower in subject:
                 resolved_id = msg.get('id')
                 logger.debug(f"Found message ID by subject match: {reference} -> {resolved_id}")
                 log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
@@ -967,14 +1431,16 @@ def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[
                 return resolved_id
         
         # No match found
-        logger.warning(f"Could not resolve message reference: {reference}")
-        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False,
-                         f"Could not resolve reference: {reference}")
+        logger.debug(f"Could not resolve message reference: {reference} - returning None for fallback")
+        if tool_context:
+            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False,
+                             f"Could not resolve reference: {reference}")
         return None
         
     except Exception as e:
         logger.error(f"Error resolving message reference '{reference}': {e}")
-        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False, str(e))
+        if tool_context:
+            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False, str(e))
         return None
 
 def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None) -> str:

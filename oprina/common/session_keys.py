@@ -27,6 +27,7 @@ EMAIL_LAST_SENT_TO = "email:last_sent_to"
 
 EMAIL_MESSAGE_INDEX_MAP = "email:message_index_map"  # Maps position to message_id
 EMAIL_LAST_LISTED_MESSAGES = "email:last_listed_messages"  # Full message data with IDs
+EMAIL_LAST_SINGLE_RESULT = "email:last_single_result"  # Single email context for "yes" responses
 # Email message operations
 EMAIL_LAST_MESSAGE_VIEWED = "email:last_message_viewed"
 EMAIL_LAST_MESSAGE_VIEWED_AT = "email:last_message_viewed_at"
@@ -52,11 +53,11 @@ EMAIL_LAST_TASK_EXTRACTION_AT = "email:last_task_extraction_at"
 EMAIL_LAST_GENERATED_REPLY = "email:last_generated_reply"
 EMAIL_LAST_REPLY_GENERATION_AT = "email:last_reply_generation_at"
 
-EMAIL_PENDING_SEND = "email_pending_send"
-EMAIL_PENDING_REPLY = "email_pending_reply"
-EMAIL_LAST_GENERATED_EMAIL = "email_last_generated_email"
-EMAIL_LAST_EMAIL_GENERATION_AT = "email_last_email_generation_at"
-EMAIL_LAST_GENERATED_EMAIL_TO = "email_last_generated_email_to"
+EMAIL_PENDING_SEND = "email:pending_send"
+EMAIL_PENDING_REPLY = "email:pending_reply"
+EMAIL_LAST_GENERATED_EMAIL = "email:last_generated_email"
+EMAIL_LAST_EMAIL_GENERATION_AT = "email:last_email_generation_at"
+EMAIL_LAST_GENERATED_EMAIL_TO = "email:last_generated_email_to"
 
 # =============================================================================
 # Calendar State (current conversation)
