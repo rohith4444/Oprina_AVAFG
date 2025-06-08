@@ -1,14 +1,19 @@
 """Oprina root agent - Multimodal voice assistant for Gmail and Calendar."""
 
+import os
 from google.adk.agents import Agent
+from google.adk.sessions import VertexAiSessionService
+
+# Import config first - this auto-loads environment
+from oprina.config import get_config
 from oprina import prompt
 from oprina.sub_agents.email.agent import email_agent
 from oprina.sub_agents.calendar.agent import calendar_agent
- 
-# from oprina.tools.memory import load_user_profile
+
+config = get_config()
 
 root_agent = Agent(
-    model="gemini-2.0-flash",  # Multimodal model
+    model=get_config()["agent_model"],  # Use config for model
     name="oprina_root_agent",
     description="Multimodal voice-enabled Gmail and Calendar assistant",
     instruction=prompt.ROOT_AGENT_INSTR,

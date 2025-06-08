@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 # Add project root to path
 current_file = os.path.abspath(__file__)
 project_root = current_file
-for _ in range(4):  # Go up 4 levels from tests/unit/test_calendar_tools.py
+for _ in range(0):  # Go up 4 levels from tests/unit/test_calendar_tools.py
     project_root = os.path.dirname(project_root)
 
 if project_root not in sys.path:
