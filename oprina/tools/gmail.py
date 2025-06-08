@@ -48,7 +48,8 @@ from oprina.common.session_keys import (
     EMAIL_LAST_EXTRACTED_TASKS, EMAIL_LAST_TASK_EXTRACTION_AT,
     EMAIL_LAST_GENERATED_REPLY, EMAIL_LAST_REPLY_GENERATION_AT,
     EMAIL_PENDING_SEND, EMAIL_PENDING_REPLY,
-    EMAIL_LAST_GENERATED_EMAIL, EMAIL_LAST_EMAIL_GENERATION_AT, EMAIL_LAST_GENERATED_EMAIL_TO
+    EMAIL_LAST_GENERATED_EMAIL, EMAIL_LAST_EMAIL_GENERATION_AT, EMAIL_LAST_GENERATED_EMAIL_TO,
+    EMAIL_LAST_LISTED_MESSAGES, EMAIL_MESSAGE_INDEX_MAP
 )
 
 logger = setup_logger("gmail_tools", console_output=True)
@@ -87,10 +88,10 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
             response = f"No messages found{' for query: ' + query if query else ''}"
             
             # Update session state even for empty results
-            tool_context.session.state[EMAIL_LAST_FETCH] = datetime.utcnow().isoformat()
-            tool_context.session.state[EMAIL_LAST_QUERY] = query
-            tool_context.session.state[EMAIL_RESULTS_COUNT] = 0
-            tool_context.session.state[EMAIL_CURRENT_RESULTS] = []
+            tool_context.state[EMAIL_LAST_FETCH] = datetime.utcnow().isoformat()
+            tool_context.state[EMAIL_LAST_QUERY] = query
+            tool_context.state[EMAIL_RESULTS_COUNT] = 0
+            tool_context.state[EMAIL_CURRENT_RESULTS] = []
             
             return response
         
@@ -118,21 +119,52 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
                 logger.warning(f"Error getting message {msg['id']}: {e}")
                 continue
         
-        # Update session state with results
-        tool_context.session.state[EMAIL_LAST_FETCH] = datetime.utcnow().isoformat()
-        tool_context.session.state[EMAIL_LAST_QUERY] = query
-        tool_context.session.state[EMAIL_RESULTS_COUNT] = len(message_summaries)
-        tool_context.session.state[EMAIL_CURRENT_RESULTS] = message_summaries
+        # Update session state with results including message ID mapping
+        tool_context.state[EMAIL_LAST_FETCH] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_QUERY] = query
+        tool_context.state[EMAIL_RESULTS_COUNT] = len(message_summaries)
+        tool_context.state[EMAIL_CURRENT_RESULTS] = message_summaries
         
-        # Format response
-        response_lines = [f"Found {len(message_summaries)} messages:"]
+        # Store message ID mapping for easy reference by agents
+        message_index_map = {}
+        for i, msg in enumerate(message_summaries, 1):
+            message_index_map[str(i)] = msg['id']
+        
+        tool_context.state[EMAIL_MESSAGE_INDEX_MAP] = message_index_map
+        tool_context.state[EMAIL_LAST_LISTED_MESSAGES] = message_summaries
+        
+        # Format response with clean, voice-optimized display
+        if len(message_summaries) == 1:
+            response_lines = ["Here is your most recent email:"]
+        else:
+            response_lines = [f"Here are the {min(len(message_summaries), 5)} most recent emails in your inbox:"]
+        
+        response_lines.append("")  # Add blank line for readability
+        
         for i, msg in enumerate(message_summaries[:5], 1):  # Show first 5
-            from_display = msg['from'][:30] + "..." if len(msg['from']) > 30 else msg['from']
-            subject_display = msg['subject'][:40] + "..." if len(msg['subject']) > 40 else msg['subject']
-            response_lines.append(f"{i}. From: {from_display} | Subject: {subject_display}")
+            # Clean up sender name for better voice readability
+            from_sender = msg['from']
+            if '<' in from_sender and '>' in from_sender:
+                # Extract just the name part if email is in "Name <email>" format
+                name_part = from_sender.split('<')[0].strip().strip('"')
+                email_part = from_sender.split('<')[1].split('>')[0]
+                if name_part:
+                    from_display = name_part
+                else:
+                    from_display = email_part
+            else:
+                from_display = from_sender
+            
+            # Truncate for voice readability
+            from_display = from_display[:35] + "..." if len(from_display) > 35 else from_display
+            subject_display = msg['subject'][:50] + "..." if len(msg['subject']) > 50 else msg['subject']
+            
+            response_lines.append(f"From: {from_display} | Subject: {subject_display}")
         
         if len(message_summaries) > 5:
             response_lines.append(f"... and {len(message_summaries) - 5} more messages")
+        
+        response_lines.append(f"\nTo read any email, say 'read email 1' or 'read the email from [sender name]'.")
         
         log_tool_execution(tool_context, "gmail_list_messages", "list_messages", True, 
                          f"Retrieved {len(message_summaries)} messages")
@@ -151,7 +183,7 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_get_message", "get_message", True, f"Message ID: {message_id}")
+        log_tool_execution(tool_context, "gmail_get_message", "get_message", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "getting_message")
@@ -161,12 +193,16 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # Get full message
-        message = service.users().messages().get(
-            userId='me', 
-            id=message_id, 
-            format='full'
-        ).execute()
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            message = service.users().messages().get(
+                userId='me', 
+                id=actual_message_id, 
+                format='full'
+            ).execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Extract headers
         headers = {h['name']: h['value'] for h in message.get('payload', {}).get('headers', [])}
@@ -175,8 +211,8 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         body = _extract_message_body(message.get('payload', {}))
         
         # Update session state
-        tool_context.session.state[EMAIL_LAST_MESSAGE_VIEWED] = message_id
-        tool_context.session.state[EMAIL_LAST_MESSAGE_VIEWED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_MESSAGE_VIEWED] = actual_message_id
+        tool_context.state[EMAIL_LAST_MESSAGE_VIEWED_AT] = datetime.utcnow().isoformat()
         
         # Format response
         response = f"""Email Details:
@@ -186,7 +222,9 @@ Subject: {headers.get('Subject', 'No Subject')}
 Date: {headers.get('Date', 'Unknown')}
 
 Content:
-{body[:500]}{'...' if len(body) > 500 else ''}"""
+{body[:500]}{'...' if len(body) > 500 else ''}
+
+Would you like to reply to this email, archive it, or take another action?"""
         
         log_tool_execution(tool_context, "gmail_get_message", "get_message", True, "Message retrieved successfully")
         return response
@@ -195,7 +233,6 @@ Content:
         logger.error(f"Error getting Gmail message {message_id}: {e}")
         log_tool_execution(tool_context, "gmail_get_message", "get_message", False, str(e))
         return f"Error retrieving email: {str(e)}"
-
 
 def gmail_search_messages(search_query: str, max_results: int = 10, tool_context=None) -> str:
     """Search Gmail messages using Gmail search syntax."""
@@ -221,8 +258,9 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
 # Gmail Sending Tools
 # =============================================================================
 
-def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str = "", tool_context=None) -> str:
-    """Send a Gmail message."""
+def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str = "", 
+                      style_check: bool = True, tool_context=None) -> str:
+    """Send a Gmail message with optional style checking."""
     validate_tool_context(tool_context, "gmail_send_message")
     
     try:
@@ -233,18 +271,33 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "sending_message")
         
+        # Style checking - if content seems casual and style_check is enabled
+        if style_check and _is_casual_content(body, subject):
+            return f"""I notice this email content seems casual:
+
+Subject: {subject}
+To: {to}
+Message: {body}
+
+Would you like me to:
+1. Send it as-is 
+2. Make it more professional
+3. Cancel and let you revise it
+
+Please let me know how you'd like to proceed."""
+        
         # Get Gmail service
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
         # Get sender email from session or profile
-        sender_email = tool_context.session.state.get(USER_EMAIL, "")
+        sender_email = tool_context.state.get(USER_EMAIL, "")
         if not sender_email:
             try:
                 profile = service.users().getProfile(userId='me').execute()
                 sender_email = profile.get('emailAddress', '')
-                tool_context.session.state[USER_EMAIL] = sender_email
+                tool_context.state[USER_EMAIL] = sender_email
             except:
                 sender_email = "me"
         
@@ -272,10 +325,10 @@ def gmail_send_message(to: str, subject: str, body: str, cc: str = "", bcc: str 
         ).execute()
         
         # Update session state after successful send
-        tool_context.session.state[EMAIL_LAST_SENT] = datetime.utcnow().isoformat()
-        tool_context.session.state[EMAIL_LAST_SENT_TO] = to
-        tool_context.session.state[EMAIL_LAST_SENT_SUBJECT] = subject
-        tool_context.session.state[EMAIL_LAST_SENT_ID] = sent_message.get('id', '')
+        tool_context.state[EMAIL_LAST_SENT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_SENT_TO] = to
+        tool_context.state[EMAIL_LAST_SENT_SUBJECT] = subject
+        tool_context.state[EMAIL_LAST_SENT_ID] = sent_message.get('id', '')
         
         log_tool_execution(tool_context, "gmail_send_message", "send_message", True, "Email sent successfully")
         return f"Email sent successfully to {to}. Subject: {subject}"
@@ -293,7 +346,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
     try:
         # Log operation
         log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", True, 
-                         f"Reply to message: {message_id}")
+                         f"Reply to message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "replying_to_message")
@@ -303,12 +356,16 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # Get original message
-        original = service.users().messages().get(
-            userId='me', 
-            id=message_id, 
-            format='full'
-        ).execute()
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            original = service.users().messages().get(
+                userId='me', 
+                id=actual_message_id, 
+                format='full'
+            ).execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Extract reply information
         headers = {h['name']: h['value'] for h in original.get('payload', {}).get('headers', [])}
@@ -337,10 +394,10 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         ).execute()
         
         # Update session state
-        tool_context.session.state[EMAIL_LAST_REPLY_SENT] = datetime.utcnow().isoformat()
-        tool_context.session.state[EMAIL_LAST_REPLY_TO] = from_email
-        tool_context.session.state[EMAIL_LAST_REPLY_ID] = sent_reply.get('id', '')
-        tool_context.session.state[EMAIL_LAST_REPLY_THREAD] = thread_id
+        tool_context.state[EMAIL_LAST_REPLY_SENT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_REPLY_TO] = from_email
+        tool_context.state[EMAIL_LAST_REPLY_ID] = sent_reply.get('id', '')
+        tool_context.state[EMAIL_LAST_REPLY_THREAD] = thread_id
         
         log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", True, f"Reply sent to {from_email}")
         return f"Reply sent to {from_email}"
@@ -369,7 +426,7 @@ def gmail_confirm_and_send(to: str, subject: str, body: str, cc: str = "", bcc: 
             'timestamp': datetime.utcnow().isoformat()
         }
         
-        tool_context.session.state[EMAIL_PENDING_SEND] = pending_email
+        tool_context.state[EMAIL_PENDING_SEND] = pending_email
         
         # Format confirmation message for agent
         confirmation_text = f"""Ready to send email:
@@ -404,20 +461,27 @@ def gmail_confirm_and_reply(message_id: str, reply_body: str, tool_context=None)
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Resolve message ID using the helper function    
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            original = service.users().messages().get(userId='me', id=actual_message_id, format='metadata').execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
             
-        original = service.users().messages().get(userId='me', id=message_id, format='metadata').execute()
         headers = {h['name']: h['value'] for h in original.get('payload', {}).get('headers', [])}
         
         # Store pending reply in session state
         pending_reply = {
-            'message_id': message_id,
+            'message_id': actual_message_id,
             'reply_body': reply_body,
             'original_from': headers.get('From', 'Unknown'),
             'original_subject': headers.get('Subject', 'No Subject'),
             'timestamp': datetime.utcnow().isoformat()
         }
         
-        tool_context.session.state[EMAIL_PENDING_REPLY] = pending_reply
+        tool_context.state[EMAIL_PENDING_REPLY] = pending_reply
         
         # Format confirmation message for agent
         confirmation_text = f"""Ready to send reply:
@@ -447,7 +511,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_mark_as_read", "mark_read", True, f"Message: {message_id}")
+        log_tool_execution(tool_context, "gmail_mark_as_read", "mark_read", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "marking_read")
@@ -457,16 +521,21 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # Remove UNREAD label
-        service.users().messages().modify(
-            userId='me',
-            id=message_id,
-            body={'removeLabelIds': ['UNREAD']}
-        ).execute()
+        # First try to use message_id directly (for actual Gmail IDs)
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            service.users().messages().modify(
+                userId='me',
+                id=actual_message_id,
+                body={'removeLabelIds': ['UNREAD']}
+            ).execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
-        tool_context.session.state[EMAIL_LAST_MARKED_READ] = message_id
-        tool_context.session.state[EMAIL_LAST_MARKED_READ_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_MARKED_READ] = actual_message_id
+        tool_context.state[EMAIL_LAST_MARKED_READ_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_mark_as_read", "mark_read", True, "Message marked as read")
         return f"Message marked as read"
@@ -483,7 +552,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_archive_message", "archive", True, f"Message: {message_id}")
+        log_tool_execution(tool_context, "gmail_archive_message", "archive", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "archiving_message")
@@ -493,16 +562,21 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # Remove INBOX label
-        service.users().messages().modify(
-            userId='me',
-            id=message_id,
-            body={'removeLabelIds': ['INBOX']}
-        ).execute()
+        # First try to use message_id directly (for actual Gmail IDs)
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            service.users().messages().modify(
+                userId='me',
+                id=actual_message_id,
+                body={'removeLabelIds': ['INBOX']}
+            ).execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
-        tool_context.session.state[EMAIL_LAST_ARCHIVED] = message_id
-        tool_context.session.state[EMAIL_LAST_ARCHIVED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_ARCHIVED] = actual_message_id
+        tool_context.state[EMAIL_LAST_ARCHIVED_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_archive_message", "archive", True, "Message archived")
         return f"Message archived successfully"
@@ -512,14 +586,13 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         log_tool_execution(tool_context, "gmail_archive_message", "archive", False, str(e))
         return f"Error archiving message: {str(e)}"
 
-
 def gmail_delete_message(message_id: str, tool_context=None) -> str:
     """Delete a Gmail message."""
     validate_tool_context(tool_context, "gmail_delete_message")
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_delete_message", "delete", True, f"Message: {message_id}")
+        log_tool_execution(tool_context, "gmail_delete_message", "delete", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "deleting_message")
@@ -529,15 +602,20 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        # Move to trash
-        service.users().messages().trash(
-            userId='me',
-            id=message_id
-        ).execute()
+        # First try to use message_id directly (for actual Gmail IDs)
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            service.users().messages().trash(
+                userId='me',
+                id=actual_message_id
+            ).execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
         
         # Update session state
-        tool_context.session.state[EMAIL_LAST_DELETED] = message_id
-        tool_context.session.state[EMAIL_LAST_DELETED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_DELETED] = actual_message_id
+        tool_context.state[EMAIL_LAST_DELETED_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_delete_message", "delete", True, "Message moved to trash")
         return f"Message moved to trash"
@@ -610,9 +688,9 @@ def gmail_generate_email(to: str, subject_intent: str, email_intent: str,
         email_content = _process_with_ai(composition_requirements, "compose", style=style)
         
         # Update session state
-        tool_context.session.state[EMAIL_LAST_GENERATED_EMAIL] = email_content
-        tool_context.session.state[EMAIL_LAST_EMAIL_GENERATION_AT] = datetime.utcnow().isoformat()
-        tool_context.session.state[EMAIL_LAST_GENERATED_EMAIL_TO] = to
+        tool_context.state[EMAIL_LAST_GENERATED_EMAIL] = email_content
+        tool_context.state[EMAIL_LAST_EMAIL_GENERATION_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_GENERATED_EMAIL_TO] = to
         
         log_tool_execution(tool_context, "gmail_generate_email", "ai_compose_email", True, "Email composition completed")
         return email_content
@@ -628,17 +706,23 @@ def gmail_summarize_message(message_id: str, detail_level: str = "moderate", too
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_summarize_message", "ai_summarize", True, f"Message ID: {message_id}")
+        log_tool_execution(tool_context, "gmail_summarize_message", "ai_summarize", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "ai_summarizing_message")
         
-        # Get Gmail service and message
+        # Get Gmail service
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        
         body = _extract_message_body(message.get('payload', {}))
         
         if not body:
@@ -648,8 +732,8 @@ def gmail_summarize_message(message_id: str, detail_level: str = "moderate", too
         summary = _process_with_ai(body, "summarize")
         
         # Update session state using proper keys
-        tool_context.session.state[EMAIL_LAST_AI_SUMMARY] = summary
-        tool_context.session.state[EMAIL_LAST_AI_SUMMARY_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_AI_SUMMARY] = summary
+        tool_context.state[EMAIL_LAST_AI_SUMMARY_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_summarize_message", "ai_summarize", True, "AI summary completed")
         return summary
@@ -666,17 +750,24 @@ def gmail_analyze_sentiment(message_id: str, tool_context=None) -> str:
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_analyze_sentiment", "ai_sentiment", True, f"Message ID: {message_id}")
+        log_tool_execution(tool_context, "gmail_analyze_sentiment", "ai_sentiment", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "ai_analyzing_sentiment")
         
-        # Get Gmail service and message
+        # Get Gmail service
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        # First try to use message_id directly (for actual Gmail IDs)
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        
         body = _extract_message_body(message.get('payload', {}))
         
         if not body:
@@ -686,8 +777,8 @@ def gmail_analyze_sentiment(message_id: str, tool_context=None) -> str:
         analysis = _process_with_ai(body, "sentiment")
         
         # Update session state using proper keys
-        tool_context.session.state[EMAIL_LAST_SENTIMENT_ANALYSIS] = analysis
-        tool_context.session.state[EMAIL_LAST_SENTIMENT_ANALYSIS_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_SENTIMENT_ANALYSIS] = analysis
+        tool_context.state[EMAIL_LAST_SENTIMENT_ANALYSIS_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_analyze_sentiment", "ai_sentiment", True, "AI sentiment analysis completed")
         return analysis
@@ -704,17 +795,23 @@ def gmail_extract_action_items(message_id: str, tool_context=None) -> str:
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_extract_action_items", "ai_extract_tasks", True, f"Message ID: {message_id}")
+        log_tool_execution(tool_context, "gmail_extract_action_items", "ai_extract_tasks", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "ai_extracting_tasks")
         
-        # Get Gmail service and message
+        # Get Gmail service
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        
         body = _extract_message_body(message.get('payload', {}))
         
         if not body:
@@ -724,8 +821,8 @@ def gmail_extract_action_items(message_id: str, tool_context=None) -> str:
         tasks = _process_with_ai(body, "tasks")
         
         # Update session state using proper keys
-        tool_context.session.state[EMAIL_LAST_EXTRACTED_TASKS] = tasks
-        tool_context.session.state[EMAIL_LAST_TASK_EXTRACTION_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_EXTRACTED_TASKS] = tasks
+        tool_context.state[EMAIL_LAST_TASK_EXTRACTION_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_extract_action_items", "ai_extract_tasks", True, "AI task extraction completed")
         return tasks
@@ -742,17 +839,23 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", True, f"Message ID: {message_id}")
+        log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "ai_generating_reply")
         
-        # Get Gmail service and message
+        # Get Gmail service
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
-        message = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        try:
+            message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
+        except Exception as e:
+            return f"Could not find email with reference '{message_id}'. Please use 'list emails' first, then refer to emails by position (e.g., '1', '2') or sender name."
+        
         body = _extract_message_body(message.get('payload', {}))
         
         if not body:
@@ -762,8 +865,8 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
         reply = _process_with_ai(body, "reply", intent=reply_intent, style=style)
         
         # Update session state using proper keys
-        tool_context.session.state[EMAIL_LAST_GENERATED_REPLY] = reply
-        tool_context.session.state[EMAIL_LAST_REPLY_GENERATION_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_GENERATED_REPLY] = reply
+        tool_context.state[EMAIL_LAST_REPLY_GENERATION_AT] = datetime.utcnow().isoformat()
         
         log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", True, "AI reply generation completed")
         return reply
@@ -777,8 +880,105 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
 # Helper Functions
 # =============================================================================
 
-def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None):
-    """Parse AI-generated email content into subject and body components."""
+def _is_casual_content(body: str, subject: str) -> bool:
+    """Detect if email content appears casual and might benefit from professionalization."""
+    casual_indicators = [
+        # Informal greetings
+        'hey', 'hi there', 'sup', 'yo', 'hiya',
+        # Casual phrases
+        'just wanted to', 'real quick', 'btw', 'fyi', 'asap',
+        # Informal closings  
+        'thanks!', 'thx', 'cheers', 'later', 'talk soon',
+        # Casual punctuation patterns
+        '!!', '...', 'lol', 'haha',
+        # Informal contractions (more than normal business use)
+        "won't", "can't", "don't", "haven't", "we'll",
+    ]
+    
+    content_lower = (body + " " + subject).lower()
+    
+    # Count casual indicators
+    casual_count = sum(1 for indicator in casual_indicators if indicator in content_lower)
+    
+    # Also check for very short messages (likely casual)
+    is_very_short = len(body.strip()) < 50
+    
+    # Consider casual if multiple indicators or very short informal message
+    return casual_count >= 2 or (casual_count >= 1 and is_very_short)
+
+def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[str]:
+    """Get message ID by user reference (position, sender, subject partial match)."""
+    # Follow the same validation pattern as other functions
+    validate_tool_context(tool_context, "_get_message_id_by_reference")
+    
+    try:
+        # Log operation start (following your logging pattern)
+        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True, 
+                         f"Reference: '{reference}'")
+        
+        # Check if tool_context and state are available (following your safety pattern)
+        if not tool_context or not hasattr(tool_context, 'state'):
+            logger.warning("No tool context or state available for message ID lookup")
+            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False, 
+                             "No tool context or state available")
+            return None
+            
+        # Get stored message data from session state (using your session key constants)
+        message_index_map = tool_context.state.get(EMAIL_MESSAGE_INDEX_MAP, {})
+        last_listed_messages = tool_context.state.get(EMAIL_LAST_LISTED_MESSAGES, [])
+        
+        if not message_index_map or not last_listed_messages:
+            logger.warning("No message index map or listed messages found in session state")
+            log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False,
+                             "No message data in session state")
+            return None
+        
+        # Try to parse as position number (1, 2, 3, etc.)
+        try:
+            position = int(reference)
+            if str(position) in message_index_map:
+                resolved_id = message_index_map[str(position)]
+                logger.debug(f"Found message ID by position {position}: {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved position {position} to ID {resolved_id}")
+                return resolved_id
+        except ValueError:
+            pass  # Not a number, continue with other methods
+        
+        # Try to match by sender (partial match, case insensitive)
+        reference_lower = reference.lower()
+        for msg in last_listed_messages:
+            sender = msg.get('from', '').lower()
+            if reference_lower in sender:
+                resolved_id = msg.get('id')
+                logger.debug(f"Found message ID by sender match: {reference} -> {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved sender '{reference}' to ID {resolved_id}")
+                return resolved_id
+        
+        # Try to match by subject (partial match, case insensitive)
+        for msg in last_listed_messages:
+            subject = msg.get('subject', '').lower()
+            if reference_lower in subject:
+                resolved_id = msg.get('id')
+                logger.debug(f"Found message ID by subject match: {reference} -> {resolved_id}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved subject '{reference}' to ID {resolved_id}")
+                return resolved_id
+        
+        # No match found
+        logger.warning(f"Could not resolve message reference: {reference}")
+        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False,
+                         f"Could not resolve reference: {reference}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error resolving message reference '{reference}': {e}")
+        log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", False, str(e))
+        return None
+
+def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None) -> str:
+    """Parse AI-generated email content into subject and body components and return formatted result."""
     validate_tool_context(tool_context, "gmail_parse_email_content")
     
     try:
@@ -809,15 +1009,18 @@ def gmail_parse_subject_and_body(ai_generated_content: str, tool_context=None):
         # Clean up subject and body
         subject = subject.strip('"\'')  # Remove quotes if present
         
+        # Return parsed content as formatted string instead of tuple
+        parsed_result = f"PARSED_SUBJECT: {subject}\nPARSED_BODY: {body}"
+        
         log_tool_execution(tool_context, "gmail_parse_subject_and_body", "parse_content", True, 
                          f"Parsed - Subject: '{subject[:50]}...', Body length: {len(body)}")
         
-        return subject, body
+        return parsed_result
         
     except Exception as e:
         logger.error(f"Error parsing AI content: {e}")
         log_tool_execution(tool_context, "gmail_parse_subject_and_body", "parse_content", False, str(e))
-        return "Email Subject", ai_generated_content  # Fallback
+        return f"PARSED_SUBJECT: Email Subject\nPARSED_BODY: {ai_generated_content}"  # Fallback
 
 
 def _extract_message_body(payload: Dict[str, Any]) -> str:
@@ -826,15 +1029,15 @@ def _extract_message_body(payload: Dict[str, Any]) -> str:
         # Handle multipart messages
         if 'parts' in payload:
             for part in payload['parts']:
-                if part['mimeType'] == 'text/plain':
-                    data = part['body'].get('data', '')
+                if part.get('mimeType') == 'text/plain':  # Added .get() for safety
+                    data = part.get('body', {}).get('data', '')
                     if data:
                         import base64
                         return base64.urlsafe_b64decode(data).decode('utf-8')
         
         # Handle single part messages
-        elif payload['mimeType'] == 'text/plain':
-            data = payload['body'].get('data', '')
+        elif payload.get('mimeType') == 'text/plain':  # Added .get() for safety
+            data = payload.get('body', {}).get('data', '')
             if data:
                 import base64
                 return base64.urlsafe_b64decode(data).decode('utf-8')

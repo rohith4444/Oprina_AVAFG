@@ -25,6 +25,8 @@ EMAIL_LAST_QUERY = "email:last_query"
 EMAIL_RESULTS_COUNT = "email:results_count"
 EMAIL_LAST_SENT_TO = "email:last_sent_to"
 
+EMAIL_MESSAGE_INDEX_MAP = "email:message_index_map"  # Maps position to message_id
+EMAIL_LAST_LISTED_MESSAGES = "email:last_listed_messages"  # Full message data with IDs
 # Email message operations
 EMAIL_LAST_MESSAGE_VIEWED = "email:last_message_viewed"
 EMAIL_LAST_MESSAGE_VIEWED_AT = "email:last_message_viewed_at"
@@ -79,3 +81,26 @@ CALENDAR_LAST_EVENT_UPDATED_AT = "calendar:last_event_updated_at"
 CALENDAR_LAST_DELETED_EVENT = "calendar:last_deleted_event"
 CALENDAR_LAST_DELETED_ID = "calendar:last_deleted_id"            # NEW
 CALENDAR_LAST_DELETED_AT = "calendar:last_deleted_at"            # NEW
+
+# =============================================================================
+# Cross-Agent Workflow Keys
+# =============================================================================
+
+# Workflow management
+ACTIVE_WORKFLOW = "workflow:active"
+WORKFLOW_HISTORY = "workflow:history"
+LAST_AGENT_TRANSFER = "workflow:last_transfer"
+
+# Meeting coordination workflows
+MEETING_COORDINATION_ACTIVE = "workflow:meeting_coordination"
+MEETING_INVITES_PENDING = "workflow:meeting_invites"
+MEETING_CONFLICTS_FOUND = "workflow:meeting_conflicts"
+
+# Email processing workflows  
+EMAIL_PROCESSING_BATCH = "workflow:email_batch"
+EMAIL_DEADLINES_FOUND = "workflow:email_deadlines"
+EMAIL_FOLLOW_UPS_NEEDED = "workflow:email_followups"
+
+# Calendar integration workflows
+CALENDAR_EMAIL_SYNC = "workflow:calendar_email_sync"
+AVAILABILITY_CHECK_RESULTS = "workflow:availability_results"
