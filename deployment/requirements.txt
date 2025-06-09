@@ -1,31 +1,17 @@
-# Core ADK and Google AI
-google-adk 
-google-genai 
-
-# Google API integration
-google-api-python-client 
+google-adk==0.5.0
+google-genai==1.17.0
+google-cloud-aiplatform==1.95.0
 google-auth 
-google-auth-httplib2 
-google-auth-oauthlib 
-
-# Google Cloud services
-google-cloud-aiplatform 
-google-cloud-core 
-google-cloud-secret-manager
-
-# Web framework (if using web interface)
+python-dotenv
+pydantic
 fastapi 
-uvicorn
+uvicorn 
+cloudpickle==3.1.1
 
-# Configuration and utilities
-python-dotenv 
-pydantic 
-requests
-absl-py
 
-# Date/time handling
-python-dateutil 
 
-# OAuth and security
-oauthlib 
-cryptography
+
+
+
+
+

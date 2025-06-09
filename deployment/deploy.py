@@ -11,7 +11,7 @@ from vertexai.preview.reasoning_engines import AdkApp
 # Add the parent directory to sys.path to import oprina
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from oprina.agent import root_agent
-from oprina.config import get_config, validate_deployment_config
+from oprina.config import get_config
 
 
 def load_requirements():
@@ -34,7 +34,7 @@ def load_requirements():
     return requirements
 
 
-def create_deployment() -> str:
+def create_deployment(config: dict) -> str:
     """Creates a new Agent Engine deployment."""
     print("Creating Oprina deployment...")
     
@@ -43,8 +43,6 @@ def create_deployment() -> str:
     if not requirements:
         print("No requirements found. Cannot proceed with deployment.")
         return None
-    
-    config = get_config()
     
     # Prepare environment variables for deployment
     env_vars = {
@@ -72,7 +70,7 @@ def create_deployment() -> str:
         description="Multimodal voice-enabled Gmail and Calendar assistant",
         requirements=requirements,
         extra_packages=[
-            "../oprina",  # The main package
+            "../oprina_dep",  # The main package
         ],
     )
     
@@ -125,16 +123,7 @@ def main():
     if command == "help" or command == "--help" or command == "-h":
         print_usage()
         return
-    
-    # Validate deployment configuration
-    if not validate_deployment_config():
-        print("Deployment configuration validation failed!")
-        print("Please check your .env file has all required variables:")
-        print("  - GOOGLE_CLOUD_PROJECT")
-        print("  - GOOGLE_CLOUD_LOCATION")
-        print("  - GOOGLE_CLOUD_STORAGE_BUCKET")
-        return
-    
+
     config = get_config()
     
     # Initialize Vertex AI
@@ -150,7 +139,7 @@ def main():
     
     # Execute command
     if command == "create":
-        create_deployment()
+        create_deployment(config)
     
     elif command == "delete":
         if len(sys.argv) < 3:
