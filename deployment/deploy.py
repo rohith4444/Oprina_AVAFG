@@ -9,7 +9,7 @@ from vertexai import agent_engines
 from vertexai.preview.reasoning_engines import AdkApp
 
 # Add the parent directory to sys.path to import oprina
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 from oprina.agent import root_agent
 from oprina.config import get_config
 
@@ -69,9 +69,6 @@ def create_deployment(config: dict) -> str:
         display_name="Oprina-Voice-Assistant",
         description="Multimodal voice-enabled Gmail and Calendar assistant",
         requirements=requirements,
-        extra_packages=[
-            "../oprina_dep",  # The main package
-        ],
     )
     
     print(f"Created remote agent: {remote_agent.resource_name}")
@@ -111,7 +108,6 @@ def print_usage():
 
 def main():
     """Main function to handle deployment operations."""
-    load_dotenv()
     
     # Check command line arguments
     if len(sys.argv) < 2:
