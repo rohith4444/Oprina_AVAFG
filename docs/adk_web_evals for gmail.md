@@ -54,3 +54,23 @@ ai processing tools- all are working well but not tested analyze sentiment and e
 -----------------------------------------------------------------------------------
 
 Need to work reply tools and test scenarios jsut few where multiple tools required and cross agent ones. Thats it.
+
+
+-------------------------------------------------------------------------------------------
+
+Complete Testing Workflow:
+bash# 1. Test locally first
+adk run oprina
+# Try: "Hello" and "What can you help me with?"
+
+# 2. Test with web UI
+adk web
+# Same tests in browser interface
+
+# 3. Deploy when local works
+cd deployment/
+python deploy.py create
+# SAVE THE RESOURCE ID from output!
+
+# 4. Test deployed version
+python test_deployment.py <RESOURCE_ID_FROM_STEP_3>
