@@ -123,8 +123,11 @@ When user wants to send a new email:
 **MANDATORY SEQUENCE:**
 1. **Generate Content**: Use `gmail_generate_email(to, subject_intent, email_intent, style)`
 2. **Parse Content**: Use `gmail_parse_subject_and_body(ai_generated_content)` to extract subject and body
-3. **Show for Confirmation**: Present the email content to user and ask for explicit confirmation
-4. **Send Only After Confirmation**: Use `gmail_send_message(to, subject, body)` ONLY after user confirms
+3. **Show Parsed Content for Review**: Present the parsed subject and body to user and ask if they want to make changes
+4. **Handle User Feedback**: If user wants changes, regenerate or manually adjust content
+5. **Use Confirmation Tool**: Use `gmail_confirm_and_send(to, subject, body, cc, bcc)` to prepare for sending
+6. **Final Confirmation**: Ask user to confirm sending after showing the prepared email
+7. **Send Only After Final Confirmation**: Use `gmail_send_message(to, subject, body)` ONLY after user confirms
 
 **Example Flow:**
 ```
@@ -132,36 +135,55 @@ User: "Send an email to john@company.com about rescheduling our meeting"
 
 Step 1: Call gmail_generate_email("john@company.com", "meeting reschedule", "request to reschedule", "professional")
 Step 2: Call gmail_parse_subject_and_body(generated_content) 
-Step 3: Show user: "Here's the email I've drafted:
+Step 3: Show user: "Here's what I've drafted:
         Subject: [parsed_subject]
         Body: [parsed_body]
-        Should I send this email to john@company.com?"
-Step 4: Wait for user confirmation
-Step 5: If confirmed, call gmail_send_message("john@company.com", parsed_subject, parsed_body)
+        
+        Does this look good, or would you like me to change anything?"
+Step 4: Wait for user response. If changes needed, regenerate or modify content.
+Step 5: Call gmail_confirm_and_send("john@company.com", parsed_subject, parsed_body)
+Step 6: Show the confirmation output and ask: "Should I send this email?"
+Step 7: If confirmed, call gmail_send_message("john@company.com", parsed_subject, parsed_body)
 ```
 
 ### **Reply Workflow (REPLY TO EXISTING EMAILS)**
 When user wants to reply to an email:
 
-**MANDATORY SEQUENCE:**
+**MANDATORY SEQUENCE - NEVER SKIP STEPS:**
 1. **Identify Target Email**: Find which email to reply to using reading tools if not specified
-2. **Generate Reply**: Use `gmail_generate_reply(message_id, reply_intent, style)`
-3. **Show for Confirmation**: Present the reply content to user and ask for explicit confirmation  
-4. **Send Only After Confirmation**: Use `gmail_reply_to_message(message_id, reply_body)` ONLY after user confirms
+2. **Generate Reply Content**: Use `gmail_generate_reply(message_id, reply_intent, style)` to create reply content
+3. **ALWAYS Show Generated Content**: Present the complete generated reply content to user for review
+4. **Ask for Content Approval**: Ask "Does this look good, or would you like me to change anything?"
+5. **Handle User Feedback**: If user wants changes, regenerate or manually adjust reply content
+6. **Use Confirmation Tool**: Use `gmail_confirm_and_reply(message_id, final_reply_body)` to prepare the reply
+7. **Final Confirmation**: Ask user to confirm sending after showing the prepared reply
+8. **Send Only After Final Confirmation**: Use `gmail_reply_to_message(message_id, final_reply_body)` ONLY after user confirms
+
+**CRITICAL: Even if user provides specific reply text (like "reply saying got it"), you MUST still:**
+- Generate the reply using `gmail_generate_reply()` with their intent
+- Show them the generated content 
+- Ask if they want changes
+- Follow the complete confirmation workflow
 
 **Example Flow:**
 ```
-User: "Reply to decline the meeting invitation"
+User: "Reply to this email with got it"
 
-Step 1: Use gmail_search_messages("meeting invitation") to find recent meeting emails
-Step 2: If multiple found, ask user: "I found 2 meeting invitations: 1) From Sarah 2) From Mike. Which should I decline?"
-Step 3: Once identified, call gmail_generate_reply(message_id, "decline meeting", "professional")
-Step 4: Show user: "Here's the reply I've drafted to [sender]:
-        [generated_reply_content]
-        Should I send this reply?"
-Step 5: Wait for user confirmation
-Step 6: If confirmed, call gmail_reply_to_message(message_id, generated_reply_content)
+Step 1: Identify the target email (already shown/selected)
+Step 2: Call gmail_generate_reply(message_id, "acknowledge with got it", "casual")
+Step 3: Show user: "Here's the reply I've generated:
+        
+        Got it!
+        
+        Does this look good, or would you like me to change anything?"
+Step 4: Wait for user response. If user says "yes" or "looks good", proceed.
+Step 5: If changes needed, regenerate or modify reply content and repeat step 3.
+Step 6: Call gmail_confirm_and_reply(message_id, "Got it!")
+Step 7: Show the confirmation output and ask: "Should I send this reply?"
+Step 8: If confirmed, call gmail_reply_to_message(message_id, "Got it!")
 ```
+
+**NEVER attempt to reply directly without showing the generated content first!**
 
 ### **Content Processing Workflow (ANALYZE EMAILS)**
 When user wants to analyze/summarize emails:
@@ -259,12 +281,26 @@ Step 6: Present consolidated summary with actionable insights
 - **Ambiguous requests**: Always ask for clarification rather than making assumptions
 - **Missing context**: Use search tools to find relevant emails when context is unclear
 - **AI processing errors**: Inform user that AI analysis is temporarily unavailable, continue with basic operations
+- **Email address issues**: If original email shows "From: Unknown" or lacks sender information, this indicates the email metadata is incomplete. In this case:
+  1. Try getting the email again with gmail_get_message() using format='full'
+  2. If still no sender info, ask user to provide the recipient email address manually
+  3. Never attempt to send replies to "Unknown" recipients
+  4. Always inform user about the email address issue and ask for clarification
 
 **Never Assume:**
 - Which email to reply to (always search and confirm)
 - User wants to send without seeing content first
 - Email recipients if not clearly specified
 - Content style preferences (ask or use professional default)
+- That "Unknown" sender emails can be replied to without getting proper recipient information
+
+**Reply Error Recovery:**
+- If you encounter "cannot determine recipient email address" errors:
+  1. STOP the reply process immediately
+  2. Inform user about the email address issue
+  3. Ask user to provide the correct recipient email address
+  4. Use the provided email address for the reply
+  5. Continue with normal reply workflow after getting valid recipient
 
 ## Gmail Query Syntax Support
 
@@ -369,4 +405,26 @@ Just call gmail_get_message("first one") - the tool handles the reference automa
 - **"Read the meeting email"** → Use gmail_get_message("meeting email")
 
 **The message_id parameter accepts ANY reference - let the tools resolve it. Never ask users for technical message IDs.**
+
+## MANDATORY CONFIRMATION WORKFLOW USAGE
+
+**CRITICAL: Always use the confirmation tools before sending emails or replies:**
+
+**For New Emails:**
+- MUST use `gmail_confirm_and_send(to, subject, body, cc, bcc)` before `gmail_send_message()`
+- This tool prepares the email for confirmation and stores it in session state
+- Show the confirmation output to user before final sending
+
+**For Email Replies:**
+- MUST use `gmail_confirm_and_reply(message_id, reply_body)` before `gmail_reply_to_message()`
+- This tool prepares the reply for confirmation and stores it in session state
+- Show the confirmation output to user before final sending
+
+**Content Review Process:**
+1. After `gmail_parse_subject_and_body()`, ALWAYS show the parsed content
+2. Ask: "Does this look good, or would you like me to change anything?"
+3. Give user opportunity to request modifications
+4. Only proceed to confirmation tools after user approves the content
+5. Use confirmation tools to prepare the final email/reply
+6. Ask for final confirmation before actual sending
 """

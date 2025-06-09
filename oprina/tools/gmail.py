@@ -259,7 +259,7 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         try:
             message = service.users().messages().get(
                 userId='me', 
-                id=actual_message_id, 
+                    id=actual_message_id, 
                 format='full'
             ).execute()
         except Exception as e:
@@ -629,7 +629,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         try:
             original = service.users().messages().get(
                 userId='me', 
-                id=actual_message_id, 
+                    id=actual_message_id, 
                 format='full'
             ).execute()
         except Exception as e:
@@ -647,12 +647,32 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         if not subject.lower().startswith('re:'):
             subject = 'Re: ' + subject
         
+        # Validate and clean up the from_email address
+        if not from_email:
+            return "Error: Could not determine recipient email address from the original message."
+        
+        # Extract just the email address if it's in "Name <email>" format
+        import re
+        email_match = re.search(r'<([^>]+)>', from_email)
+        if email_match:
+            clean_email = email_match.group(1).strip()
+        else:
+            # If no angle brackets, use the whole string but clean it
+            clean_email = from_email.strip()
+        
+        # Validate email format
+        email_pattern = r'^[^@]+@[^@]+\.[^@]+$'
+        if not re.match(email_pattern, clean_email):
+            return f"Error: Invalid email address format found: '{clean_email}'. Please check the original message."
+        
+        logger.info(f"REPLY: Replying to email: {clean_email}")
+        
         # Create reply
         from email.mime.text import MIMEText
         import base64
         
         message = MIMEText(reply_body)
-        message['to'] = from_email
+        message['to'] = clean_email
         message['subject'] = subject
         message['In-Reply-To'] = headers.get('Message-ID', '')
         message['References'] = headers.get('Message-ID', '')
@@ -666,12 +686,12 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         
         # Update session state
         tool_context.state[EMAIL_LAST_REPLY_SENT] = datetime.utcnow().isoformat()
-        tool_context.state[EMAIL_LAST_REPLY_TO] = from_email
+        tool_context.state[EMAIL_LAST_REPLY_TO] = clean_email
         tool_context.state[EMAIL_LAST_REPLY_ID] = sent_reply.get('id', '')
         tool_context.state[EMAIL_LAST_REPLY_THREAD] = thread_id
         
-        log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", True, f"Reply sent to {from_email}")
-        return f"Reply sent to {from_email}"
+        log_tool_execution(tool_context, "gmail_reply_to_message", "reply_message", True, f"Reply sent to {clean_email}")
+        return f"Reply sent to {clean_email}"
         
     except Exception as e:
         logger.error(f"Error replying to message {message_id}: {e}")
@@ -732,7 +752,7 @@ def gmail_confirm_and_reply(message_id: str, reply_body: str, tool_context=None)
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
-        
+            
         # Resolve message ID using the helper function    
         actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
         
@@ -801,7 +821,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().modify(
                 userId='me',
-                id=actual_message_id,
+                    id=actual_message_id,
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
         except Exception as e:
@@ -845,7 +865,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().modify(
                 userId='me',
-                id=actual_message_id,
+                    id=actual_message_id,
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
         except Exception as e:
@@ -888,7 +908,7 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().trash(
                 userId='me',
-                id=actual_message_id
+                    id=actual_message_id
             ).execute()
         except Exception as e:
             if message_id.isdigit():
