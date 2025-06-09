@@ -59,6 +59,65 @@ EMAIL_LAST_GENERATED_EMAIL = "email:last_generated_email"
 EMAIL_LAST_EMAIL_GENERATION_AT = "email:last_email_generation_at"
 EMAIL_LAST_GENERATED_EMAIL_TO = "email:last_generated_email_to"
 
+# Draft management
+EMAIL_LAST_DRAFT_CREATED = "email:last_draft_created"
+EMAIL_LAST_DRAFT_CREATED_AT = "email:last_draft_created_at"
+EMAIL_DRAFTS_COUNT = "email:drafts_count"
+EMAIL_LAST_DRAFTS_FETCH = "email:last_drafts_fetch"
+EMAIL_LAST_DRAFT_SENT = "email:last_draft_sent"
+EMAIL_LAST_DRAFT_SENT_AT = "email:last_draft_sent_at"
+EMAIL_LAST_SENT_MESSAGE_ID = "email:last_sent_message_id"
+EMAIL_LAST_DRAFT_DELETED = "email:last_draft_deleted"
+EMAIL_LAST_DRAFT_DELETED_AT = "email:last_draft_deleted_at"
+
+# Label management
+EMAIL_LABELS_COUNT = "email:labels_count"
+EMAIL_LAST_LABELS_FETCH = "email:last_labels_fetch"
+EMAIL_LAST_LABEL_CREATED = "email:last_label_created"
+EMAIL_LAST_LABEL_CREATED_AT = "email:last_label_created_at"
+EMAIL_LAST_LABEL_CREATED_NAME = "email:last_label_created_name"
+EMAIL_LAST_LABEL_APPLIED = "email:last_label_applied"
+EMAIL_LAST_LABEL_APPLIED_AT = "email:last_label_applied_at"
+EMAIL_LAST_LABEL_APPLIED_TO = "email:last_label_applied_to"
+EMAIL_LAST_LABEL_REMOVED = "email:last_label_removed"
+EMAIL_LAST_LABEL_REMOVED_AT = "email:last_label_removed_at"
+EMAIL_LAST_LABEL_REMOVED_FROM = "email:last_label_removed_from"
+
+# Enhanced status management
+EMAIL_LAST_STARRED = "email:last_starred"
+EMAIL_LAST_STARRED_AT = "email:last_starred_at"
+EMAIL_LAST_UNSTARRED = "email:last_unstarred"
+EMAIL_LAST_UNSTARRED_AT = "email:last_unstarred_at"
+EMAIL_LAST_MARKED_IMPORTANT = "email:last_marked_important"
+EMAIL_LAST_MARKED_IMPORTANT_AT = "email:last_marked_important_at"
+EMAIL_LAST_MARKED_NOT_IMPORTANT = "email:last_marked_not_important"
+EMAIL_LAST_MARKED_NOT_IMPORTANT_AT = "email:last_marked_not_important_at"
+
+# Spam management
+EMAIL_LAST_MARKED_SPAM = "email:last_marked_spam"
+EMAIL_LAST_MARKED_SPAM_AT = "email:last_marked_spam_at"
+EMAIL_LAST_UNMARKED_SPAM = "email:last_unmarked_spam"
+EMAIL_LAST_UNMARKED_SPAM_AT = "email:last_unmarked_spam_at"
+
+# Thread management
+EMAIL_LAST_THREAD_VIEWED = "email:last_thread_viewed"
+EMAIL_LAST_THREAD_VIEWED_AT = "email:last_thread_viewed_at"
+EMAIL_LAST_THREAD_MESSAGE_COUNT = "email:last_thread_message_count"
+EMAIL_LAST_THREAD_MODIFIED = "email:last_thread_modified"
+EMAIL_LAST_THREAD_MODIFIED_AT = "email:last_thread_modified_at"
+
+# Attachment management
+EMAIL_LAST_ATTACHMENTS_LISTED = "email:last_attachments_listed"
+EMAIL_LAST_ATTACHMENTS_COUNT = "email:last_attachments_count"
+EMAIL_LAST_ATTACHMENTS_DATA = "email:last_attachments_data"
+
+# User profile
+EMAIL_USER_EMAIL = "email:user_email"
+EMAIL_PROFILE_FETCHED_AT = "email:profile_fetched_at"
+EMAIL_MESSAGES_TOTAL = "email:messages_total"
+EMAIL_THREADS_TOTAL = "email:threads_total"
+EMAIL_LAST_MESSAGE_ID = "email:last_message_id"
+
 # =============================================================================
 # Calendar State (current conversation)
 # =============================================================================

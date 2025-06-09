@@ -50,7 +50,32 @@ from oprina.common.session_keys import (
     EMAIL_PENDING_SEND, EMAIL_PENDING_REPLY,
     EMAIL_LAST_GENERATED_EMAIL, EMAIL_LAST_EMAIL_GENERATION_AT, EMAIL_LAST_GENERATED_EMAIL_TO,
     EMAIL_LAST_LISTED_MESSAGES, EMAIL_MESSAGE_INDEX_MAP,
-    EMAIL_LAST_SINGLE_RESULT
+    EMAIL_LAST_SINGLE_RESULT,
+    EMAIL_LAST_DRAFT_CREATED, EMAIL_LAST_DRAFT_CREATED_AT,
+    EMAIL_DRAFTS_COUNT, EMAIL_LAST_DRAFTS_FETCH,
+    EMAIL_LAST_DRAFT_SENT, EMAIL_LAST_DRAFT_SENT_AT,
+    EMAIL_LAST_SENT_MESSAGE_ID,
+    EMAIL_LAST_DRAFT_DELETED, EMAIL_LAST_DRAFT_DELETED_AT,
+    EMAIL_LABELS_COUNT, EMAIL_LAST_LABELS_FETCH,
+    EMAIL_LAST_LABEL_CREATED, EMAIL_LAST_LABEL_CREATED_AT,
+    EMAIL_LAST_LABEL_CREATED_NAME,
+    EMAIL_LAST_LABEL_APPLIED, EMAIL_LAST_LABEL_APPLIED_AT,
+    EMAIL_LAST_LABEL_APPLIED_TO,
+    EMAIL_LAST_LABEL_REMOVED, EMAIL_LAST_LABEL_REMOVED_AT,
+    EMAIL_LAST_LABEL_REMOVED_FROM,
+    EMAIL_LAST_STARRED, EMAIL_LAST_STARRED_AT,
+    EMAIL_LAST_UNSTARRED, EMAIL_LAST_UNSTARRED_AT,
+    EMAIL_LAST_MARKED_IMPORTANT, EMAIL_LAST_MARKED_IMPORTANT_AT,
+    EMAIL_LAST_MARKED_NOT_IMPORTANT, EMAIL_LAST_MARKED_NOT_IMPORTANT_AT,
+    EMAIL_LAST_MARKED_SPAM, EMAIL_LAST_MARKED_SPAM_AT,
+    EMAIL_LAST_UNMARKED_SPAM, EMAIL_LAST_UNMARKED_SPAM_AT,
+    EMAIL_LAST_THREAD_VIEWED, EMAIL_LAST_THREAD_VIEWED_AT,
+    EMAIL_LAST_THREAD_MESSAGE_COUNT,
+    EMAIL_LAST_THREAD_MODIFIED, EMAIL_LAST_THREAD_MODIFIED_AT,
+    EMAIL_LAST_ATTACHMENTS_LISTED, EMAIL_LAST_ATTACHMENTS_COUNT,
+    EMAIL_LAST_ATTACHMENTS_DATA,
+    EMAIL_USER_EMAIL, EMAIL_PROFILE_FETCHED_AT, EMAIL_MESSAGES_TOTAL,
+    EMAIL_THREADS_TOTAL, EMAIL_LAST_MESSAGE_ID
 )
 
 logger = setup_logger("gmail_tools", console_output=True)
@@ -259,7 +284,7 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         try:
             message = service.users().messages().get(
                 userId='me', 
-                    id=actual_message_id, 
+                        id=actual_message_id, 
                 format='full'
             ).execute()
         except Exception as e:
@@ -629,7 +654,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         try:
             original = service.users().messages().get(
                 userId='me', 
-                    id=actual_message_id, 
+                        id=actual_message_id, 
                 format='full'
             ).execute()
         except Exception as e:
@@ -821,7 +846,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().modify(
                 userId='me',
-                    id=actual_message_id,
+                        id=actual_message_id,
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
         except Exception as e:
@@ -865,7 +890,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().modify(
                 userId='me',
-                    id=actual_message_id,
+                        id=actual_message_id,
                 body={'removeLabelIds': ['INBOX']}
             ).execute()
         except Exception as e:
@@ -908,7 +933,7 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().trash(
                 userId='me',
-                    id=actual_message_id
+                        id=actual_message_id
             ).execute()
         except Exception as e:
             if message_id.isdigit():
@@ -1190,6 +1215,923 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
         logger.error(f"Error generating reply for message {message_id}: {e}")
         log_tool_execution(tool_context, "gmail_generate_reply", "ai_generate_reply", False, str(e))
         return f"Error generating reply: {str(e)}"
+    
+    
+# =============================================================================
+# Gmail Draft Management Tools
+# =============================================================================
+
+def gmail_create_draft(to: str, subject: str, body: str, cc: str = "", bcc: str = "", tool_context=None) -> str:
+    """Create a new Gmail draft."""
+    validate_tool_context(tool_context, "gmail_create_draft")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_create_draft", "create_draft", True, 
+                         f"To: {to}, Subject: '{subject}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "creating_draft")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Create draft message
+        from email.mime.text import MIMEText
+        import base64
+        
+        message = MIMEText(body)
+        message['to'] = to
+        message['subject'] = subject
+        if cc:
+            message['cc'] = cc
+        if bcc:
+            message['bcc'] = bcc
+        
+        # Create draft
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        draft = service.users().drafts().create(
+            userId='me',
+            body={'message': {'raw': raw_message}}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_DRAFT_CREATED] = draft.get('id', '')
+        tool_context.state[EMAIL_LAST_DRAFT_CREATED_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_create_draft", "create_draft", True, f"Draft created with ID {draft.get('id', '')}")
+        return f"Draft created successfully. Draft ID: {draft.get('id', '')}"
+        
+    except Exception as e:
+        logger.error(f"Error creating draft: {e}")
+        log_tool_execution(tool_context, "gmail_create_draft", "create_draft", False, str(e))
+        return f"Error creating draft: {str(e)}"
+
+def gmail_list_drafts(max_results: int = 10, tool_context=None) -> str:
+    """List Gmail drafts."""
+    validate_tool_context(tool_context, "gmail_list_drafts")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_list_drafts", "list_drafts", True, f"Max results: {max_results}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "listing_drafts")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Get drafts
+        result = service.users().drafts().list(userId='me', maxResults=max_results).execute()
+        drafts = result.get('drafts', [])
+        
+        if not drafts:
+            tool_context.state[EMAIL_DRAFTS_COUNT] = 0
+            log_tool_execution(tool_context, "gmail_list_drafts", "list_drafts", True, "No drafts found")
+            return "You have no drafts in your Gmail account."
+        
+        # Get detailed info for each draft
+        draft_summaries = []
+        for draft in drafts:
+            try:
+                draft_data = service.users().drafts().get(userId='me', id=draft['id']).execute()
+                message = draft_data.get('message', {})
+                headers = {h['name']: h['value'] for h in message.get('payload', {}).get('headers', [])}
+                
+                summary = {
+                    "id": draft['id'],
+                    "to": headers.get('To', 'No recipient'),
+                    "subject": headers.get('Subject', 'No Subject'),
+                    "date": headers.get('Date', 'Unknown')
+                }
+                draft_summaries.append(summary)
+                
+            except Exception as e:
+                logger.error(f"Error getting draft details {draft['id']}: {e}")
+                continue
+        
+        # Update session state
+        tool_context.state[EMAIL_DRAFTS_COUNT] = len(draft_summaries)
+        tool_context.state[EMAIL_LAST_DRAFTS_FETCH] = datetime.utcnow().isoformat()
+        
+        # Format response
+        response_lines = [f"You have {len(draft_summaries)} draft(s):"]
+        response_lines.append("")
+        
+        for i, draft in enumerate(draft_summaries, 1):
+            to_display = draft['to'][:40] + "..." if len(draft['to']) > 40 else draft['to']
+            subject_display = draft['subject'][:50] + "..." if len(draft['subject']) > 50 else draft['subject']
+            response_lines.append(f"{i}. To: {to_display} | Subject: {subject_display}")
+        
+        log_tool_execution(tool_context, "gmail_list_drafts", "list_drafts", True, f"Retrieved {len(draft_summaries)} drafts")
+        return "\n".join(response_lines)
+        
+    except Exception as e:
+        logger.error(f"Error listing drafts: {e}")
+        log_tool_execution(tool_context, "gmail_list_drafts", "list_drafts", False, str(e))
+        return f"Error retrieving drafts: {str(e)}"
+
+def gmail_send_draft(draft_id: str, tool_context=None) -> str:
+    """Send a Gmail draft."""
+    validate_tool_context(tool_context, "gmail_send_draft")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_send_draft", "send_draft", True, f"Draft ID: {draft_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "sending_draft")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Send draft
+        sent_message = service.users().drafts().send(
+            userId='me',
+            body={'id': draft_id}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_DRAFT_SENT] = draft_id
+        tool_context.state[EMAIL_LAST_DRAFT_SENT_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_SENT_MESSAGE_ID] = sent_message.get('id', '')
+        
+        log_tool_execution(tool_context, "gmail_send_draft", "send_draft", True, f"Draft {draft_id} sent successfully")
+        return f"Draft sent successfully. Message ID: {sent_message.get('id', '')}"
+        
+    except Exception as e:
+        logger.error(f"Error sending draft {draft_id}: {e}")
+        log_tool_execution(tool_context, "gmail_send_draft", "send_draft", False, str(e))
+        return f"Error sending draft: {str(e)}"
+
+def gmail_delete_draft(draft_id: str, tool_context=None) -> str:
+    """Delete a Gmail draft."""
+    validate_tool_context(tool_context, "gmail_delete_draft")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_delete_draft", "delete_draft", True, f"Draft ID: {draft_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "deleting_draft")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Delete draft
+        service.users().drafts().delete(userId='me', id=draft_id).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_DRAFT_DELETED] = draft_id
+        tool_context.state[EMAIL_LAST_DRAFT_DELETED_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_delete_draft", "delete_draft", True, f"Draft {draft_id} deleted")
+        return f"Draft deleted successfully"
+        
+    except Exception as e:
+        logger.error(f"Error deleting draft {draft_id}: {e}")
+        log_tool_execution(tool_context, "gmail_delete_draft", "delete_draft", False, str(e))
+        return f"Error deleting draft: {str(e)}"
+
+# =============================================================================
+# Gmail Label Management Tools
+# =============================================================================
+
+def gmail_list_labels(tool_context=None) -> str:
+    """List all Gmail labels."""
+    validate_tool_context(tool_context, "gmail_list_labels")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_list_labels", "list_labels", True, "Retrieving labels")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "listing_labels")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Get labels
+        result = service.users().labels().list(userId='me').execute()
+        labels = result.get('labels', [])
+        
+        if not labels:
+            log_tool_execution(tool_context, "gmail_list_labels", "list_labels", True, "No labels found")
+            return "No labels found in your Gmail account."
+        
+        # Separate system and user labels
+        system_labels = []
+        user_labels = []
+        
+        for label in labels:
+            if label.get('type') == 'system':
+                system_labels.append(label)
+            else:
+                user_labels.append(label)
+        
+        # Update session state
+        tool_context.state[EMAIL_LABELS_COUNT] = len(labels)
+        tool_context.state[EMAIL_LAST_LABELS_FETCH] = datetime.utcnow().isoformat()
+        
+        # Format response
+        response_lines = [f"Gmail Labels ({len(labels)} total):"]
+        response_lines.append("")
+        
+        if system_labels:
+            response_lines.append("System Labels:")
+            for label in system_labels:
+                response_lines.append(f"  • {label['name']} (ID: {label['id']})")
+            response_lines.append("")
+        
+        if user_labels:
+            response_lines.append("Custom Labels:")
+            for label in user_labels:
+                response_lines.append(f"  • {label['name']} (ID: {label['id']})")
+        
+        log_tool_execution(tool_context, "gmail_list_labels", "list_labels", True, f"Retrieved {len(labels)} labels")
+        return "\n".join(response_lines)
+        
+    except Exception as e:
+        logger.error(f"Error listing labels: {e}")
+        log_tool_execution(tool_context, "gmail_list_labels", "list_labels", False, str(e))
+        return f"Error retrieving labels: {str(e)}"
+
+def gmail_create_label(label_name: str, tool_context=None) -> str:
+    """Create a new Gmail label."""
+    validate_tool_context(tool_context, "gmail_create_label")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_create_label", "create_label", True, f"Label name: '{label_name}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "creating_label")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Create label
+        label_object = {
+            'name': label_name,
+            'labelListVisibility': 'labelShow',
+            'messageListVisibility': 'show'
+        }
+        
+        created_label = service.users().labels().create(
+            userId='me',
+            body=label_object
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_LABEL_CREATED] = created_label.get('id', '')
+        tool_context.state[EMAIL_LAST_LABEL_CREATED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_LABEL_CREATED_NAME] = label_name
+        
+        log_tool_execution(tool_context, "gmail_create_label", "create_label", True, f"Label '{label_name}' created with ID {created_label.get('id', '')}")
+        return f"Label '{label_name}' created successfully. Label ID: {created_label.get('id', '')}"
+        
+    except Exception as e:
+        logger.error(f"Error creating label '{label_name}': {e}")
+        log_tool_execution(tool_context, "gmail_create_label", "create_label", False, str(e))
+        return f"Error creating label: {str(e)}"
+
+def gmail_apply_label(message_id: str, label_name: str, tool_context=None) -> str:
+    """Apply a label to a Gmail message."""
+    validate_tool_context(tool_context, "gmail_apply_label")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_apply_label", "apply_label", True, 
+                         f"Message ID/Reference: {message_id}, Label: '{label_name}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "applying_label")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Get label ID by name
+        labels_result = service.users().labels().list(userId='me').execute()
+        labels = labels_result.get('labels', [])
+        
+        label_id = None
+        for label in labels:
+            if label['name'].lower() == label_name.lower():
+                label_id = label['id']
+                break
+        
+        if not label_id:
+            return f"Label '{label_name}' not found. Use gmail_list_labels to see available labels."
+        
+        # Apply label to message
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={'addLabelIds': [label_id]}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_LABEL_APPLIED] = label_name
+        tool_context.state[EMAIL_LAST_LABEL_APPLIED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_LABEL_APPLIED_TO] = actual_message_id
+        
+        log_tool_execution(tool_context, "gmail_apply_label", "apply_label", True, f"Label '{label_name}' applied to message")
+        return f"Label '{label_name}' applied to message successfully"
+        
+    except Exception as e:
+        logger.error(f"Error applying label '{label_name}' to message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_apply_label", "apply_label", False, str(e))
+        return f"Error applying label: {str(e)}"
+
+def gmail_remove_label(message_id: str, label_name: str, tool_context=None) -> str:
+    """Remove a label from a Gmail message."""
+    validate_tool_context(tool_context, "gmail_remove_label")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_remove_label", "remove_label", True, 
+                         f"Message ID/Reference: {message_id}, Label: '{label_name}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "removing_label")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Get label ID by name
+        labels_result = service.users().labels().list(userId='me').execute()
+        labels = labels_result.get('labels', [])
+        
+        label_id = None
+        for label in labels:
+            if label['name'].lower() == label_name.lower():
+                label_id = label['id']
+                break
+        
+        if not label_id:
+            return f"Label '{label_name}' not found. Use gmail_list_labels to see available labels."
+        
+        # Remove label from message
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={'removeLabelIds': [label_id]}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_LABEL_REMOVED] = label_name
+        tool_context.state[EMAIL_LAST_LABEL_REMOVED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_LABEL_REMOVED_FROM] = actual_message_id
+        
+        log_tool_execution(tool_context, "gmail_remove_label", "remove_label", True, f"Label '{label_name}' removed from message")
+        return f"Label '{label_name}' removed from message successfully"
+        
+    except Exception as e:
+        logger.error(f"Error removing label '{label_name}' from message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_remove_label", "remove_label", False, str(e))
+        return f"Error removing label: {str(e)}"
+
+# =============================================================================
+# Gmail Enhanced Status Management Tools
+# =============================================================================
+
+def gmail_star_message(message_id: str, tool_context=None) -> str:
+    """Star a Gmail message."""
+    validate_tool_context(tool_context, "gmail_star_message")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_star_message", "star_message", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "starring_message")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Star message by adding STARRED label
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={'addLabelIds': ['STARRED']}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_STARRED] = actual_message_id
+        tool_context.state[EMAIL_LAST_STARRED_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_star_message", "star_message", True, "Message starred")
+        return "Message starred successfully"
+        
+    except Exception as e:
+        logger.error(f"Error starring message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_star_message", "star_message", False, str(e))
+        return f"Error starring message: {str(e)}"
+
+def gmail_unstar_message(message_id: str, tool_context=None) -> str:
+    """Unstar a Gmail message."""
+    validate_tool_context(tool_context, "gmail_unstar_message")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_unstar_message", "unstar_message", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "unstarring_message")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Unstar message by removing STARRED label
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={'removeLabelIds': ['STARRED']}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_UNSTARRED] = actual_message_id
+        tool_context.state[EMAIL_LAST_UNSTARRED_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_unstar_message", "unstar_message", True, "Message unstarred")
+        return "Message unstarred successfully"
+        
+    except Exception as e:
+        logger.error(f"Error unstarring message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_unstar_message", "unstar_message", False, str(e))
+        return f"Error unstarring message: {str(e)}"
+
+def gmail_mark_important(message_id: str, tool_context=None) -> str:
+    """Mark a Gmail message as important."""
+    validate_tool_context(tool_context, "gmail_mark_important")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_mark_important", "mark_important", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "marking_important")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Mark as important by adding IMPORTANT label
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={'addLabelIds': ['IMPORTANT']}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_MARKED_IMPORTANT] = actual_message_id
+        tool_context.state[EMAIL_LAST_MARKED_IMPORTANT_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_mark_important", "mark_important", True, "Message marked as important")
+        return "Message marked as important successfully"
+        
+    except Exception as e:
+        logger.error(f"Error marking message as important {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_mark_important", "mark_important", False, str(e))
+        return f"Error marking as important: {str(e)}"
+
+def gmail_mark_not_important(message_id: str, tool_context=None) -> str:
+    """Mark a Gmail message as not important."""
+    validate_tool_context(tool_context, "gmail_mark_not_important")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_mark_not_important", "mark_not_important", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "marking_not_important")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Mark as not important by removing IMPORTANT label
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={'removeLabelIds': ['IMPORTANT']}
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_MARKED_NOT_IMPORTANT] = actual_message_id
+        tool_context.state[EMAIL_LAST_MARKED_NOT_IMPORTANT_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_mark_not_important", "mark_not_important", True, "Message marked as not important")
+        return "Message marked as not important successfully"
+        
+    except Exception as e:
+        logger.error(f"Error marking message as not important {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_mark_not_important", "mark_not_important", False, str(e))
+        return f"Error marking as not important: {str(e)}"
+
+# =============================================================================
+# Gmail Spam Management Tools
+# =============================================================================
+
+def gmail_mark_spam(message_id: str, tool_context=None) -> str:
+    """Move a Gmail message to spam."""
+    validate_tool_context(tool_context, "gmail_mark_spam")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_mark_spam", "mark_spam", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "marking_spam")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Mark as spam by adding SPAM label and removing INBOX
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={
+                'addLabelIds': ['SPAM'],
+                'removeLabelIds': ['INBOX', 'UNREAD']
+            }
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_MARKED_SPAM] = actual_message_id
+        tool_context.state[EMAIL_LAST_MARKED_SPAM_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_mark_spam", "mark_spam", True, "Message moved to spam")
+        return "Message moved to spam successfully"
+        
+    except Exception as e:
+        logger.error(f"Error marking message as spam {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_mark_spam", "mark_spam", False, str(e))
+        return f"Error marking as spam: {str(e)}"
+
+def gmail_unmark_spam(message_id: str, tool_context=None) -> str:
+    """Remove a Gmail message from spam."""
+    validate_tool_context(tool_context, "gmail_unmark_spam")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_unmark_spam", "unmark_spam", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "unmarking_spam")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Remove from spam by removing SPAM label and adding INBOX
+        service.users().messages().modify(
+            userId='me',
+            id=actual_message_id,
+            body={
+                'addLabelIds': ['INBOX'],
+                'removeLabelIds': ['SPAM']
+            }
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_UNMARKED_SPAM] = actual_message_id
+        tool_context.state[EMAIL_LAST_UNMARKED_SPAM_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_unmark_spam", "unmark_spam", True, "Message removed from spam")
+        return "Message removed from spam successfully"
+        
+    except Exception as e:
+        logger.error(f"Error removing message from spam {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_unmark_spam", "unmark_spam", False, str(e))
+        return f"Error removing from spam: {str(e)}"
+
+# =============================================================================
+# Gmail Thread Management Tools
+# =============================================================================
+
+def gmail_get_thread(thread_id: str, tool_context=None) -> str:
+    """Get a complete Gmail thread (conversation)."""
+    validate_tool_context(tool_context, "gmail_get_thread")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_get_thread", "get_thread", True, f"Thread ID: {thread_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "getting_thread")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Get thread
+        thread = service.users().threads().get(userId='me', id=thread_id).execute()
+        messages = thread.get('messages', [])
+        
+        if not messages:
+            return f"Thread {thread_id} contains no messages"
+        
+        # Process each message in the thread
+        conversation_parts = []
+        for i, message in enumerate(messages, 1):
+            headers = {h['name']: h['value'] for h in message.get('payload', {}).get('headers', [])}
+            body = _extract_message_body(message.get('payload', {}))
+            
+            from_sender = headers.get('From', 'Unknown')
+            subject = headers.get('Subject', 'No Subject')
+            date = headers.get('Date', 'Unknown')
+            
+            # Clean up sender display
+            if '<' in from_sender and '>' in from_sender:
+                name_part = from_sender.split('<')[0].strip().strip('"')
+                if name_part:
+                    from_display = name_part
+                else:
+                    from_display = from_sender.split('<')[1].split('>')[0]
+            else:
+                from_display = from_sender
+            
+            conversation_parts.append(f"""Message {i} of {len(messages)}:
+From: {from_display}
+Date: {date}
+Subject: {subject}
+
+{body[:300]}{'...' if len(body) > 300 else ''}
+
+{'='*50}""")
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_THREAD_VIEWED] = thread_id
+        tool_context.state[EMAIL_LAST_THREAD_VIEWED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_THREAD_MESSAGE_COUNT] = len(messages)
+        
+        response = f"Gmail Thread ({len(messages)} messages):\n\n" + "\n\n".join(conversation_parts)
+        
+        log_tool_execution(tool_context, "gmail_get_thread", "get_thread", True, f"Retrieved thread with {len(messages)} messages")
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error getting thread {thread_id}: {e}")
+        log_tool_execution(tool_context, "gmail_get_thread", "get_thread", False, str(e))
+        return f"Error retrieving thread: {str(e)}"
+
+def gmail_modify_thread(thread_id: str, add_labels: str = "", remove_labels: str = "", tool_context=None) -> str:
+    """Modify labels on an entire Gmail thread."""
+    validate_tool_context(tool_context, "gmail_modify_thread")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_modify_thread", "modify_thread", True, 
+                         f"Thread ID: {thread_id}, Add: '{add_labels}', Remove: '{remove_labels}'")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "modifying_thread")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Parse labels
+        add_label_ids = []
+        remove_label_ids = []
+        
+        if add_labels:
+            # Get all available labels to resolve names to IDs
+            labels_result = service.users().labels().list(userId='me').execute()
+            all_labels = labels_result.get('labels', [])
+            
+            for label_name in add_labels.split(','):
+                label_name = label_name.strip()
+                for label in all_labels:
+                    if label['name'].lower() == label_name.lower():
+                        add_label_ids.append(label['id'])
+                        break
+        
+        if remove_labels:
+            # Get all available labels to resolve names to IDs
+            if not all_labels:  # Only fetch if not already fetched
+                labels_result = service.users().labels().list(userId='me').execute()
+                all_labels = labels_result.get('labels', [])
+            
+            for label_name in remove_labels.split(','):
+                label_name = label_name.strip()
+                for label in all_labels:
+                    if label['name'].lower() == label_name.lower():
+                        remove_label_ids.append(label['id'])
+                        break
+        
+        # Modify thread
+        modify_body = {}
+        if add_label_ids:
+            modify_body['addLabelIds'] = add_label_ids
+        if remove_label_ids:
+            modify_body['removeLabelIds'] = remove_label_ids
+        
+        if not modify_body:
+            return "No valid labels specified for modification"
+        
+        service.users().threads().modify(
+            userId='me',
+            id=thread_id,
+            body=modify_body
+        ).execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_THREAD_MODIFIED] = thread_id
+        tool_context.state[EMAIL_LAST_THREAD_MODIFIED_AT] = datetime.utcnow().isoformat()
+        
+        log_tool_execution(tool_context, "gmail_modify_thread", "modify_thread", True, "Thread modified successfully")
+        return f"Thread labels modified successfully. Added: {add_labels or 'none'}, Removed: {remove_labels or 'none'}"
+        
+    except Exception as e:
+        logger.error(f"Error modifying thread {thread_id}: {e}")
+        log_tool_execution(tool_context, "gmail_modify_thread", "modify_thread", False, str(e))
+        return f"Error modifying thread: {str(e)}"
+
+# =============================================================================
+# Gmail Attachment Tools
+# =============================================================================
+
+def gmail_list_attachments(message_id: str, tool_context=None) -> str:
+    """List attachments in a Gmail message."""
+    validate_tool_context(tool_context, "gmail_list_attachments")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_list_attachments", "list_attachments", True, f"Message ID/Reference: {message_id}")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "listing_attachments")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference
+        actual_message_id = _get_message_id_by_reference(message_id, tool_context) or message_id
+        
+        # Get message with full payload
+        message = service.users().messages().get(userId='me', id=actual_message_id, format='full').execute()
+        
+        # Find attachments
+        attachments = []
+        
+        def find_attachments(payload):
+            if 'parts' in payload:
+                for part in payload['parts']:
+                    if part.get('filename'):
+                        # This part has a filename, so it's an attachment
+                        attachment_id = part['body'].get('attachmentId')
+                        if attachment_id:
+                            attachments.append({
+                                'filename': part['filename'],
+                                'mimeType': part.get('mimeType', 'unknown'),
+                                'size': part['body'].get('size', 0),
+                                'attachmentId': attachment_id
+                            })
+                    else:
+                        # Recursively check nested parts
+                        find_attachments(part)
+            elif payload.get('filename'):
+                # Single attachment
+                attachment_id = payload['body'].get('attachmentId')
+                if attachment_id:
+                    attachments.append({
+                        'filename': payload['filename'],
+                        'mimeType': payload.get('mimeType', 'unknown'),
+                        'size': payload['body'].get('size', 0),
+                        'attachmentId': attachment_id
+                    })
+        
+        find_attachments(message.get('payload', {}))
+        
+        if not attachments:
+            log_tool_execution(tool_context, "gmail_list_attachments", "list_attachments", True, "No attachments found")
+            return "This message has no attachments"
+        
+        # Update session state
+        tool_context.state[EMAIL_LAST_ATTACHMENTS_LISTED] = actual_message_id
+        tool_context.state[EMAIL_LAST_ATTACHMENTS_COUNT] = len(attachments)
+        tool_context.state[EMAIL_LAST_ATTACHMENTS_DATA] = attachments
+        
+        # Format response
+        response_lines = [f"Message has {len(attachments)} attachment(s):"]
+        response_lines.append("")
+        
+        for i, attachment in enumerate(attachments, 1):
+            size_kb = attachment['size'] / 1024 if attachment['size'] > 0 else 0
+            response_lines.append(f"{i}. {attachment['filename']} ({attachment['mimeType']}, {size_kb:.1f} KB)")
+        
+        log_tool_execution(tool_context, "gmail_list_attachments", "list_attachments", True, f"Found {len(attachments)} attachments")
+        return "\n".join(response_lines)
+        
+    except Exception as e:
+        logger.error(f"Error listing attachments for message {message_id}: {e}")
+        log_tool_execution(tool_context, "gmail_list_attachments", "list_attachments", False, str(e))
+        return f"Error listing attachments: {str(e)}"
+
+# =============================================================================
+# Gmail User Profile Tools
+# =============================================================================
+
+def gmail_get_profile(tool_context=None) -> str:
+    """Get Gmail user profile information."""
+    validate_tool_context(tool_context, "gmail_get_profile")
+    
+    try:
+        # Log operation
+        log_tool_execution(tool_context, "gmail_get_profile", "get_profile", True, "Retrieving profile")
+        
+        # Update agent activity
+        update_agent_activity(tool_context, "email_agent", "getting_profile")
+        
+        # Get Gmail service
+        service = get_gmail_service()
+        if not service:
+            return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Get profile
+        profile = service.users().getProfile(userId='me').execute()
+        
+        # Update session state
+        tool_context.state[EMAIL_USER_EMAIL] = profile.get('emailAddress', '')
+        tool_context.state[EMAIL_PROFILE_FETCHED_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_MESSAGES_TOTAL] = profile.get('messagesTotal', 0)
+        tool_context.state[EMAIL_THREADS_TOTAL] = profile.get('threadsTotal', 0)
+        
+        # Format response
+        response_lines = [
+            "Gmail Profile Information:",
+            "",
+            f"Email Address: {profile.get('emailAddress', 'Unknown')}",
+            f"Total Messages: {profile.get('messagesTotal', 0):,}",
+            f"Total Threads: {profile.get('threadsTotal', 0):,}",
+            f"History ID: {profile.get('historyId', 'Unknown')}"
+        ]
+        
+        log_tool_execution(tool_context, "gmail_get_profile", "get_profile", True, "Profile retrieved successfully")
+        return "\n".join(response_lines)
+        
+    except Exception as e:
+        logger.error(f"Error getting profile: {e}")
+        log_tool_execution(tool_context, "gmail_get_profile", "get_profile", False, str(e))
+        return f"Error retrieving profile: {str(e)}"
+    
+    
+    
     
 # =============================================================================
 # Helper Functions
@@ -1565,7 +2507,39 @@ gmail_parse_subject_and_body_tool = FunctionTool(func=gmail_parse_subject_and_bo
 gmail_confirm_and_send_tool = FunctionTool(func=gmail_confirm_and_send)
 gmail_confirm_and_reply_tool = FunctionTool(func=gmail_confirm_and_reply)
 
-# Gmail tools collection
+# Draft management tools
+gmail_create_draft_tool = FunctionTool(func=gmail_create_draft)
+gmail_list_drafts_tool = FunctionTool(func=gmail_list_drafts)
+gmail_send_draft_tool = FunctionTool(func=gmail_send_draft)
+gmail_delete_draft_tool = FunctionTool(func=gmail_delete_draft)
+
+# Label management tools
+gmail_list_labels_tool = FunctionTool(func=gmail_list_labels)
+gmail_create_label_tool = FunctionTool(func=gmail_create_label)
+gmail_apply_label_tool = FunctionTool(func=gmail_apply_label)
+gmail_remove_label_tool = FunctionTool(func=gmail_remove_label)
+
+# Enhanced status management tools
+gmail_star_message_tool = FunctionTool(func=gmail_star_message)
+gmail_unstar_message_tool = FunctionTool(func=gmail_unstar_message)
+gmail_mark_important_tool = FunctionTool(func=gmail_mark_important)
+gmail_mark_not_important_tool = FunctionTool(func=gmail_mark_not_important)
+
+# Spam management tools
+gmail_mark_spam_tool = FunctionTool(func=gmail_mark_spam)
+gmail_unmark_spam_tool = FunctionTool(func=gmail_unmark_spam)
+
+# Thread management tools
+gmail_get_thread_tool = FunctionTool(func=gmail_get_thread)
+gmail_modify_thread_tool = FunctionTool(func=gmail_modify_thread)
+
+# Attachment tools
+gmail_list_attachments_tool = FunctionTool(func=gmail_list_attachments)
+
+# User profile tools
+gmail_get_profile_tool = FunctionTool(func=gmail_get_profile)
+
+# Complete Gmail tools collection
 GMAIL_TOOLS = [
     # Reading tools
     gmail_list_messages_tool,
@@ -1591,7 +2565,39 @@ GMAIL_TOOLS = [
     gmail_generate_email_tool,
     gmail_parse_subject_and_body_tool,
     gmail_confirm_and_send_tool,
-    gmail_confirm_and_reply_tool
+    gmail_confirm_and_reply_tool,
+    
+    # Draft management tools
+    gmail_create_draft_tool,
+    gmail_list_drafts_tool,
+    gmail_send_draft_tool,
+    gmail_delete_draft_tool,
+    
+    # Label management tools
+    gmail_list_labels_tool,
+    gmail_create_label_tool,
+    gmail_apply_label_tool,
+    gmail_remove_label_tool,
+    
+    # Enhanced status management tools
+    gmail_star_message_tool,
+    gmail_unstar_message_tool,
+    gmail_mark_important_tool,
+    gmail_mark_not_important_tool,
+    
+    # Spam management tools
+    gmail_mark_spam_tool,
+    gmail_unmark_spam_tool,
+    
+    # Thread management tools
+    gmail_get_thread_tool,
+    gmail_modify_thread_tool,
+    
+    # Attachment tools
+    gmail_list_attachments_tool,
+    
+    # User profile tools
+    gmail_get_profile_tool
 ]
 
 # Export for easy access
@@ -1616,12 +2622,45 @@ __all__ = [
     "gmail_extract_action_items",
     "gmail_generate_reply",
     
-    # NEW AI composition and workflow functions
+    # AI composition and workflow functions
     "gmail_generate_email",
     "gmail_parse_subject_and_body",
     "gmail_confirm_and_send",
     "gmail_confirm_and_reply",
     
+    # Draft management functions
+    "gmail_create_draft",
+    "gmail_list_drafts",
+    "gmail_send_draft",
+    "gmail_delete_draft",
+    
+    # Label management functions
+    "gmail_list_labels",
+    "gmail_create_label",
+    "gmail_apply_label",
+    "gmail_remove_label",
+    
+    # Enhanced status management functions
+    "gmail_star_message",
+    "gmail_unstar_message",
+    "gmail_mark_important",
+    "gmail_mark_not_important",
+    
+    # Spam management functions
+    "gmail_mark_spam",
+    "gmail_unmark_spam",
+    
+    # Thread management functions
+    "gmail_get_thread",
+    "gmail_modify_thread",
+    
+    # Attachment functions
+    "gmail_list_attachments",
+    
+    # User profile functions
+    "gmail_get_profile",
+    
     # Tools collection
     "GMAIL_TOOLS"
 ]
+

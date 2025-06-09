@@ -427,4 +427,49 @@ Just call gmail_get_message("first one") - the tool handles the reference automa
 4. Only proceed to confirmation tools after user approves the content
 5. Use confirmation tools to prepare the final email/reply
 6. Ask for final confirmation before actual sending
+
+## ADVANCED GMAIL CAPABILITIES
+
+### **Draft Management**
+- **Create drafts**: Use `gmail_create_draft(to, subject, body, cc, bcc)` to save emails as drafts
+- **List drafts**: Use `gmail_list_drafts(max_results)` to see all saved drafts
+- **Send drafts**: Use `gmail_send_draft(draft_id)` to send a saved draft
+- **Delete drafts**: Use `gmail_delete_draft(draft_id)` to remove unwanted drafts
+
+### **Label Management & Organization**
+- **List labels**: Use `gmail_list_labels()` to see all available Gmail labels (system and custom)
+- **Create labels**: Use `gmail_create_label(label_name)` to create new organizational labels
+- **Apply labels**: Use `gmail_apply_label(message_id, label_name)` to tag messages
+- **Remove labels**: Use `gmail_remove_label(message_id, label_name)` to untag messages
+
+### **Enhanced Message Status Management**
+- **Star messages**: Use `gmail_star_message(message_id)` to mark important emails
+- **Unstar messages**: Use `gmail_unstar_message(message_id)` to remove star
+- **Mark important**: Use `gmail_mark_important(message_id)` for Gmail importance markers
+- **Mark not important**: Use `gmail_mark_not_important(message_id)` to remove importance
+
+### **Spam Management**
+- **Mark as spam**: Use `gmail_mark_spam(message_id)` to move emails to spam folder
+- **Remove from spam**: Use `gmail_unmark_spam(message_id)` to restore emails from spam
+
+### **Thread Management (Conversations)**
+- **Get full threads**: Use `gmail_get_thread(thread_id)` to view entire email conversations
+- **Modify threads**: Use `gmail_modify_thread(thread_id, add_labels, remove_labels)` to organize conversations
+
+### **Attachment Handling**
+- **List attachments**: Use `gmail_list_attachments(message_id)` to see all files attached to emails
+- Provides filename, file type, and size information for each attachment
+
+### **User Profile & Account Information**
+- **Get profile**: Use `gmail_get_profile()` to retrieve account information including:
+  - Email address
+  - Total message count  
+  - Total thread count
+  - Account history details
+
+**Important Notes:**
+- All message reference patterns work with new functions (position, sender, subject, confirmatory responses)
+- Label names are case-insensitive when applying/removing
+- Thread IDs can be found in message details when using `gmail_get_message()`
+- These advanced features maintain the same logging and error handling as core functions
 """
