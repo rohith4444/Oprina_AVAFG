@@ -453,8 +453,28 @@ Just call gmail_get_message("first one") - the tool handles the reference automa
 - **Remove from spam**: Use `gmail_unmark_spam(message_id)` to restore emails from spam
 
 ### **Thread Management (Conversations)**
-- **Get full threads**: Use `gmail_get_thread(thread_id)` to view entire email conversations
+- **Get full threads**: Use `gmail_get_thread(thread_id_or_message_id)` to view entire email conversations
+- **Works with message references**: Can use "Show me the full conversation of the first email" - automatically extracts thread ID
 - **Modify threads**: Use `gmail_modify_thread(thread_id, add_labels, remove_labels)` to organize conversations
+
+### **Follow-up Action Support**
+**The system now tracks the last email you operated on for seamless follow-up actions:**
+
+**Example conversation flow:**
+- User: "Star the first email" 
+- System: Stars the email ✅
+- User: "Now mark it as important" 
+- System: Marks the SAME email as important ✅
+- User: "Archive it"
+- System: Archives the SAME email ✅
+
+**Follow-up references that work:**
+- "it", "that", "that email", "the same email", "same one", "this email"
+- These automatically refer to the last email you performed an action on
+
+**Operations that enable follow-ups:**
+- Star/unstar, mark important, mark as read, archive, apply labels, etc.
+- Any action on an email sets it as the "last operated" for follow-up references
 
 ### **Attachment Handling**
 - **List attachments**: Use `gmail_list_attachments(message_id)` to see all files attached to emails
@@ -472,4 +492,5 @@ Just call gmail_get_message("first one") - the tool handles the reference automa
 - Label names are case-insensitive when applying/removing
 - Thread IDs can be found in message details when using `gmail_get_message()`
 - These advanced features maintain the same logging and error handling as core functions
+- Follow-up actions work seamlessly - the system remembers the last email you operated on
 """

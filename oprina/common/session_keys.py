@@ -164,3 +164,8 @@ EMAIL_FOLLOW_UPS_NEEDED = "workflow:email_followups"
 # Calendar integration workflows
 CALENDAR_EMAIL_SYNC = "workflow:calendar_email_sync"
 AVAILABILITY_CHECK_RESULTS = "workflow:availability_results"
+
+# Follow-up action tracking
+EMAIL_LAST_OPERATED_MESSAGE = "email:last_operated_message"
+EMAIL_LAST_OPERATED_MESSAGE_AT = "email:last_operated_message_at"
+EMAIL_LAST_OPERATION_TYPE = "email:last_operation_type"

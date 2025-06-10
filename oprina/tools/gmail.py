@@ -75,7 +75,9 @@ from oprina.common.session_keys import (
     EMAIL_LAST_ATTACHMENTS_LISTED, EMAIL_LAST_ATTACHMENTS_COUNT,
     EMAIL_LAST_ATTACHMENTS_DATA,
     EMAIL_USER_EMAIL, EMAIL_PROFILE_FETCHED_AT, EMAIL_MESSAGES_TOTAL,
-    EMAIL_THREADS_TOTAL, EMAIL_LAST_MESSAGE_ID
+    EMAIL_THREADS_TOTAL, EMAIL_LAST_MESSAGE_ID,
+    EMAIL_LAST_OPERATED_MESSAGE, EMAIL_LAST_OPERATION_TYPE,
+    EMAIL_LAST_OPERATED_MESSAGE_AT
 )
 
 logger = setup_logger("gmail_tools", console_output=True)
@@ -284,7 +286,7 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         try:
             message = service.users().messages().get(
                 userId='me', 
-                        id=actual_message_id, 
+                            id=actual_message_id, 
                 format='full'
             ).execute()
         except Exception as e:
@@ -654,7 +656,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         try:
             original = service.users().messages().get(
                 userId='me', 
-                        id=actual_message_id, 
+                            id=actual_message_id, 
                 format='full'
             ).execute()
         except Exception as e:
@@ -846,7 +848,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().modify(
                 userId='me',
-                        id=actual_message_id,
+                            id=actual_message_id,
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
         except Exception as e:
@@ -859,8 +861,11 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         tool_context.state[EMAIL_LAST_MARKED_READ] = actual_message_id
         tool_context.state[EMAIL_LAST_MARKED_READ_AT] = datetime.utcnow().isoformat()
         
+        # Track for follow-up actions
+        _track_message_operation(actual_message_id, "mark_as_read", tool_context)
+        
         log_tool_execution(tool_context, "gmail_mark_as_read", "mark_read", True, "Message marked as read")
-        return f"Message marked as read"
+        return "Message marked as read successfully"
         
     except Exception as e:
         logger.error(f"Error marking message as read: {e}")
@@ -874,7 +879,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_archive_message", "archive", True, f"Message ID/Reference: {message_id}")
+        log_tool_execution(tool_context, "gmail_archive_message", "archive_message", True, f"Message ID/Reference: {message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "archiving_message")
@@ -890,9 +895,9 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().modify(
                 userId='me',
-                        id=actual_message_id,
+                            id=actual_message_id,
                 body={'removeLabelIds': ['INBOX']}
-            ).execute()
+        ).execute()
         except Exception as e:
             if message_id.isdigit():
                 return f"Could not find email at position '{message_id}'. Please use 'list emails' first to see available emails, then try archiving email {message_id} again."
@@ -903,12 +908,15 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         tool_context.state[EMAIL_LAST_ARCHIVED] = actual_message_id
         tool_context.state[EMAIL_LAST_ARCHIVED_AT] = datetime.utcnow().isoformat()
         
-        log_tool_execution(tool_context, "gmail_archive_message", "archive", True, "Message archived")
-        return f"Message archived successfully"
+        # Track for follow-up actions
+        _track_message_operation(actual_message_id, "archive_message", tool_context)
+        
+        log_tool_execution(tool_context, "gmail_archive_message", "archive_message", True, "Message archived")
+        return "Message archived successfully"
         
     except Exception as e:
         logger.error(f"Error archiving message: {e}")
-        log_tool_execution(tool_context, "gmail_archive_message", "archive", False, str(e))
+        log_tool_execution(tool_context, "gmail_archive_message", "archive_message", False, str(e))
         return f"Error archiving message: {str(e)}"
 
 def gmail_delete_message(message_id: str, tool_context=None) -> str:
@@ -933,7 +941,7 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         try:
             service.users().messages().trash(
                 userId='me',
-                        id=actual_message_id
+                            id=actual_message_id
             ).execute()
         except Exception as e:
             if message_id.isdigit():
@@ -1647,6 +1655,9 @@ def gmail_star_message(message_id: str, tool_context=None) -> str:
         tool_context.state[EMAIL_LAST_STARRED] = actual_message_id
         tool_context.state[EMAIL_LAST_STARRED_AT] = datetime.utcnow().isoformat()
         
+        # Track for follow-up actions
+        _track_message_operation(actual_message_id, "star_message", tool_context)
+        
         log_tool_execution(tool_context, "gmail_star_message", "star_message", True, "Message starred")
         return "Message starred successfully"
         
@@ -1685,6 +1696,9 @@ def gmail_unstar_message(message_id: str, tool_context=None) -> str:
         tool_context.state[EMAIL_LAST_UNSTARRED] = actual_message_id
         tool_context.state[EMAIL_LAST_UNSTARRED_AT] = datetime.utcnow().isoformat()
         
+        # Track for follow-up actions
+        _track_message_operation(actual_message_id, "unstar_message", tool_context)
+        
         log_tool_execution(tool_context, "gmail_unstar_message", "unstar_message", True, "Message unstarred")
         return "Message unstarred successfully"
         
@@ -1722,6 +1736,9 @@ def gmail_mark_important(message_id: str, tool_context=None) -> str:
         # Update session state
         tool_context.state[EMAIL_LAST_MARKED_IMPORTANT] = actual_message_id
         tool_context.state[EMAIL_LAST_MARKED_IMPORTANT_AT] = datetime.utcnow().isoformat()
+        
+        # Track for follow-up actions
+        _track_message_operation(actual_message_id, "mark_important", tool_context)
         
         log_tool_execution(tool_context, "gmail_mark_important", "mark_important", True, "Message marked as important")
         return "Message marked as important successfully"
@@ -1859,13 +1876,13 @@ def gmail_unmark_spam(message_id: str, tool_context=None) -> str:
 # Gmail Thread Management Tools
 # =============================================================================
 
-def gmail_get_thread(thread_id: str, tool_context=None) -> str:
-    """Get a complete Gmail thread (conversation)."""
+def gmail_get_thread(thread_id_or_message_id: str, tool_context=None) -> str:
+    """Get a complete Gmail thread (conversation). Can accept either thread ID or message ID."""
     validate_tool_context(tool_context, "gmail_get_thread")
     
     try:
         # Log operation
-        log_tool_execution(tool_context, "gmail_get_thread", "get_thread", True, f"Thread ID: {thread_id}")
+        log_tool_execution(tool_context, "gmail_get_thread", "get_thread", True, f"Thread/Message ID: {thread_id_or_message_id}")
         
         # Update agent activity
         update_agent_activity(tool_context, "email_agent", "getting_thread")
@@ -1874,6 +1891,23 @@ def gmail_get_thread(thread_id: str, tool_context=None) -> str:
         service = get_gmail_service()
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
+        
+        # Try to resolve message reference first
+        actual_id = _get_message_id_by_reference(thread_id_or_message_id, tool_context) or thread_id_or_message_id
+        
+        # Check if this is a message ID - if so, get the thread ID from the message
+        try:
+            # First try to get it as a message to extract thread ID
+            message = service.users().messages().get(userId='me', id=actual_id, format='minimal').execute()
+            thread_id = message.get('threadId')
+            if thread_id:
+                log_tool_execution(tool_context, "gmail_get_thread", "get_thread", True, f"Extracted thread ID {thread_id} from message {actual_id}")
+            else:
+                # If no thread ID found, assume the input was already a thread ID
+                thread_id = actual_id
+        except Exception:
+            # If getting as message fails, assume it's already a thread ID
+            thread_id = actual_id
         
         # Get thread
         thread = service.users().threads().get(userId='me', id=thread_id).execute()
@@ -1922,7 +1956,7 @@ Subject: {subject}
         return response
         
     except Exception as e:
-        logger.error(f"Error getting thread {thread_id}: {e}")
+        logger.error(f"Error getting thread {thread_id_or_message_id}: {e}")
         log_tool_execution(tool_context, "gmail_get_thread", "get_thread", False, str(e))
         return f"Error retrieving thread: {str(e)}"
 
@@ -2262,6 +2296,24 @@ def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[
         
         # Handle confirmatory responses that refer to the most recent/first email
         confirmatory_responses = ['yes', 'yeah', 'yep', 'sure', 'okay', 'ok', 'that one', 'it', 'that email', 'this one']
+        
+        # Handle follow-up references that refer to the last operated message
+        followup_references = ['it', 'that', 'that email', 'the same email', 'same one', 'that one', 'this email', 'this one']
+        
+        if any(phrase == reference_lower for phrase in followup_references):
+            logger.debug(f"Detected follow-up reference: '{reference_lower}'")
+            
+            # Check for last operated message first
+            last_operated_message = tool_context.state.get(EMAIL_LAST_OPERATED_MESSAGE)
+            if last_operated_message:
+                logger.info(f"RESOLVE: Found last operated message for follow-up reference: {last_operated_message}")
+                log_tool_execution(tool_context, "_get_message_id_by_reference", "resolve_reference", True,
+                                 f"Resolved follow-up '{reference}' to last operated message {last_operated_message}")
+                return last_operated_message
+            else:
+                logger.debug(f"RESOLVE: No last operated message found, treating as confirmatory response")
+                # Fall through to confirmatory response handling
+        
         if any(phrase == reference_lower for phrase in confirmatory_responses):
             logger.debug(f"Detected confirmatory response: '{reference_lower}'")
             
@@ -2476,6 +2528,14 @@ def _extract_message_body(payload: Dict[str, Any]) -> str:
         logger.warning(f"Error extracting message body: {e}")
         return "Error reading message content"
 
+def _track_message_operation(message_id: str, operation_type: str, tool_context=None):
+    """Track the last message operation for follow-up actions."""
+    if tool_context and hasattr(tool_context, 'state'):
+        tool_context.state[EMAIL_LAST_OPERATED_MESSAGE] = message_id
+        tool_context.state[EMAIL_LAST_OPERATED_MESSAGE_AT] = datetime.utcnow().isoformat()
+        tool_context.state[EMAIL_LAST_OPERATION_TYPE] = operation_type
+        logger.debug(f"TRACK: Recorded {operation_type} operation on message {message_id}")
+
 
 # =============================================================================
 # Create ADK Function Tools
@@ -2520,7 +2580,7 @@ gmail_apply_label_tool = FunctionTool(func=gmail_apply_label)
 gmail_remove_label_tool = FunctionTool(func=gmail_remove_label)
 
 # Enhanced status management tools
-gmail_star_message_tool = FunctionTool(func=gmail_star_message)
+gmail_star_message_tool = FunctionTool(func=gmail_star_message) 
 gmail_unstar_message_tool = FunctionTool(func=gmail_unstar_message)
 gmail_mark_important_tool = FunctionTool(func=gmail_mark_important)
 gmail_mark_not_important_tool = FunctionTool(func=gmail_mark_not_important)
@@ -2532,6 +2592,7 @@ gmail_unmark_spam_tool = FunctionTool(func=gmail_unmark_spam)
 # Thread management tools
 gmail_get_thread_tool = FunctionTool(func=gmail_get_thread)
 gmail_modify_thread_tool = FunctionTool(func=gmail_modify_thread)
+
 
 # Attachment tools
 gmail_list_attachments_tool = FunctionTool(func=gmail_list_attachments)
