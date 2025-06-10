@@ -8,7 +8,7 @@ from oprina.sub_agents.calendar.agent import calendar_agent
 
 root_agent = Agent(
     model="gemini-2.0-flash",  # Use config for model
-    name="oprina_root_agent",
+    name="oprina",
     description="Multimodal voice-enabled Gmail and Calendar assistant",
     instruction=prompt.ROOT_AGENT_INSTR,
     sub_agents=[
