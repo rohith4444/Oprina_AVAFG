@@ -108,6 +108,19 @@
   color: var(--text);
 }
 
+.conversation-item.active {
+  background-color: var(--primary-blue);
+  color: white;
+}
+
+.conversation-item.active .conversation-time {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.conversation-item.active .conversation-preview {
+  color: white;
+}
+
 .conversation-item:hover {
   background-color: var(--background-alt);
 }
