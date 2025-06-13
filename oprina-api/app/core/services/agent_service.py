@@ -6,13 +6,15 @@ from typing import Dict, Any, AsyncGenerator, Optional
 import structlog
 
 from app.core.agent.client import agent_client
-from app.core.agent.session_manager import AgentSessionManager
-from app.core.agent.message_handler import MessageHandler
-from app.core.agent.error_handler import agent_error_handler, AgentError
 from app.core.database.repositories.session_repository import SessionRepository
 from app.core.database.repositories.message_repository import MessageRepository
 
 logger = structlog.get_logger(__name__)
+
+
+class AgentError(Exception):
+    """Simple agent error for service operations."""
+    pass
 
 
 class AgentService:
@@ -25,35 +27,35 @@ class AgentService:
     ):
         self.session_repo = session_repo
         self.message_repo = message_repo
-        
-        # Initialize agent components
-        self.session_manager = AgentSessionManager(session_repo)
-        self.message_handler = MessageHandler(message_repo, session_repo)
         self.agent_client = agent_client
-        self.error_handler = agent_error_handler
     
     async def create_agent_session(
         self, 
         user_id: str, 
         user_session_id: str
     ) -> Dict[str, Any]:
-        """Create a new agent session."""
+        """Create a new agent session and link it to user session."""
         try:
-            session_data = await self.session_manager.create_agent_session(
-                user_id=user_id,
-                user_session_id=user_session_id
+            # Create agent session directly with Vertex AI
+            agent_session_data = await self.agent_client.create_session(user_id)
+            
+            # Update the user session with agent session ID
+            await self.session_repo.update_session_links(
+                session_id=user_session_id,
+                vertex_session_id=agent_session_data["vertex_session_id"]
             )
             
             logger.info(f"Created agent session for user {user_id}")
-            return session_data
+            return {
+                "agent_session_id": agent_session_data["vertex_session_id"],
+                "user_session_id": user_session_id,
+                "user_id": user_id,
+                "status": "active"
+            }
             
         except Exception as e:
-            context = {"user_id": user_id, "user_session_id": user_session_id}
-            error_response = self.error_handler.handle_error(e, context)
-            raise AgentError(
-                error_response["message"],
-                details=error_response
-            )
+            logger.error(f"Failed to create agent session for user {user_id}: {e}")
+            raise AgentError(f"Failed to create agent session: {str(e)}")
     
     async def send_message(
         self, 
@@ -63,34 +65,54 @@ class AgentService:
     ) -> Dict[str, Any]:
         """Send a message to the agent."""
         try:
-            # Validate session
-            if not await self.session_manager.validate_session(user_id, session_id):
-                raise AgentError("Invalid or expired session")
+            # Get session with agent link
+            session_data = await self.session_repo.get_session_with_links(session_id)
             
-            # Send message through handler
-            result = await self.message_handler.send_message(
+            if not session_data or not session_data.get("vertex_session_id"):
+                raise AgentError("No agent session found")
+            
+            vertex_session_id = session_data["vertex_session_id"]
+            
+            # Store user message
+            user_message = await self.message_repo.create_message({
+                "session_id": session_id,
+                "user_id": user_id,
+                "role": "user",
+                "content": message,
+                "message_type": "text"
+            })
+            
+            # Send to agent directly
+            agent_response = await self.agent_client.send_message(
                 user_id=user_id,
-                session_id=session_id,
-                message_content=message
+                session_id=vertex_session_id,
+                message=message
             )
             
-            # Reset error count on successful message
-            self.error_handler.reset_error_count({"user_id": user_id, "session_id": session_id})
+            # Store agent response
+            assistant_message = await self.message_repo.create_message({
+                "session_id": session_id,
+                "user_id": user_id,
+                "role": "assistant",
+                "content": agent_response["response"],
+                "message_type": "text"
+            })
+            
+            # Update session activity
+            await self.session_repo.update_last_activity(session_id)
             
             logger.info(f"Sent message to agent for session {session_id}")
-            return result
+            return {
+                "user_message": user_message,
+                "assistant_message": assistant_message,
+                "response": agent_response["response"],
+                "session_id": session_id
+            }
             
         except Exception as e:
-            context = {"user_id": user_id, "session_id": session_id, "message": message}
-            error_response = self.error_handler.handle_error(e, context)
-            
-            # Increment error count
-            self.error_handler.increment_error_count(context)
-            
-            raise AgentError(
-                error_response["message"],
-                details=error_response
-            )
+            logger.error(f"Failed to send message for session {session_id}: {e}", 
+                        extra={"user_id": user_id, "session_id": session_id})
+            raise AgentError(f"Failed to send message: {str(e)}")
     
     async def stream_message(
         self, 
@@ -100,37 +122,91 @@ class AgentService:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Send a message to the agent and stream the response."""
         try:
-            # Validate session
-            if not await self.session_manager.validate_session(user_id, session_id):
-                yield {"type": "error", "error": "Invalid or expired session"}
+            # Get session with agent link
+            session_data = await self.session_repo.get_session_with_links(session_id)
+            
+            if not session_data or not session_data.get("vertex_session_id"):
+                yield {"type": "error", "error": "No agent session found"}
                 return
             
-            # Stream message through handler
-            async for event in self.message_handler.stream_message(
-                user_id=user_id,
-                session_id=session_id,
-                message_content=message
-            ):
-                yield event
+            vertex_session_id = session_data["vertex_session_id"]
             
-            # Reset error count on successful stream
-            self.error_handler.reset_error_count({"user_id": user_id, "session_id": session_id})
+            # Store user message
+            user_message = await self.message_repo.create_message({
+                "session_id": session_id,
+                "user_id": user_id,
+                "role": "user",
+                "content": message,
+                "message_type": "text"
+            })
+            
+            yield {
+                "type": "user_message",
+                "message": user_message,
+                "session_id": session_id
+            }
+            
+            # Stream from agent directly
+            response_parts = []
+            
+            async for event in self.agent_client.stream_message(
+                user_id=user_id,
+                session_id=vertex_session_id,
+                message=message
+            ):
+                # Extract content from event
+                if event.get("content"):
+                    response_parts.append(event["content"])
+                    
+                    yield {
+                        "type": "agent_response_chunk",
+                        "content": event["content"],
+                        "session_id": session_id
+                    }
+            
+            # Store complete response
+            full_response = " ".join(response_parts).strip()
+            
+            if full_response:
+                assistant_message = await self.message_repo.create_message({
+                    "session_id": session_id,
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "content": full_response,
+                    "message_type": "text"
+                })
+                
+                yield {
+                    "type": "agent_response_complete",
+                    "message": assistant_message,
+                    "session_id": session_id
+                }
+            
+            # Update session activity
+            await self.session_repo.update_last_activity(session_id)
             
             logger.info(f"Streamed message to agent for session {session_id}")
             
         except Exception as e:
-            context = {"user_id": user_id, "session_id": session_id, "message": message}
-            error_response = self.error_handler.handle_error(e, context)
-            
-            # Increment error count
-            self.error_handler.increment_error_count(context)
-            
+            logger.error(f"Failed to stream message for session {session_id}: {e}",
+                        extra={"user_id": user_id, "session_id": session_id})
             yield {
-                "type": "error", 
-                "error": error_response["message"],
-                "details": error_response
+                "type": "error",
+                "error": f"Failed to stream message: {str(e)}",
+                "session_id": session_id
             }
-    
+
+    async def get_user_sessions(self, user_id: str) -> list[Dict[str, Any]]:
+        """Get all sessions for a user from database."""
+        try:
+            # Get sessions directly from database - no need to query Vertex AI
+            sessions = await self.session_repo.get_user_sessions(user_id)
+            return sessions
+            
+        except Exception as e:
+            logger.error(f"Failed to get sessions for user {user_id}: {e}")
+            raise AgentError(f"Failed to get user sessions: {str(e)}")
+
     async def get_conversation_history(
         self, 
         user_id: str, 
@@ -139,11 +215,8 @@ class AgentService:
     ) -> list[Dict[str, Any]]:
         """Get conversation history for a session."""
         try:
-            # Validate session ownership
-            if not await self.session_manager.validate_session(user_id, session_id):
-                raise AgentError("Invalid or expired session")
-            
-            messages = await self.message_handler.get_conversation_history(
+            # Get conversation history directly from message repository
+            messages = await self.message_repo.get_conversation_history(
                 session_id=session_id,
                 limit=limit
             )
@@ -151,66 +224,6 @@ class AgentService:
             return messages
             
         except Exception as e:
-            context = {"user_id": user_id, "session_id": session_id}
-            error_response = self.error_handler.handle_error(e, context)
-            raise AgentError(
-                error_response["message"],
-                details=error_response
-            )
-    
-    async def get_user_sessions(self, user_id: str) -> list[Dict[str, Any]]:
-        """Get all agent sessions for a user."""
-        try:
-            sessions = await self.session_manager.list_user_agent_sessions(user_id)
-            return sessions
-            
-        except Exception as e:
-            context = {"user_id": user_id}
-            error_response = self.error_handler.handle_error(e, context)
-            raise AgentError(
-                error_response["message"],
-                details=error_response
-            )
-    
-    async def end_session(self, user_id: str, session_id: str) -> bool:
-        """End an agent session."""
-        try:
-            # Validate session ownership
-            if not await self.session_manager.validate_session(user_id, session_id):
-                raise AgentError("Invalid or expired session")
-            
-            # End session in database
-            await self.session_repo.end_session(session_id)
-            
-            # Clean up error counts
-            self.error_handler.reset_error_count({"user_id": user_id, "session_id": session_id})
-            
-            logger.info(f"Ended agent session {session_id}")
-            return True
-            
-        except Exception as e:
-            context = {"user_id": user_id, "session_id": session_id}
-            error_response = self.error_handler.handle_error(e, context)
-            raise AgentError(
-                error_response["message"],
-                details=error_response
-            )
-    
-    async def health_check(self) -> Dict[str, Any]:
-        """Check agent health and connectivity."""
-        try:
-            is_healthy = await self.agent_client.health_check()
-            
-            return {
-                "status": "healthy" if is_healthy else "unhealthy",
-                "agent_available": is_healthy,
-                "timestamp": logger._structlog_kwargs.get("timestamp", "unknown")
-            }
-            
-        except Exception as e:
-            logger.error(f"Agent health check failed: {e}")
-            return {
-                "status": "unhealthy",
-                "agent_available": False,
-                "error": str(e)
-            }
+            logger.error(f"Failed to get conversation history for session {session_id}: {e}",
+                        extra={"user_id": user_id, "session_id": session_id})
+            raise AgentError(f"Failed to get conversation history: {str(e)}")

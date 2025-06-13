@@ -95,13 +95,23 @@ class OAuthService:
         """Initialize OAuth providers based on configuration."""
         providers = {}
         
-        # Google OAuth
+        # Google OAuth (default/legacy)
         if settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET:
             providers["google"] = GoogleOAuthProvider(
                 client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
                 client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
                 redirect_uri=f"{settings.OAUTH_REDIRECT_BASE_URL}/api/v1/oauth/callback/google"
             )
+        
+        # Gmail-specific OAuth
+        if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
+            from app.core.integrations.oauth.gmail_oauth import get_gmail_oauth_provider
+            providers["gmail"] = get_gmail_oauth_provider()
+        
+        # Calendar-specific OAuth
+        if settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET:
+            from app.core.integrations.oauth.calendar_oauth import get_calendar_oauth_provider
+            providers["calendar"] = get_calendar_oauth_provider()
         
         # Microsoft OAuth
         if settings.MICROSOFT_OAUTH_CLIENT_ID and settings.MICROSOFT_OAUTH_CLIENT_SECRET:

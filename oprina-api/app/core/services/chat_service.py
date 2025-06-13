@@ -243,11 +243,17 @@ class ChatService:
     ) -> bool:
         """Delete a message from chat history."""
         try:
-            # Validate through agent service (includes ownership check)
-            result = await self.agent_service.message_handler.delete_message(
-                message_id=message_id,
-                user_id=user_id
-            )
+            # Get message to verify ownership
+            message = await self.message_repo.get_message_by_id(message_id)
+            
+            if not message:
+                return False
+            
+            if message.get("user_id") != user_id:
+                raise ValueError("User not authorized to delete this message")
+            
+            # Delete the message
+            result = await self.message_repo.delete_message(message_id)
             
             logger.info(f"Deleted message {message_id}")
             return result

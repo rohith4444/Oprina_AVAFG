@@ -2,7 +2,6 @@
 Supabase database connection and client management.
 """
 
-import asyncio
 from typing import Optional
 from supabase import create_client, Client
 from app.config import settings

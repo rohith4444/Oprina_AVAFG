@@ -6,13 +6,17 @@ in the database schema. It handles chat sessions between users and the AI agent.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from decimal import Decimal
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import uuid
+
+# TYPE_CHECKING imports - only used for type hints, not at runtime
+if TYPE_CHECKING:
+    from app.models.database.message import Message
 
 Base = declarative_base()
 

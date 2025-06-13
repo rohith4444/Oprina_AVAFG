@@ -13,7 +13,7 @@ import time
 import uuid
 
 from app.config import get_settings
-from app.api.endpoints import auth, chat, sessions, health, oauth, voice
+from app.api.endpoints import auth, chat, sessions, health, oauth, voice, admin
 from app.utils.logging import get_logger, setup_logging
 from app.utils.errors import (
     OprinaError, ValidationError, AuthenticationError, 
@@ -229,6 +229,12 @@ app.include_router(
     tags=["voice"]
 )
 
+app.include_router(
+    admin.router,
+    prefix="/api/v1/admin",
+    tags=["admin"]
+)
+
 
 # Root endpoint
 @app.get("/")
@@ -272,6 +278,22 @@ async def startup_event():
         logger.info(f"OAuth providers configured: {', '.join(oauth_providers)}")
     else:
         logger.warning("No OAuth providers configured")
+    
+    # Start background tasks
+    try:
+        from app.core.database.repositories.token_repository import TokenRepository
+        from app.core.services.oauth_service import get_oauth_service
+        from app.core.services.background_tasks import startup_background_tasks
+        
+        # Initialize services
+        token_repo = TokenRepository()
+        oauth_service = get_oauth_service(token_repo)
+        
+        # Start background tasks
+        await startup_background_tasks(oauth_service)
+        
+    except Exception as e:
+        logger.error(f"Failed to start background tasks: {e}")
 
 
 # Shutdown event
@@ -279,6 +301,13 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup on application shutdown."""
     logger.info("Shutting down Oprina API...")
+    
+    # Stop background tasks
+    try:
+        from app.core.services.background_tasks import shutdown_background_tasks
+        await shutdown_background_tasks()
+    except Exception as e:
+        logger.error(f"Error stopping background tasks: {e}")
 
 
 if __name__ == "__main__":

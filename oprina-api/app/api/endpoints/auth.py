@@ -9,6 +9,7 @@ from app.core.services.user_service import UserService
 from app.api.dependencies import get_user_service, get_current_user, get_optional_current_user
 from app.api.models.requests import CreateUserRequest, UpdateUserRequest
 from app.api.models.responses import UserResponse, AuthResponse
+from app.utils.auth import AuthManager
 
 router = APIRouter()
 
@@ -23,9 +24,9 @@ async def register_user(
         # Create or get existing user
         user = await user_service.create_or_get_user(user_data.dict())
         
-        # Generate simple token for Phase 1
-        # In production, this would be a proper JWT token
-        token = f"user_{user['id']}"
+        # Generate proper JWT token
+        auth_manager = AuthManager()
+        token = auth_manager.create_access_token(user['id'])
         
         return AuthResponse(
             access_token=token,
@@ -45,14 +46,14 @@ async def login_user(
     user_data: CreateUserRequest,
     user_service: UserService = Depends(get_user_service)
 ):
-    """Login user (same as register for Phase 1)."""
+    """Login user (same as register for simplified auth)."""
     try:
-        # For Phase 1, login is the same as register
         # This will find existing user or create new one
         user = await user_service.create_or_get_user(user_data.dict())
         
-        # Generate simple token for Phase 1
-        token = f"user_{user['id']}"
+        # Generate proper JWT token
+        auth_manager = AuthManager()
+        token = auth_manager.create_access_token(user['id'])
         
         return AuthResponse(
             access_token=token,
@@ -100,8 +101,8 @@ async def logout_user(
     current_user: dict = Depends(get_current_user)
 ):
     """Logout current user."""
-    # For Phase 1, logout is just a confirmation
-    # In production, you would invalidate the token
+    # For stateless JWT, logout is just a confirmation
+    # In production, you could maintain a token blacklist
     return {"message": "Successfully logged out", "user_id": current_user["id"]}
 
 

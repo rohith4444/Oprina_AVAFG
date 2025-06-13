@@ -142,10 +142,17 @@ class TokenRepository:
         self,
         user_id: str,
         service_type: str,
-        provider: str
+        provider: Optional[str] = None  # Auto-detect provider based on service_type
     ) -> Optional[ServiceToken]:
         """Get the active token for a specific user, service, and provider."""
         try:
+            # Auto-detect provider based on service_type if not specified
+            if provider is None:
+                if service_type in ["gmail", "calendar"]:
+                    provider = service_type  # Use service_type as provider name
+                else:
+                    provider = "google"  # Default fallback
+            
             return self.db.query(ServiceToken).filter(
                 and_(
                     ServiceToken.user_id == user_id,
@@ -159,6 +166,53 @@ class TokenRepository:
         except Exception as e:
             logger.error(f"Failed to get active token: {str(e)}")
             raise DatabaseError(f"Failed to get active token: {str(e)}")
+    
+    async def get_active_token_data(
+        self,
+        user_id: str,
+        service_type: str,
+        provider: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get active token with decrypted access token as dict."""
+        try:
+            token = await self.get_active_token(user_id, service_type, provider)
+            if not token or not token.is_valid:
+                return None
+            
+            # Decrypt and return token data
+            from app.utils.encryption import decrypt_token
+            
+            # Mark as used
+            token.mark_used()
+            self.db.commit()
+            
+            return {
+                "access_token": decrypt_token(token.access_token_encrypted),
+                "expires_at": token.expires_at,
+                "service": service_type,
+                "user_id": user_id,
+                "provider": token.provider,
+                "scope": token.scope
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get active token data: {str(e)}")
+            raise DatabaseError(f"Failed to get active token data: {str(e)}")
+    
+    async def is_service_connected(
+        self,
+        user_id: str,
+        service_type: str,
+        provider: Optional[str] = None
+    ) -> bool:
+        """Check if user has an active token for the specified service."""
+        try:
+            token = await self.get_active_token(user_id, service_type, provider)
+            return token is not None and token.is_valid
+            
+        except Exception as e:
+            logger.error(f"Failed to check service connection: {str(e)}")
+            return False
     
     async def get_decrypted_access_token(self, token_id: str) -> Optional[str]:
         """Get and decrypt the access token."""

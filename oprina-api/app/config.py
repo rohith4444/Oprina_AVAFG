@@ -2,7 +2,6 @@
 Configuration settings for Oprina API.
 """
 
-import os
 from typing import List
 from pydantic import BaseSettings
 
@@ -29,15 +28,8 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     SUPABASE_SERVICE_KEY: str = ""
     
-    # Google Cloud settings
-    GOOGLE_CLOUD_PROJECT: str = ""
-    GOOGLE_CLOUD_LOCATION: str = "us-central1"
-    GOOGLE_CLOUD_STAGING_BUCKET: str = ""
-    
     # Vertex AI Agent settings
-    VERTEX_AI_PROJECT_ID: str = ""
     VERTEX_AI_AGENT_ID: str = ""
-    VERTEX_AI_LOCATION: str = "us-central1"
     
     # HeyGen settings
     HEYGEN_API_KEY: str = ""
@@ -46,9 +38,12 @@ class Settings(BaseSettings):
     # OAuth settings
     GOOGLE_OAUTH_CLIENT_ID: str = ""
     GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    GOOGLE_CLIENT_ID: str = ""  # For Gmail/Calendar integration
+    GOOGLE_CLIENT_SECRET: str = ""  # For Gmail/Calendar integration
     MICROSOFT_OAUTH_CLIENT_ID: str = ""
     MICROSOFT_OAUTH_CLIENT_SECRET: str = ""
     OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
+    BACKEND_URL: str = "http://localhost:8000"  # For OAuth integration files
     
     # Voice Services Configuration
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -66,8 +61,16 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    # Admin settings
+    ADMIN_TOKEN: str = "admin-token-change-in-production"
+    
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60
+    
+    # Background tasks
+    ENABLE_BACKGROUND_TASKS: bool = True
+    TOKEN_REFRESH_INTERVAL_MINUTES: int = 30
+    CLEANUP_INTERVAL_HOURS: int = 6
     
     # Logging
     LOG_LEVEL: str = "INFO"

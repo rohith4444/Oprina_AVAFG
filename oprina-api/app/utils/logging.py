@@ -15,8 +15,6 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
 import json
-import uuid
-
 
 class RequestIDFilter(logging.Filter):
     """Filter to add request ID to log records."""

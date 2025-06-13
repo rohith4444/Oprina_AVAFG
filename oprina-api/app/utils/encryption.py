@@ -2,9 +2,16 @@
 Token encryption and password utilities for Oprina API.
 
 This module provides secure encryption and hashing functions for:
-- Service token encryption/decryption
-- Password hashing and verification
-- Secure data storage
+- JWT token creation and verification (with centralized configuration)
+- Service token encryption/decryption for database storage
+- Password hashing and verification using bcrypt
+- Cryptographically secure token generation
+- API key generation and formatting
+- Sensitive data encryption for secure storage
+- Data masking for logging and display
+
+All JWT operations use centralized configuration and support proper
+expiration, signature verification, and type validation.
 """
 
 import os
@@ -18,6 +25,7 @@ import bcrypt
 import jwt
 from datetime import datetime, timedelta
 
+from app.config import get_settings
 from app.utils.errors import TokenError, ValidationError
 from app.utils.logging import get_logger
 
@@ -194,7 +202,9 @@ def create_jwt_token(
         JWT token string
     """
     if not secret_key:
-        secret_key = os.getenv('JWT_SECRET_KEY', 'development-secret-key')
+        from app.config import get_settings
+        settings = get_settings()
+        secret_key = settings.JWT_SECRET_KEY
     
     payload = {
         'user_id': user_id,
@@ -229,7 +239,9 @@ def verify_jwt_token(
         TokenError: If token is invalid or expired
     """
     if not secret_key:
-        secret_key = os.getenv('JWT_SECRET_KEY', 'development-secret-key')
+        from app.config import get_settings
+        settings = get_settings()
+        secret_key = settings.JWT_SECRET_KEY
     
     try:
         payload = jwt.decode(token, secret_key, algorithms=['HS256'])

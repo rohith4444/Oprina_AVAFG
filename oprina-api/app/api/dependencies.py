@@ -114,7 +114,62 @@ def get_voice_service(
     return VoiceService(message_repository, session_repository, chat_service)
 
 
+def get_auth_manager() -> AuthManager:
+    """Get AuthManager instance."""
+    return AuthManager()
+
+
 # Authentication Dependencies
+
+async def _authenticate_jwt_token(
+    credentials: HTTPAuthorizationCredentials,
+    user_repository: UserRepository,
+    auth_manager: AuthManager,
+    update_activity: bool = False
+) -> Optional[User]:
+    """
+    Helper function to authenticate JWT token and return user.
+    
+    Args:
+        credentials: HTTP authorization credentials
+        user_repository: User repository for database operations
+        auth_manager: AuthManager instance
+        update_activity: Whether to update user's last activity
+        
+    Returns:
+        User object if authentication successful, None otherwise
+        
+    Raises:
+        AuthenticationError: If authentication fails (only when required)
+    """
+    try:
+        payload = auth_manager.decode_jwt_token(credentials.credentials)
+        
+        if not payload:
+            return None
+        
+        user_id = payload.get("user_id")
+        if not user_id:
+            return None
+        
+        user = await user_repository.get_user_by_id(user_id)
+        if not user:
+            return None
+        
+        if not user.is_active:
+            return None
+        
+        # Update last activity if requested
+        if update_activity:
+            await user_repository.update_last_activity(user_id)
+            logger.debug(f"Authenticated user: {user.email}")
+        
+        return user
+        
+    except Exception as e:
+        logger.warning(f"JWT authentication failed: {str(e)}")
+        return None
+
 
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
@@ -128,26 +183,8 @@ async def get_current_user_optional(
     if not credentials:
         return None
     
-    try:
-        auth_manager = AuthManager()
-        payload = auth_manager.decode_jwt_token(credentials.credentials)
-        
-        if not payload:
-            return None
-        
-        user_id = payload.get("sub")
-        if not user_id:
-            return None
-        
-        user = await user_repository.get_user_by_id(user_id)
-        if not user or not user.is_active:
-            return None
-        
-        return user
-        
-    except Exception as e:
-        logger.warning(f"Failed to authenticate user: {str(e)}")
-        return None
+    auth_manager = AuthManager()
+    return await _authenticate_jwt_token(credentials, user_repository, auth_manager)
 
 
 async def get_current_user(
@@ -161,52 +198,27 @@ async def get_current_user(
     """
     try:
         auth_manager = AuthManager()
-        payload = auth_manager.decode_jwt_token(credentials.credentials)
+        user = await _authenticate_jwt_token(credentials, user_repository, auth_manager, update_activity=True)
         
-        if not payload:
-            raise AuthenticationError("Invalid token")
-        
-        user_id = payload.get("sub")
-        if not user_id:
-            raise AuthenticationError("Invalid token payload")
-        
-        user = await user_repository.get_user_by_id(user_id)
         if not user:
-            raise AuthenticationError("User not found")
+            raise AuthenticationError("Invalid or expired token")
         
-        if not user.is_active:
-            raise AuthenticationError("User account is deactivated")
-        
-        # Update last activity
-        await user_repository.update_last_activity(user_id)
-        
-        logger.debug(f"Authenticated user: {user.email}")
         return user
         
-    except AuthenticationError:
-        raise
+    except AuthenticationError as e:
+        logger.error(f"Authentication failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
+        logger.error(f"Unexpected authentication error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-
-async def get_current_active_user(
-    current_user: User = Depends(get_current_user)
-) -> User:
-    """
-    Get current active user.
-    Ensures user is both authenticated and active.
-    """
-    if not current_user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    return current_user
 
 
 async def get_current_admin_user(
@@ -215,10 +227,10 @@ async def get_current_admin_user(
     """
     Get current user and verify admin permissions.
     """
-    if not current_user.is_admin:
+    if not hasattr(current_user, 'is_admin') or not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
+            detail="Administrator privileges required"
         )
     return current_user
 
@@ -227,7 +239,6 @@ async def get_current_admin_user(
 
 async def get_api_key_user(
     request: Request,
-    db: Session = Depends(get_db),
     user_repository: UserRepository = Depends(get_user_repository),
     token_service: TokenService = Depends(get_token_service)
 ) -> Optional[User]:
@@ -243,12 +254,24 @@ async def get_api_key_user(
         # Validate API key and get user info
         key_info = await token_service.validate_api_key(api_key)
         if not key_info:
+            logger.debug("Invalid API key provided")
             return None
         
-        user = await user_repository.get_user_by_id(key_info["user_id"])
-        if not user or not user.is_active:
+        user_id = key_info.get("user_id")
+        if not user_id:
+            logger.warning("API key validation returned no user_id")
             return None
         
+        user = await user_repository.get_user_by_id(user_id)
+        if not user:
+            logger.warning(f"User not found for API key: {user_id}")
+            return None
+        
+        if not user.is_active:
+            logger.warning(f"Inactive user attempted API key access: {user_id}")
+            return None
+        
+        logger.debug(f"API key authentication successful: {user.email}")
         return user
         
     except Exception as e:
@@ -282,7 +305,7 @@ async def require_authentication(
     return user
 
 
-# Rate Limiting Dependencies (placeholder for future implementation)
+# Rate Limiting Dependencies (Future Implementation)
 
 async def rate_limit_per_user(
     current_user: User = Depends(get_current_user),
@@ -290,20 +313,26 @@ async def rate_limit_per_user(
 ) -> User:
     """
     Apply rate limiting per user.
-    Currently a placeholder - implement with Redis in production.
+    
+    Future implementation will use Redis to track:
+    - Requests per user per time window
+    - Different limits for different endpoint categories
+    - Configurable rate limits per user tier
     """
-    # TODO: Implement rate limiting with Redis
-    # For now, just pass through the user
+    # Placeholder: Pass through for now
     return current_user
 
 
 async def rate_limit_per_ip(request: Request) -> Request:
     """
     Apply rate limiting per IP address.
-    Currently a placeholder - implement with Redis in production.
+    
+    Future implementation will use Redis to track:
+    - Requests per IP per time window
+    - Global IP-based rate limits
+    - Whitelist/blacklist functionality
     """
-    # TODO: Implement IP-based rate limiting with Redis
-    # For now, just pass through the request
+    # Placeholder: Pass through for now
     return request
 
 

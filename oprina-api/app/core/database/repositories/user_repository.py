@@ -7,7 +7,7 @@ from datetime import datetime
 from supabase import Client
 import structlog
 
-from app.core.database.models import BaseDBModel, RecordNotFoundError, serialize_for_db, handle_supabase_response
+from app.core.database.models import RecordNotFoundError, serialize_for_db, handle_supabase_response
 
 logger = structlog.get_logger(__name__)
 

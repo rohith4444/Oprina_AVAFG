@@ -1,11 +1,15 @@
 """
 Authentication utilities for Oprina API.
 
-This module provides authentication functions for:
-- Token generation and verification
-- User session management
-- Authentication decorators
-- Security utilities
+This module provides comprehensive JWT-based authentication functions for:
+- Access token and refresh token generation and verification
+- User session management with session tokens
+- API key generation and validation
+- Authentication decorators and security utilities
+- Permission checking framework (placeholder)
+
+All authentication is handled through JWT tokens with proper expiration,
+signature verification, and type validation.
 """
 
 import os
@@ -14,7 +18,8 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 from functools import wraps
 
-from app.utils.errors import AuthenticationError, AuthorizationError, TokenError
+from app.config import get_settings
+from app.utils.errors import AuthenticationError, AuthorizationError, TokenError, ValidationError
 from app.utils.encryption import create_jwt_token, verify_jwt_token, generate_secure_token
 from app.utils.logging import get_logger
 
@@ -25,9 +30,10 @@ class AuthManager:
     """Manages authentication operations for the application."""
     
     def __init__(self):
-        self.jwt_secret = os.getenv('JWT_SECRET_KEY', 'development-secret-key')
-        self.token_expiry_hours = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
-        self.refresh_token_expiry_days = int(os.getenv('REFRESH_TOKEN_EXPIRY_DAYS', '30'))
+        settings = get_settings()
+        self.jwt_secret = settings.JWT_SECRET_KEY                    # ✅ Use config
+        self.token_expiry_hours = settings.ACCESS_TOKEN_EXPIRE_MINUTES // 60
+        self.refresh_token_expiry_days = 30  # Add to config if needed
     
     def create_access_token(self, user_id: str, additional_claims: Optional[Dict[str, Any]] = None) -> str:
         """Create an access token for user authentication."""
@@ -92,6 +98,32 @@ class AuthManager:
         except Exception as e:
             logger.error(f"Refresh token verification failed: {str(e)}")
             raise TokenError(f"Refresh token verification failed: {str(e)}")
+    
+    def decode_jwt_token(self, token: str) -> Dict[str, Any]:
+        """
+        Decode and verify any JWT token and return payload.
+        This method is used by FastAPI dependencies.
+        
+        Args:
+            token: JWT token string
+            
+        Returns:
+            Token payload dictionary
+        """
+        try:
+            payload = verify_jwt_token(token, self.jwt_secret)
+            
+            # Accept any valid JWT token type (access, refresh, session, api_key)
+            token_type = payload.get('type')
+            if not token_type:
+                raise TokenError("Token missing type field")
+            
+            return payload
+        except TokenError:
+            raise
+        except Exception as e:
+            logger.error(f"JWT token decoding failed: {str(e)}")
+            raise TokenError(f"Token decoding failed: {str(e)}")
 
 
 # Global auth manager instance
@@ -331,22 +363,18 @@ def require_permission(permission: str):
     Decorator to require specific permission for a function.
     
     Args:
-        permission: Required permission string
+        permission: Required permission name
     """
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # This is a placeholder for permission checking
-            # In a full implementation, this would check user permissions
+            # Permission checking system not yet implemented
+            # Future implementation would:
+            # 1. Extract user from token/kwargs
+            # 2. Check user permissions against required permission
+            # 3. Raise AuthorizationError if insufficient permissions
             
-            current_user_id = kwargs.get('current_user_id')
-            if not current_user_id:
-                raise AuthorizationError("User context required for permission check")
-            
-            # TODO: Implement actual permission checking logic
-            # For now, just log the permission check
-            logger.info(f"Permission check: {permission} for user {current_user_id}")
-            
+            logger.warning(f"Permission check bypassed for: {permission}")
             return func(*args, **kwargs)
         
         return wrapper

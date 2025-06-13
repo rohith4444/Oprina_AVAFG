@@ -4,8 +4,6 @@ Vertex AI Agent client for communicating with deployed Oprina agent.
 
 import asyncio
 from typing import Optional, Dict, Any, AsyncGenerator
-import httpx
-from google.cloud import aiplatform
 from vertexai import agent_engines
 import structlog
 
@@ -20,8 +18,6 @@ class VertexAgentClient:
     def __init__(self):
         self._agent_app: Optional[Any] = None
         self._initialized = False
-        self._project_id = settings.GOOGLE_CLOUD_PROJECT
-        self._location = settings.VERTEX_AI_LOCATION
         self._agent_id = settings.VERTEX_AI_AGENT_ID
     
     async def initialize(self) -> None:
@@ -30,16 +26,11 @@ class VertexAgentClient:
             return
         
         try:
-            if not self._project_id or not self._agent_id:
-                raise ValueError("Google Cloud Project and Agent ID must be configured")
+            if not self._agent_id:
+                raise ValueError("Vertex AI Agent ID must be configured")
             
-            # Initialize Vertex AI
-            aiplatform.init(
-                project=self._project_id,
-                location=self._location
-            )
-            
-            # Get the deployed agent
+            # Get the deployed agent directly by resource ID
+            # The agent_engines.get() method handles project/location from the resource ID
             self._agent_app = agent_engines.get(self._agent_id)
             
             self._initialized = True
@@ -138,50 +129,6 @@ class VertexAgentClient:
             logger.error(f"Failed to stream message to agent: {e}")
             raise
     
-    async def get_session(self, user_id: str, session_id: str) -> Dict[str, Any]:
-        """Get agent session information."""
-        if not self._initialized:
-            await self.initialize()
-        
-        try:
-            session_info = self._agent_app.get_session(
-                user_id=user_id, 
-                session_id=session_id
-            )
-            
-            return {
-                "session_id": session_info["id"],
-                "user_id": user_id,
-                "status": "active"  # Assume active if we can retrieve it
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to get agent session {session_id}: {e}")
-            raise
-    
-    async def list_sessions(self, user_id: str) -> list[Dict[str, Any]]:
-        """List all agent sessions for a user."""
-        if not self._initialized:
-            await self.initialize()
-        
-        try:
-            sessions_response = self._agent_app.list_sessions(user_id=user_id)
-            
-            sessions = sessions_response.get("sessions", [])
-            
-            return [
-                {
-                    "session_id": session["id"],
-                    "user_id": user_id,
-                    "status": "active"
-                }
-                for session in sessions
-            ]
-            
-        except Exception as e:
-            logger.error(f"Failed to list agent sessions for user {user_id}: {e}")
-            raise
-    
     def _process_response_events(self, events: list) -> str:
         """Process response events into a single response string."""
         response_parts = []
@@ -206,10 +153,8 @@ class VertexAgentClient:
             if not self._initialized:
                 await self.initialize()
             
-            # Try to create a test session
-            test_session = await self.create_session("health_check_user")
-            
-            return True
+            # Simple health check - just verify agent is accessible
+            return self._agent_app is not None
             
         except Exception as e:
             logger.error(f"Agent health check failed: {e}")
