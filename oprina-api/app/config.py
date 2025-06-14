@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     ENABLE_BACKGROUND_TASKS: bool = True
     TOKEN_REFRESH_INTERVAL_MINUTES: int = 30
     CLEANUP_INTERVAL_HOURS: int = 6
+
+    BACKEND_API_URL: str = "http://localhost:8000"  # Your backend URL
+    INTERNAL_API_KEY: str = "your-internal-api-key"  # Your internal API key
     
     # Logging
     LOG_LEVEL: str = "INFO"

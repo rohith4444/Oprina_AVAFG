@@ -41,12 +41,35 @@ class VertexAgentClient:
             raise
     
     async def create_session(self, user_id: str) -> Dict[str, Any]:
-        """Create a new agent session for a user."""
+        """Create a new agent session with user context in state."""
         if not self._initialized:
             await self.initialize()
         
         try:
+            # Create the Vertex AI session
             session_response = self._agent_app.create_session(user_id=user_id)
+            
+            # Set initial session state with user context
+            initial_state = {
+                "user:id": user_id,
+                "user:backend_url": settings.BACKEND_API_URL or "http://localhost:8000",
+                "user:session_type": "multi_user",
+                "gmail:connected": False,
+                "calendar:connected": False,
+            }
+            
+            # Update the session with initial state
+            # Note: This may vary based on your Vertex AI agent implementation
+            # If update_session_state doesn't exist, the session may already have the user_id accessible
+            try:
+                await self._agent_app.update_session_state(
+                    session_id=session_response["id"],
+                    state_updates=initial_state
+                )
+            except AttributeError:
+                # If update_session_state method doesn't exist, log and continue
+                # The user_id should still be accessible via session.user_id
+                logger.info("Session state update method not available, relying on session.user_id")
             
             session_data = {
                 "vertex_session_id": session_response["id"],
@@ -59,7 +82,7 @@ class VertexAgentClient:
             
         except Exception as e:
             logger.error(f"Failed to create agent session for user {user_id}: {e}")
-            raise
+
     
     async def send_message(
         self, 

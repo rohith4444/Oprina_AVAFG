@@ -114,22 +114,23 @@ class UsageRepository:
     # Usage Quotas
     
     async def get_or_create_quota(self, user_id: str) -> UsageQuota:
-        """Get or create usage quota for a user."""
+        """Get or create usage quota for a user (20 minutes total per account)."""
         try:
-            current_month = datetime.utcnow().strftime("%Y-%m")
-            
-            # Try to get existing quota
-            response = self.client.table("usage_quotas").select("*").eq("user_id", user_id).eq("current_month", current_month).execute()
+            # Try to get existing quota (one per user, lifetime)
+            response = self.client.table("usage_quotas").select("*").eq("user_id", user_id).execute()
             
             if response.data:
                 return UsageQuota(**response.data[0])
             
-            # Create new quota for this month
+            # Create new quota for this user (20 minutes total)
             quota = UsageQuota(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
-                current_month=current_month,
-                last_reset_at=datetime.utcnow()
+                total_limit_minutes=20,
+                used_minutes=0,
+                used_seconds=0,
+                session_count=0,
+                quota_exhausted=False
             )
             
             data = quota.model_dump()
@@ -137,7 +138,7 @@ class UsageRepository:
             response = self.client.table("usage_quotas").insert(data).execute()
             
             if response.data:
-                logger.info(f"Created new quota for user {user_id} for {current_month}")
+                logger.info(f"Created new 20-minute quota for user {user_id}")
                 return UsageQuota(**response.data[0])
             else:
                 raise Exception("Failed to create usage quota")
@@ -146,22 +147,36 @@ class UsageRepository:
             logger.error(f"Error getting/creating quota for user {user_id}: {str(e)}")
             raise
     
-    async def update_quota_usage(self, user_id: str, duration_minutes: float, cost: float) -> Optional[UsageQuota]:
-        """Update quota usage after a session."""
+    async def update_quota_usage(self, user_id: str, duration_seconds: int) -> Optional[UsageQuota]:
+        """Update quota usage after a session (20-minute total limit)."""
         try:
             quota = await self.get_or_create_quota(user_id)
             
+            # Calculate new totals
+            new_total_seconds = quota.used_seconds + duration_seconds
+            new_total_minutes = new_total_seconds // 60
+            
+            # Check if quota is now exhausted (>= 20 minutes)
+            quota_exhausted = new_total_minutes >= quota.total_limit_minutes
+            
             updates = {
-                "used_minutes": quota.used_minutes + int(duration_minutes),
-                "used_cost": round(quota.used_cost + cost, 2),
+                "used_seconds": new_total_seconds,
+                "used_minutes": new_total_minutes,
                 "session_count": quota.session_count + 1,
+                "quota_exhausted": quota_exhausted,
                 "updated_at": datetime.utcnow().isoformat()
             }
+            
+            # Mark exhaustion timestamp if just reached limit
+            if quota_exhausted and not quota.quota_exhausted:
+                updates["exhausted_at"] = datetime.utcnow().isoformat()
             
             response = self.client.table("usage_quotas").update(updates).eq("id", quota.id).execute()
             
             if response.data:
-                logger.info(f"Updated quota usage for user {user_id}")
+                logger.info(f"Updated quota usage for user {user_id}: {new_total_minutes}/{quota.total_limit_minutes} minutes used")
+                if quota_exhausted:
+                    logger.warning(f"User {user_id} has exhausted their 20-minute quota!")
                 return UsageQuota(**response.data[0])
             else:
                 logger.warning(f"Failed to update quota for user {user_id}")
@@ -172,30 +187,31 @@ class UsageRepository:
             raise
     
     async def check_quota_limits(self, user_id: str) -> Dict[str, Any]:
-        """Check if user has exceeded quota limits."""
+        """Check if user has exceeded 20-minute quota limit."""
         try:
             quota = await self.get_or_create_quota(user_id)
             
-            minutes_remaining = max(0, quota.monthly_limit_minutes - quota.used_minutes)
-            cost_remaining = max(0.0, quota.monthly_limit_cost - quota.used_cost)
+            minutes_remaining = max(0, quota.total_limit_minutes - quota.used_minutes)
+            seconds_remaining = max(0, (quota.total_limit_minutes * 60) - quota.used_seconds)
             
-            minutes_percentage = (quota.used_minutes / quota.monthly_limit_minutes) * 100 if quota.monthly_limit_minutes > 0 else 0
-            cost_percentage = (quota.used_cost / quota.monthly_limit_cost) * 100 if quota.monthly_limit_cost > 0 else 0
+            minutes_percentage = (quota.used_minutes / quota.total_limit_minutes) * 100 if quota.total_limit_minutes > 0 else 0
             
             return {
-                "can_create_session": minutes_remaining > 0 and cost_remaining > 0,
+                "can_create_session": not quota.quota_exhausted and minutes_remaining > 0,
                 "quota": quota,
                 "limits": {
+                    "total_limit_minutes": quota.total_limit_minutes,
+                    "used_minutes": quota.used_minutes,
+                    "used_seconds": quota.used_seconds,
                     "minutes_remaining": minutes_remaining,
-                    "cost_remaining": round(cost_remaining, 2),
+                    "seconds_remaining": seconds_remaining,
                     "minutes_percentage": round(minutes_percentage, 1),
-                    "cost_percentage": round(cost_percentage, 1)
+                    "quota_exhausted": quota.quota_exhausted
                 },
                 "warnings": {
-                    "approaching_minute_limit": minutes_percentage >= 80,
-                    "approaching_cost_limit": cost_percentage >= 80,
-                    "exceeded_minute_limit": minutes_remaining <= 0,
-                    "exceeded_cost_limit": cost_remaining <= 0
+                    "approaching_limit": minutes_percentage >= 80,  # 16+ minutes used
+                    "quota_exhausted": quota.quota_exhausted,
+                    "exhausted_at": quota.exhausted_at.isoformat() if quota.exhausted_at else None
                 }
             }
             

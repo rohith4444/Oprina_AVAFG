@@ -40,24 +40,23 @@ class AvatarUsageRecord(BaseModel):
 
 
 class UsageQuota(BaseModel):
-    """User's avatar usage quota and limits."""
+    """User's avatar usage quota - 20 minutes total per account."""
     
     id: Optional[str] = None
     user_id: str = Field(..., description="User ID")
     
-    # Monthly limits
-    monthly_limit_minutes: int = Field(default=60, description="Monthly limit in minutes")
-    monthly_limit_cost: float = Field(default=50.0, description="Monthly cost limit in USD")
+    # Total account limits (lifetime)
+    total_limit_minutes: int = Field(default=20, description="Total limit in minutes (20 min per account)")
     
-    # Current usage
-    current_month: str = Field(..., description="Current billing month (YYYY-MM)")
-    used_minutes: int = Field(default=0, description="Minutes used this month")
-    used_cost: float = Field(default=0.0, description="Cost used this month")
-    session_count: int = Field(default=0, description="Number of sessions this month")
+    # Current usage (lifetime)
+    used_minutes: int = Field(default=0, description="Total minutes used")
+    used_seconds: int = Field(default=0, description="Total seconds used (for precision)")
+    session_count: int = Field(default=0, description="Total number of sessions")
     
     # Status
     is_active: bool = Field(default=True, description="Whether quota is active")
-    last_reset_at: datetime = Field(default_factory=datetime.utcnow, description="Last quota reset")
+    quota_exhausted: bool = Field(default=False, description="Whether 20-minute limit reached")
+    exhausted_at: Optional[datetime] = Field(None, description="When quota was exhausted")
     
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)

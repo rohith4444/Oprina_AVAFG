@@ -4,7 +4,7 @@ Supports both production (API-based) and development (pickle file) modes.
 """
 
 import os
-import pickle
+import pickle, requests
 from pathlib import Path
 from typing import Optional, Any
 from google.auth.transport.requests import Request
@@ -71,47 +71,98 @@ def _get_session_id_from_context(tool_context) -> Optional[str]:
     except Exception as e:
         logger.debug(f"Could not extract session ID: {e}")
         return None
-
-def _get_credentials_from_api(service: str, vertex_session_id: str) -> Optional[Credentials]:
+    
+def _extract_user_id_from_context(tool_context) -> Optional[str]:
     """
-    Get OAuth credentials from backend API for production.
+    Extract user_id from tool context session state.
     
     Args:
-        service: Service name ('gmail' or 'calendar')
-        vertex_session_id: Vertex AI session ID
+        tool_context: ADK tool context
         
     Returns:
-        Google OAuth2 Credentials object or None
+        user_id string or None
     """
     try:
-        # Get token from backend API
-        if service == "gmail":
-            token_data = token_client.get_gmail_token(vertex_session_id)
-        elif service == "calendar":
-            token_data = token_client.get_calendar_token(vertex_session_id)
-        else:
-            logger.error(f"Unknown service: {service}")
-            return None
+        if tool_context and hasattr(tool_context, 'state'):
+            # Method 1: From session state (our preferred method)
+            user_id = tool_context.state.get("user:id")
+            if user_id:
+                logger.debug(f"Found user_id in session state: {user_id}")
+                return user_id
         
-        if not token_data or not token_client.validate_token(token_data):
-            logger.info(f"No valid {service} token found for session {vertex_session_id}")
-            return None
+        # Method 2: Try session.user_id (ADK built-in)
+        if tool_context and hasattr(tool_context, 'session'):
+            if hasattr(tool_context.session, 'user_id'):
+                user_id = tool_context.session.user_id
+                logger.debug(f"Found user_id in session.user_id: {user_id}")
+                return user_id
         
-        # Create credentials object
-        creds = Credentials(
-            token=token_data["access_token"],
-            refresh_token=None,  # Backend handles refresh
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.getenv("GOOGLE_CLIENT_ID"),
-            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-            scopes=[]  # Scopes are managed by backend
-        )
-        
-        logger.info(f"Retrieved {service} credentials from API for session {vertex_session_id}")
-        return creds
+        logger.debug("No user_id found in tool context")
+        return None
         
     except Exception as e:
-        logger.error(f"Failed to get {service} credentials from API: {e}")
+        logger.error(f"Error extracting user_id from context: {e}")
+        return None
+
+def _get_credentials_from_api(service: str, user_id: str) -> Optional[Credentials]:
+    """
+    Get OAuth credentials from backend API using user_id.
+    
+    Args:
+        service: Service name (gmail, calendar)
+        user_id: User identifier
+        
+    Returns:
+        Google Credentials object or None
+    """
+    try:
+        backend_url = os.getenv("BACKEND_API_URL", "http://localhost:8000")
+        api_key = os.getenv("INTERNAL_API_KEY")
+        
+        if not backend_url or not api_key:
+            logger.error("Backend API URL or API key not configured")
+            return None
+        
+        # Call your existing backend API endpoint
+        url = f"{backend_url}/api/v1/internal/tokens/{service}/{user_id}"
+        headers = {
+            "X-Internal-API-Key": api_key,
+            "Content-Type": "application/json"
+        }
+        
+        logger.debug(f"Getting {service} token for user {user_id} from {url}")
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            
+            # Create Google Credentials object
+            credentials = Credentials(
+                token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token"),
+                id_token=token_data.get("id_token"),
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=token_data.get("client_id"),
+                client_secret=token_data.get("client_secret"),
+                scopes=token_data.get("scopes", [])
+            )
+            
+            logger.info(f"Successfully retrieved {service} credentials for user {user_id}")
+            return credentials
+            
+        elif response.status_code == 404:
+            logger.info(f"No {service} token found for user {user_id}")
+            return None
+        else:
+            logger.error(f"API request failed: {response.status_code} - {response.text}")
+            return None
+            
+    except requests.RequestException as e:
+        logger.error(f"Network error accessing token API: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Error getting credentials from API: {e}")
         return None
 
 def _get_credentials_from_pickle(service: str) -> Optional[Credentials]:
@@ -157,88 +208,90 @@ def _get_credentials_from_pickle(service: str) -> Optional[Credentials]:
         logger.error(f"Error getting {service} credentials from pickle: {e}")
         return None
 
-def get_gmail_service(tool_context=None) -> Optional[Any]:
+def get_gmail_service(tool_context=None):
     """
-    Get authenticated Gmail service.
-    Supports both production (API) and development (pickle) modes.
+    Get Gmail service with multi-user support via session state.
     
     Args:
-        tool_context: ADK tool context (for production mode)
+        tool_context: ADK tool context (automatically provided)
         
     Returns:
-        Gmail service object or None if not authenticated
+        Gmail service object or None
     """
     try:
-        logger.debug("Attempting to get Gmail service")
-        creds = None
+        # Method 1: Try to get user_id from session state
+        user_id = _extract_user_id_from_context(tool_context)
         
-        # Try production mode first (API-based) using tool_context
-        if tool_context:
-            vertex_session_id = _get_session_id_from_context(tool_context)
-            if vertex_session_id:
-                logger.debug(f"Using production mode for session {vertex_session_id}")
-                creds = _get_credentials_from_api("gmail", vertex_session_id)
-            else:
-                logger.debug("No session ID found in tool_context")
+        if user_id:
+            logger.info(f"Getting Gmail service for user: {user_id}")
+            credentials = _get_credentials_from_api('gmail', user_id)
+            
+            if credentials:
+                # Mark Gmail as connected in session state
+                if tool_context and hasattr(tool_context, 'state'):
+                    tool_context.state["gmail:connected"] = True
+                
+                # Refresh token if needed
+                if credentials.expired and credentials.refresh_token:
+                    credentials.refresh(Request())
+                
+                return build('gmail', 'v1', credentials=credentials)
         
-        # Fallback to development mode (pickle file)
-        if not creds:
-            logger.debug("Using development mode (pickle file)")
-            creds = _get_credentials_from_pickle("gmail")
+        # Method 2: Fallback to pickle files (development mode)
+        logger.info("Falling back to pickle file authentication")
+        credentials = _get_credentials_from_pickle('gmail')
         
-        if not creds:
-            logger.warning("No Gmail credentials available")
-            return None
+        if credentials:
+            return build('gmail', 'v1', credentials=credentials)
         
-        # Create and return service
-        service = build('gmail', 'v1', credentials=creds)
-        logger.info("Gmail service created successfully")
-        return service
+        logger.warning("No Gmail authentication available")
+        return None
         
     except Exception as e:
-        logger.error(f"Error getting Gmail service: {e}")
+        logger.error(f"Error creating Gmail service: {e}")
         return None
 
-def get_calendar_service(tool_context=None) -> Optional[Any]:
+def get_calendar_service(tool_context=None):
     """
-    Get authenticated Calendar service.
-    Supports both production (API) and development (pickle) modes.
+    Get Calendar service with multi-user support via session state.
     
     Args:
-        tool_context: ADK tool context (for production mode)
+        tool_context: ADK tool context (automatically provided)
         
     Returns:
-        Calendar service object or None if not authenticated
+        Calendar service object or None
     """
     try:
-        logger.debug("Attempting to get Calendar service")
-        creds = None
+        # Method 1: Try to get user_id from session state
+        user_id = _extract_user_id_from_context(tool_context)
         
-        # Try production mode first (API-based) using tool_context
-        if tool_context:
-            vertex_session_id = _get_session_id_from_context(tool_context)
-            if vertex_session_id:
-                logger.debug(f"Using production mode for session {vertex_session_id}")
-                creds = _get_credentials_from_api("calendar", vertex_session_id)
-            else:
-                logger.debug("No session ID found in tool_context")
+        if user_id:
+            logger.info(f"Getting Calendar service for user: {user_id}")
+            credentials = _get_credentials_from_api('calendar', user_id)
+            
+            if credentials:
+                # Mark Calendar as connected in session state
+                if tool_context and hasattr(tool_context, 'state'):
+                    tool_context.state["calendar:connected"] = True
+                
+                # Refresh token if needed
+                if credentials.expired and credentials.refresh_token:
+                    credentials.refresh(Request())
+                
+                return build('calendar', 'v3', credentials=credentials)
         
-        # Fallback to development mode (pickle file)
-        if not creds:
-            logger.debug("Using development mode (pickle file)")
-            creds = _get_credentials_from_pickle("calendar")
+        # Method 2: Fallback to pickle files (development mode)
+        logger.info("Falling back to pickle file authentication")
+        credentials = _get_credentials_from_pickle('calendar')
         
-        if not creds:
-            logger.warning("No Calendar credentials available")
-            return None
+        if credentials:
+            return build('calendar', 'v3', credentials=credentials)
         
-        # Create and return service
-        service = build('calendar', 'v3', credentials=creds)
-        logger.info("Calendar service created successfully")
-        return service
+        logger.warning("No Calendar authentication available")
+        return None
         
     except Exception as e:
-        logger.error(f"Error getting Calendar service: {e}")
+        logger.error(f"Error creating Calendar service: {e}")
         return None
 
 def check_gmail_connection(tool_context=None) -> bool:
