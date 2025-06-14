@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from datetime import datetime
 
 from app.core.database.connection import get_database_client
-from app.api.models.responses import HealthResponse
+from app.api.models.responses.health import HealthResponse
 
 router = APIRouter()
 

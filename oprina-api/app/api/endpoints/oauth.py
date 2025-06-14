@@ -18,12 +18,12 @@ from app.api.dependencies import (
 )
 from app.core.services.token_service import TokenService
 from app.core.services.oauth_service import OAuthService
-from app.models.requests.oauth import (
+from app.api.models.requests.oauth import (
     OAuthInitiateRequest,
     TokenRefreshRequest,
     TokenRevokeRequest
 )
-from app.models.responses.oauth import (
+from app.api.models.responses.oauth import (
     OAuthInitiateResponse,
     TokenResponse,
     TokenListResponse,

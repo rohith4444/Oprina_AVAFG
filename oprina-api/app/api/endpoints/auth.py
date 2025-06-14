@@ -7,8 +7,8 @@ from typing import Optional
 
 from app.core.services.user_service import UserService
 from app.api.dependencies import get_user_service, get_current_user, get_optional_current_user
-from app.api.models.requests import CreateUserRequest, UpdateUserRequest
-from app.api.models.responses import UserResponse, AuthResponse
+from app.api.models.requests.auth import CreateUserRequest, UpdateUserRequest
+from app.api.models.responses.auth import UserResponse, AuthResponse
 from app.utils.auth import AuthManager
 
 router = APIRouter()

@@ -5,7 +5,7 @@ Agent service for orchestrating communication with deployed agent.
 from typing import Dict, Any, AsyncGenerator, Optional
 import structlog
 
-from app.core.agent.client import agent_client
+from app.core.integrations.client import agent_client
 from app.core.database.repositories.session_repository import SessionRepository
 from app.core.database.repositories.message_repository import MessageRepository
 

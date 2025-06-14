@@ -16,13 +16,13 @@ from app.api.dependencies import (
     validate_pagination
 )
 from app.core.services.voice_service import VoiceService
-from app.models.requests.voice import (
+from app.api.models.requests.voice import (
     VoiceMessageRequest,
     TranscriptionRequest,
     SynthesisRequest,
     VoiceSettingsRequest
 )
-from app.models.responses.voice import (
+from app.api.models.responses.voice import (
     VoiceMessageResponse,
     TranscriptionResponse,
     SynthesisResponse,

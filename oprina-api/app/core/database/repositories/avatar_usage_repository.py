@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from supabase import Client
 
 from app.models.database.avatar_usage import AvatarUsageRecord, UsageQuota, UsageSummary
+from app.core.database.schema_validator import TableNames
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -31,7 +32,7 @@ class UsageRepository:
             
             data = record.model_dump()
             
-            response = self.client.table("avatar_usage_records").insert(data).execute()
+            response = self.client.table(TableNames.AVATAR_USAGE_RECORDS).insert(data).execute()
             
             if response.data:
                 logger.info(f"Created avatar usage record: {record.id}")
@@ -48,7 +49,7 @@ class UsageRepository:
         try:
             updates["updated_at"] = datetime.utcnow().isoformat()
             
-            response = self.client.table("avatar_usage_records").update(updates).eq("id", record_id).execute()
+            response = self.client.table(TableNames.AVATAR_USAGE_RECORDS).update(updates).eq("id", record_id).execute()
             
             if response.data:
                 logger.info(f"Updated usage record: {record_id}")
@@ -65,7 +66,7 @@ class UsageRepository:
         """End an avatar session and calculate final usage."""
         try:
             # Find the active record
-            response = self.client.table("avatar_usage_records").select("*").eq("avatar_session_id", avatar_session_id).eq("status", "active").execute()
+            response = self.client.table(TableNames.AVATAR_USAGE_RECORDS).select("*").eq("avatar_session_id", avatar_session_id).eq("status", "active").execute()
             
             if not response.data:
                 logger.warning(f"No active usage record found for avatar session: {avatar_session_id}")
@@ -98,7 +99,7 @@ class UsageRepository:
     async def get_user_usage_records(self, user_id: str, billing_period: Optional[str] = None, limit: int = 50) -> List[AvatarUsageRecord]:
         """Get usage records for a user."""
         try:
-            query = self.client.table("avatar_usage_records").select("*").eq("user_id", user_id)
+            query = self.client.table(TableNames.AVATAR_USAGE_RECORDS).select("*").eq("user_id", user_id)
             
             if billing_period:
                 query = query.eq("billing_period", billing_period)
@@ -117,7 +118,7 @@ class UsageRepository:
         """Get or create usage quota for a user (20 minutes total per account)."""
         try:
             # Try to get existing quota (one per user, lifetime)
-            response = self.client.table("usage_quotas").select("*").eq("user_id", user_id).execute()
+            response = self.client.table(TableNames.USAGE_QUOTAS).select("*").eq("user_id", user_id).execute()
             
             if response.data:
                 return UsageQuota(**response.data[0])
@@ -135,7 +136,7 @@ class UsageRepository:
             
             data = quota.model_dump()
             
-            response = self.client.table("usage_quotas").insert(data).execute()
+            response = self.client.table(TableNames.USAGE_QUOTAS).insert(data).execute()
             
             if response.data:
                 logger.info(f"Created new 20-minute quota for user {user_id}")
@@ -171,7 +172,7 @@ class UsageRepository:
             if quota_exhausted and not quota.quota_exhausted:
                 updates["exhausted_at"] = datetime.utcnow().isoformat()
             
-            response = self.client.table("usage_quotas").update(updates).eq("id", quota.id).execute()
+            response = self.client.table(TableNames.USAGE_QUOTAS).update(updates).eq("id", quota.id).execute()
             
             if response.data:
                 logger.info(f"Updated quota usage for user {user_id}: {new_total_minutes}/{quota.total_limit_minutes} minutes used")
@@ -198,23 +199,43 @@ class UsageRepository:
             
             return {
                 "can_create_session": not quota.quota_exhausted and minutes_remaining > 0,
-                "quota": quota,
-                "limits": {
-                    "total_limit_minutes": quota.total_limit_minutes,
-                    "used_minutes": quota.used_minutes,
-                    "used_seconds": quota.used_seconds,
-                    "minutes_remaining": minutes_remaining,
-                    "seconds_remaining": seconds_remaining,
-                    "minutes_percentage": round(minutes_percentage, 1),
-                    "quota_exhausted": quota.quota_exhausted
-                },
-                "warnings": {
-                    "approaching_limit": minutes_percentage >= 80,  # 16+ minutes used
-                    "quota_exhausted": quota.quota_exhausted,
-                    "exhausted_at": quota.exhausted_at.isoformat() if quota.exhausted_at else None
-                }
+                "quota_exhausted": quota.quota_exhausted,
+                "used_minutes": quota.used_minutes,
+                "total_limit_minutes": quota.total_limit_minutes,
+                "minutes_remaining": minutes_remaining,
+                "seconds_remaining": seconds_remaining,
+                "usage_percentage": round(minutes_percentage, 2),
+                "session_count": quota.session_count,
+                "exhausted_at": quota.exhausted_at
             }
             
         except Exception as e:
             logger.error(f"Error checking quota limits for user {user_id}: {str(e)}")
+            raise
+    
+    # Usage Summaries
+    
+    async def get_usage_summary(self, user_id: str, billing_period: str) -> Optional[UsageSummary]:
+        """Get usage summary for a specific billing period."""
+        try:
+            response = self.client.table(TableNames.USAGE_SUMMARIES).select("*").eq("user_id", user_id).eq("billing_period", billing_period).execute()
+            
+            if response.data:
+                return UsageSummary(**response.data[0])
+            else:
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting usage summary for user {user_id}, period {billing_period}: {str(e)}")
+            raise
+    
+    async def get_user_usage_summaries(self, user_id: str, limit: int = 12) -> List[UsageSummary]:
+        """Get usage summaries for a user (last 12 months by default)."""
+        try:
+            response = self.client.table(TableNames.USAGE_SUMMARIES).select("*").eq("user_id", user_id).order("billing_period", desc=True).limit(limit).execute()
+            
+            return [UsageSummary(**summary) for summary in response.data]
+            
+        except Exception as e:
+            logger.error(f"Error getting usage summaries for user {user_id}: {str(e)}")
             raise 

@@ -8,6 +8,7 @@ from supabase import Client
 import structlog
 
 from app.core.database.models import BaseDBModel, RecordNotFoundError, serialize_for_db, handle_supabase_response
+from app.core.database.schema_validator import TableNames
 
 logger = structlog.get_logger(__name__)
 
@@ -17,7 +18,7 @@ class SessionRepository:
     
     def __init__(self, db_client: Client):
         self.db = db_client
-        self.table_name = "user_sessions"
+        self.table_name = TableNames.SESSIONS  # Fixed: was "user_sessions"
     
     async def create_session(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new session."""
