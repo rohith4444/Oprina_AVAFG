@@ -1,7 +1,10 @@
-"""
-Updated main.py - INCLUDES AUTH, USER, AND SESSIONS ENDPOINTS.
+# app/main.py - Updated with Background Token Service
 
-This version includes session management with Vertex AI integration.
+"""
+Updated main.py - INCLUDES AUTH, USER, SESSIONS, OAUTH, AND BACKGROUND TOKEN REFRESH.
+
+This version includes session management with Vertex AI integration, OAuth, 
+and automatic background token refresh.
 """
 
 import time
@@ -10,25 +13,33 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.utils.logging import get_logger  # UPDATED IMPORT
+from app.utils.logging import get_logger
 
 # Import all working endpoints
 from app.api.endpoints import health
 from app.api.endpoints import auth
 from app.api.endpoints import user
-from app.api.endpoints import sessions  # ADDED
+from app.api.endpoints import sessions
+from app.api.endpoints import oauth
+
+# Import background service
+from app.core.services.background_tasks import (
+    start_background_token_service,
+    stop_background_token_service,
+    get_background_token_service
+)
 
 # Initialize settings
 settings = get_settings()
 
 # Setup logging
-logger = get_logger(__name__)  # UPDATED
+logger = get_logger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.API_V1_STR if hasattr(settings, 'API_V1_STR') else "Oprina API",
+    title=settings.API_TITLE,
     version="1.0.0",
-    description="AI Agent API - Full Session Management",  # UPDATED
+    description="AI Agent API - Full Session Management with OAuth & Background Token Refresh",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -70,44 +81,33 @@ async def value_error_handler(request: Request, exc: ValueError):
     )
 
 # Include routers
-# 1. Health endpoints (basic testing)
-app.include_router(
-    health.router,
-    prefix="/api/v1/health",
-    tags=["health"]
-)
-
-# 2. Auth endpoints (registration, login, etc.)
-app.include_router(
-    auth.router,
-    prefix="/api/v1/auth",
-    tags=["authentication"]
-)
-
-# 3. User endpoints (profile management)
-app.include_router(
-    user.router,
-    prefix="/api/v1",  # users.router already has /users prefix
-    tags=["users"]
-)
-
-# 4. Session endpoints (session management)  # ADDED
-app.include_router(
-    sessions.router,
-    prefix="/api/v1/sessions",
-    tags=["sessions"]
-)
+app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
+app.include_router(user.router, prefix="/api/v1", tags=["users"])
+app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
+app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["oauth"])
 
 # Root endpoint
 @app.get("/")
 async def root():
     """Root endpoint with available endpoints."""
+    # Get background service stats
+    bg_service = get_background_token_service()
+    bg_stats = bg_service.get_stats()
+    
     return {
         "name": "Oprina API",
         "version": "1.0.0",
-        "status": "running - full session management",  # UPDATED
+        "status": "running - full session management with OAuth & background refresh",
         "docs": "/docs",
         "redoc": "/redoc",
+        "oauth_configured": settings.oauth_configured,
+        "background_service": {
+            "enabled": bg_stats["enabled"],
+            "running": bg_stats["is_running"],
+            "total_refreshes": bg_stats["total_refreshes"],
+            "last_run": bg_stats["last_run"]
+        },
         "available_endpoints": {
             "health": [
                 "GET /api/v1/health/ping",
@@ -122,32 +122,50 @@ async def root():
                 "DELETE /api/v1/auth/deactivate"
             ],
             "users": [
-                "GET /api/v1/users/me",
-                "PUT /api/v1/users/me",
-                "POST /api/v1/users/change-password"
+                "GET /api/v1/user/me",
+                "PUT /api/v1/user/me",
+                "POST /api/v1/user/change-password"
             ],
-            "sessions": [  # ADDED
+            "sessions": [
                 "POST /api/v1/sessions",
                 "GET /api/v1/sessions",
                 "GET /api/v1/sessions/{id}",
                 "DELETE /api/v1/sessions/{id}",
                 "GET /api/v1/sessions/{id}/messages",
                 "POST /api/v1/sessions/{id}/end"
+            ],
+            "oauth": [
+                "GET /api/v1/oauth/connect/{service}",
+                "POST /api/v1/oauth/disconnect",
+                "GET /api/v1/oauth/status",
+                "GET /api/v1/oauth/google/login",
+                "GET /api/v1/oauth/google/signup",
+                "GET /api/v1/oauth/callback",
+                "GET /api/v1/oauth/config",
+                "GET /api/v1/oauth/health",
+                "GET /api/v1/oauth/background-status"
             ]
         }
     }
 
-# Simple ping at root level
+# Simple ping
 @app.get("/ping")
 async def ping():
     """Simple ping."""
     return {"status": "ok", "timestamp": time.time()}
 
+# Background service status endpoint
+@app.get("/api/v1/admin/background-status")
+async def background_service_status():
+    """Get background service status (for monitoring)."""
+    bg_service = get_background_token_service()
+    return bg_service.get_stats()
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Startup event to log available endpoints."""
-    logger.info("🎯 Starting Oprina API with Session Management")  # UPDATED
+    """Startup event to log available endpoints and start background service."""
+    logger.info("🎯 Starting Oprina API with Session Management, OAuth & Background Token Refresh")
     logger.info("Available endpoints:")
     logger.info("  📋 Health: GET /api/v1/health/")
     logger.info("  🔐 Auth: POST /api/v1/auth/register")
@@ -155,21 +173,52 @@ async def startup_event():
     logger.info("  🔐 Auth: POST /api/v1/auth/logout")
     logger.info("  🔐 Auth: GET /api/v1/auth/validate")
     logger.info("  🔐 Auth: DELETE /api/v1/auth/deactivate")
-    logger.info("  👤 Users: GET /api/v1/users/me")
-    logger.info("  👤 Users: PUT /api/v1/users/me")
-    logger.info("  👤 Users: POST /api/v1/users/change-password")
-    logger.info("  💬 Sessions: POST /api/v1/sessions")  # ADDED
-    logger.info("  💬 Sessions: GET /api/v1/sessions")   # ADDED
-    logger.info("  💬 Sessions: GET /api/v1/sessions/{id}")  # ADDED
-    logger.info("  💬 Sessions: DELETE /api/v1/sessions/{id}")  # ADDED
-    logger.info("  💬 Sessions: GET /api/v1/sessions/{id}/messages")  # ADDED
+    logger.info("  👤 Users: GET /api/v1/user/me")
+    logger.info("  👤 Users: PUT /api/v1/user/me")
+    logger.info("  👤 Users: POST /api/v1/user/change-password")
+    logger.info("  💬 Sessions: POST /api/v1/sessions")
+    logger.info("  💬 Sessions: GET /api/v1/sessions")
+    logger.info("  💬 Sessions: GET /api/v1/sessions/{id}")
+    logger.info("  💬 Sessions: DELETE /api/v1/sessions/{id}")
+    logger.info("  💬 Sessions: GET /api/v1/sessions/{id}/messages")
+    logger.info("  🔗 OAuth: GET /api/v1/oauth/connect/{service}")
+    logger.info("  🔗 OAuth: GET /api/v1/oauth/google/login")
+    logger.info("  🔗 OAuth: GET /api/v1/oauth/google/signup")
+    logger.info("  🔗 OAuth: GET /api/v1/oauth/callback")
+    logger.info("  🔗 OAuth: GET /api/v1/oauth/status")
+    logger.info("  🔗 OAuth: GET /api/v1/oauth/background-status")
+    
+    # Log OAuth configuration status
+    if settings.oauth_configured:
+        logger.info("  ✅ OAuth is configured and ready")
+    else:
+        logger.warning("  ⚠️  OAuth not configured - check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
+    
+    # Start background token refresh service
+    try:
+        if settings.ENABLE_BACKGROUND_TASKS:
+            start_background_token_service()
+            logger.info("  🔄 Background token refresh service started")
+            logger.info(f"     Refresh interval: {settings.TOKEN_REFRESH_INTERVAL_MINUTES} minutes")
+            logger.info(f"     Cleanup interval: {settings.CLEANUP_INTERVAL_HOURS} hours")
+        else:
+            logger.info("  ⏸️  Background token refresh is disabled")
+    except Exception as e:
+        logger.error(f"  ❌ Failed to start background service: {str(e)}")
+    
     logger.info("  📖 Docs: /docs")
 
 # Shutdown event
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Shutdown event."""
+    """Shutdown event - stop background service."""
     logger.info("🛑 Shutting down Oprina API")
+    
+    try:
+        stop_background_token_service()
+        logger.info("🔄 Background token refresh service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping background service: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

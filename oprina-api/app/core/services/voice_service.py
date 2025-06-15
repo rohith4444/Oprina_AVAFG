@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, AsyncGenerator
 from datetime import datetime
 
 from app.core.integrations.speech import SpeechToTextService, TextToSpeechService
-from app.core.services.chat_service import ChatService
+# from app.core.services.chat_service import ChatService
 from app.core.database.repositories.message_repository import MessageRepository
 from app.core.database.repositories.session_repository import SessionRepository
 from app.utils.errors import ValidationError, OprinaError
@@ -34,11 +34,11 @@ class VoiceService:
         self,
         message_repository: MessageRepository,
         session_repository: SessionRepository,
-        chat_service: ChatService
+        # chat_service: ChatService
     ):
         self.message_repository = message_repository
         self.session_repository = session_repository
-        self.chat_service = chat_service
+        # self.chat_service = chat_service
         
         # Initialize speech services
         self.stt_service = SpeechToTextService()
@@ -434,7 +434,7 @@ class VoiceService:
 def get_voice_service(
     message_repository: MessageRepository,
     session_repository: SessionRepository,
-    chat_service: ChatService
+    # chat_service: ChatService
 ) -> VoiceService:
     """Get a voice service instance."""
     return VoiceService(message_repository, session_repository, chat_service)

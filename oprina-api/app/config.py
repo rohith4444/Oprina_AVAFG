@@ -36,15 +36,36 @@ class Settings(BaseSettings):
     HEYGEN_API_KEY: str = ""
     HEYGEN_API_URL: str = "https://api.heygen.com"
     
-    # OAuth settings
-    GOOGLE_OAUTH_CLIENT_ID: str = ""
-    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
-    GOOGLE_CLIENT_ID: str = ""  # For Gmail/Calendar integration
-    GOOGLE_CLIENT_SECRET: str = ""  # For Gmail/Calendar integration
-    MICROSOFT_OAUTH_CLIENT_ID: str = ""
-    MICROSOFT_OAUTH_CLIENT_SECRET: str = ""
-    OAUTH_REDIRECT_BASE_URL: str = "http://localhost:8000"
-    BACKEND_URL: str = "http://localhost:8000"  # For OAuth integration files
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/oauth/callback"
+    
+    # OAuth Scopes
+    GOOGLE_GMAIL_SCOPES: str = " ".join([
+        "openid",
+        "email", 
+        "profile",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.compose",
+        "https://www.googleapis.com/auth/gmail.labels",
+        "https://www.googleapis.com/auth/gmail.metadata"
+    ])
+
+    GOOGLE_CALENDAR_SCOPES: str = " ".join([
+        "openid",
+        "email",
+        "profile", 
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/calendar.settings.readonly"
+    ])
+
+    GOOGLE_AUTH_SCOPES: str = "openid email profile"
+        
+    # Frontend URLs (for redirects after OAuth)
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # Voice Services Configuration
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -78,6 +99,24 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = "INFO"
+    
+    # Properties that depend on other settings
+    @property
+    def FRONTEND_SETTINGS_URL(self) -> str:
+        return f"{self.FRONTEND_URL}/settings"
+    
+    @property
+    def FRONTEND_DASHBOARD_URL(self) -> str:
+        return f"{self.FRONTEND_URL}/dashboard"
+    
+    @property
+    def FRONTEND_LOGIN_URL(self) -> str:
+        return f"{self.FRONTEND_URL}/login"
+    
+    @property
+    def oauth_configured(self) -> bool:
+        """Check if OAuth is properly configured."""
+        return bool(self.GOOGLE_CLIENT_ID and self.GOOGLE_CLIENT_SECRET)
     
     class Config:
         env_file = ".env"

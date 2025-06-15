@@ -19,7 +19,7 @@ from app.utils.logging import get_logger
 from app.utils.encryption import verify_password
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/user", tags=["user"])
+router = APIRouter()
 
 
 @router.get("/me", response_model=UserProfileResponse)

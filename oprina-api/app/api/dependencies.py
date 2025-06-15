@@ -16,6 +16,7 @@ from app.core.database.repositories.message_repository import MessageRepository
 from app.core.services.user_service import UserService
 from app.core.services.agent_service import AgentService
 from app.core.services.voice_service import VoiceService
+from app.core.services.google_oauth_service import GoogleOAuthService
 from app.utils.auth import AuthManager
 from app.utils.errors import AuthenticationError
 from app.utils.logging import get_logger
@@ -66,6 +67,12 @@ def get_voice_service(
 ) -> VoiceService:
     """Get voice service dependency."""
     return VoiceService(session_repository, message_repository, agent_service)
+
+def get_oauth_service(
+    user_repository: UserRepository = Depends(get_user_repository)
+) -> GoogleOAuthService:
+    """Get OAuth service dependency."""
+    return GoogleOAuthService(user_repository)
 
 def get_auth_manager() -> AuthManager:
     """Get AuthManager instance."""
