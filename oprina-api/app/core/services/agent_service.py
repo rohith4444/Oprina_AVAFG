@@ -34,24 +34,45 @@ class AgentService:
         user_id: str, 
         user_session_id: str
     ) -> Dict[str, Any]:
-        """Create a new agent session and link it to user session."""
+        """
+        Create a new Vertex AI agent session and link it to user session.
+        Gracefully handles Vertex AI failures - session creation still succeeds.
+        """
         try:
-            # Create agent session directly with Vertex AI
-            agent_session_data = await self.agent_client.create_session(user_id)
-            
-            # Update the user session with agent session ID
-            await self.session_repo.update_session_links(
-                session_id=user_session_id,
-                vertex_session_id=agent_session_data["vertex_session_id"]
-            )
-            
-            logger.info(f"Created agent session for user {user_id}")
-            return {
-                "agent_session_id": agent_session_data["vertex_session_id"],
-                "user_session_id": user_session_id,
-                "user_id": user_id,
-                "status": "active"
-            }
+            # Try to create Vertex AI session
+            try:
+                agent_session_data = await self.agent_client.create_session(user_id)
+                vertex_session_id = agent_session_data["vertex_session_id"]
+                
+                # Update the user session with Vertex AI session ID
+                await self.session_repo.update_session_links(
+                    session_id=user_session_id,
+                    vertex_session_id=vertex_session_id
+                )
+                
+                logger.info(f"Created Vertex AI session {vertex_session_id} for user {user_id}")
+                
+                return {
+                    "agent_session_id": vertex_session_id,
+                    "user_session_id": user_session_id,
+                    "user_id": user_id,
+                    "status": "active",
+                    "vertex_integration": True
+                }
+                
+            except Exception as vertex_error:
+                # Log the error but don't fail session creation
+                logger.warning(f"Vertex AI session creation failed for user {user_id}: {vertex_error}")
+                
+                # Session creation still succeeds without Vertex AI
+                return {
+                    "agent_session_id": None,
+                    "user_session_id": user_session_id,
+                    "user_id": user_id,
+                    "status": "active",
+                    "vertex_integration": False,
+                    "vertex_error": str(vertex_error)
+                }
             
         except Exception as e:
             logger.error(f"Failed to create agent session for user {user_id}: {e}")

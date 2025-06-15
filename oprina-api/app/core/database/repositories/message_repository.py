@@ -1,16 +1,17 @@
 """
 Message repository for managing chat messages.
+Updated for simplified schema and voice integration.
 """
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from supabase import Client
-import structlog
 
 from app.core.database.models import BaseDBModel, RecordNotFoundError, serialize_for_db, handle_supabase_response
 from app.core.database.schema_validator import TableNames
+from app.utils.logging import get_logger
 
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 class MessageRepository:
@@ -21,11 +22,29 @@ class MessageRepository:
         self.table_name = TableNames.MESSAGES
     
     async def create_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new message."""
+        """Create a new message (voice or text)."""
         try:
-            # Add timestamp
+            # Add timestamp (only created_at, no updated_at in schema)
             message_data["created_at"] = datetime.utcnow().isoformat()
-            message_data["updated_at"] = datetime.utcnow().isoformat()
+            
+            # Set defaults for voice integration
+            if "message_type" not in message_data:
+                message_data["message_type"] = "text"
+            if "voice_metadata" not in message_data:
+                message_data["voice_metadata"] = {}
+            
+            # Note: message_index will be auto-set by database trigger
+            # Don't set it manually unless specifically needed
+            
+            # Validate required fields
+            required_fields = ["session_id", "user_id", "role", "content"]
+            for field in required_fields:
+                if field not in message_data:
+                    raise ValueError(f"Missing required field: {field}")
+            
+            # Validate role
+            if message_data["role"] not in ["user", "assistant"]:
+                raise ValueError(f"Invalid role: {message_data['role']}")
             
             # Serialize data
             serialized_data = serialize_for_db(message_data)
@@ -34,7 +53,7 @@ class MessageRepository:
             response = self.db.table(self.table_name).insert(serialized_data).execute()
             
             result = handle_supabase_response(response)
-            logger.info(f"Created message with ID: {result.get('id')}")
+            logger.info(f"Created message with ID: {result.get('id')} for session: {message_data.get('session_id')}")
             
             return result
             
@@ -59,21 +78,27 @@ class MessageRepository:
     async def get_session_messages(
         self, 
         session_id: str, 
-        limit: int = 50, 
-        offset: int = 0
+        limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Get messages for a session with pagination."""
+        """Get messages for a session in chronological order."""
         try:
-            response = (
+            query = (
                 self.db.table(self.table_name)
                 .select("*")
                 .eq("session_id", session_id)
-                .order("created_at", desc=False)
-                .range(offset, offset + limit - 1)
-                .execute()
+                .order("message_index", desc=False)  # Chronological order
             )
             
-            return response.data or []
+            # Apply limit if specified
+            if limit > 0:
+                query = query.limit(limit)
+            
+            response = query.execute()
+            
+            messages = response.data or []
+            logger.debug(f"Retrieved {len(messages)} messages for session {session_id}")
+            
+            return messages
             
         except Exception as e:
             logger.error(f"Failed to get session messages {session_id}: {e}")
@@ -90,7 +115,32 @@ class MessageRepository:
                 self.db.table(self.table_name)
                 .select("*")
                 .eq("session_id", session_id)
-                .order("created_at", desc=True)
+                .order("message_index", desc=False)  # Chronological order
+                .limit(limit)
+                .execute()
+            )
+            
+            messages = response.data or []
+            logger.debug(f"Retrieved {len(messages)} conversation messages for session {session_id}")
+            
+            return messages
+            
+        except Exception as e:
+            logger.error(f"Failed to get conversation history {session_id}: {e}")
+            raise
+    
+    async def get_latest_messages(
+        self, 
+        session_id: str, 
+        limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Get the most recent messages for a session (useful for UI)."""
+        try:
+            response = (
+                self.db.table(self.table_name)
+                .select("*")
+                .eq("session_id", session_id)
+                .order("message_index", desc=True)  # Most recent first
                 .limit(limit)
                 .execute()
             )
@@ -100,65 +150,91 @@ class MessageRepository:
             return list(reversed(messages))
             
         except Exception as e:
-            logger.error(f"Failed to get conversation history {session_id}: {e}")
+            logger.error(f"Failed to get latest messages {session_id}: {e}")
             raise
     
-    async def update_message(self, message_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update message data."""
+    async def get_messages_by_role(
+        self, 
+        session_id: str, 
+        role: str
+    ) -> List[Dict[str, Any]]:
+        """Get messages by role (user or assistant) for a session."""
         try:
-            # Add updated timestamp
-            update_data["updated_at"] = datetime.utcnow().isoformat()
+            if role not in ["user", "assistant"]:
+                raise ValueError(f"Invalid role: {role}")
             
-            # Serialize data
-            serialized_data = serialize_for_db(update_data)
-            
-            # Update message
             response = (
                 self.db.table(self.table_name)
-                .update(serialized_data)
-                .eq("id", message_id)
+                .select("*")
+                .eq("session_id", session_id)
+                .eq("role", role)
+                .order("message_index", desc=False)
                 .execute()
             )
             
-            if not response.data:
-                raise RecordNotFoundError(f"Message {message_id} not found")
-            
-            result = handle_supabase_response(response)
-            logger.info(f"Updated message {message_id}")
-            
-            return result
+            return response.data or []
             
         except Exception as e:
-            logger.error(f"Failed to update message {message_id}: {e}")
+            logger.error(f"Failed to get {role} messages for session {session_id}: {e}")
             raise
     
-    async def delete_message(self, message_id: str) -> bool:
-        """Delete message."""
+    async def get_voice_messages(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get all voice messages for a session."""
         try:
-            response = self.db.table(self.table_name).delete().eq("id", message_id).execute()
+            response = (
+                self.db.table(self.table_name)
+                .select("*")
+                .eq("session_id", session_id)
+                .eq("message_type", "voice")
+                .order("message_index", desc=False)
+                .execute()
+            )
             
-            if not response.data:
-                raise RecordNotFoundError(f"Message {message_id} not found")
-            
-            logger.info(f"Deleted message {message_id}")
-            return True
+            return response.data or []
             
         except Exception as e:
-            logger.error(f"Failed to delete message {message_id}: {e}")
+            logger.error(f"Failed to get voice messages for session {session_id}: {e}")
             raise
     
-    async def get_user_message_count(self, user_id: str, session_id: Optional[str] = None) -> int:
-        """Get total message count for a user."""
+    async def count_session_messages(self, session_id: str) -> int:
+        """Count total messages in a session."""
         try:
-            query = self.db.table(self.table_name).select("id", count="exact").eq("user_id", user_id)
-            
-            if session_id:
-                query = query.eq("session_id", session_id)
-            
-            response = query.execute()
+            response = (
+                self.db.table(self.table_name)
+                .select("id", count="exact")
+                .eq("session_id", session_id)
+                .execute()
+            )
             
             return response.count or 0
             
         except Exception as e:
-            logger.error(f"Failed to get message count for user {user_id}: {e}")
-            raise 
+            logger.error(f"Failed to count messages for session {session_id}: {e}")
+            raise
+    
+    async def get_message_context(
+        self, 
+        session_id: str, 
+        around_message_index: int, 
+        context_size: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Get messages around a specific message index (useful for context)."""
+        try:
+            start_index = max(1, around_message_index - context_size)
+            end_index = around_message_index + context_size
+            
+            response = (
+                self.db.table(self.table_name)
+                .select("*")
+                .eq("session_id", session_id)
+                .gte("message_index", start_index)
+                .lte("message_index", end_index)
+                .order("message_index", desc=False)
+                .execute()
+            )
+            
+            return response.data or []
+            
+        except Exception as e:
+            logger.error(f"Failed to get message context for session {session_id}: {e}")
+            raise

@@ -11,7 +11,11 @@ from supabase import Client
 # Core imports that should work
 from app.core.database.connection import get_database_client
 from app.core.database.repositories.user_repository import UserRepository
+from app.core.database.repositories.session_repository import SessionRepository
+from app.core.database.repositories.message_repository import MessageRepository
 from app.core.services.user_service import UserService
+from app.core.services.agent_service import AgentService
+from app.core.services.voice_service import VoiceService
 from app.utils.auth import AuthManager
 from app.utils.errors import AuthenticationError
 from app.utils.logging import get_logger
@@ -33,12 +37,35 @@ def get_user_repository(db: Client = Depends(get_db)) -> UserRepository:
     """Get user repository dependency."""
     return UserRepository(db)
 
+def get_session_repository(db: Client = Depends(get_db)) -> SessionRepository:
+    """Get session repository dependency."""
+    return SessionRepository(db)
+
+def get_message_repository(db: Client = Depends(get_db)) -> MessageRepository:
+    """Get message repository dependency."""
+    return MessageRepository(db)
+
 # Service Dependencies - ONLY USER
 def get_user_service(
     user_repository: UserRepository = Depends(get_user_repository)
 ) -> UserService:
     """Get user service dependency."""
     return UserService(user_repository)
+
+def get_agent_service(
+    session_repository: SessionRepository = Depends(get_session_repository),
+    message_repository: MessageRepository = Depends(get_message_repository)
+) -> AgentService:
+    """Get agent service dependency."""
+    return AgentService(session_repository, message_repository)
+
+def get_voice_service(
+    session_repository: SessionRepository = Depends(get_session_repository),
+    message_repository: MessageRepository = Depends(get_message_repository),
+    agent_service: AgentService = Depends(get_agent_service)
+) -> VoiceService:
+    """Get voice service dependency."""
+    return VoiceService(session_repository, message_repository, agent_service)
 
 def get_auth_manager() -> AuthManager:
     """Get AuthManager instance."""

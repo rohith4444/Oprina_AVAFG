@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, AsyncGenerator
 from vertexai import agent_engines
 import structlog
 
-from app.config import settings
+from app.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -18,7 +18,8 @@ class VertexAgentClient:
     def __init__(self):
         self._agent_app: Optional[Any] = None
         self._initialized = False
-        self._agent_id = settings.VERTEX_AI_AGENT_ID
+        self.settings = get_settings()
+        self._agent_id = self.settings.VERTEX_AI_AGENT_ID
     
     async def initialize(self) -> None:
         """Initialize the agent client."""
@@ -52,7 +53,7 @@ class VertexAgentClient:
             # Set initial session state with user context
             initial_state = {
                 "user:id": user_id,
-                "user:backend_url": settings.BACKEND_API_URL or "http://localhost:8000",
+                "user:backend_url": self.settings.BACKEND_API_URL or "http://localhost:8000",
                 "user:session_type": "multi_user",
                 "gmail:connected": False,
                 "calendar:connected": False,

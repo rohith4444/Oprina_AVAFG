@@ -1,33 +1,34 @@
 """
-Updated main.py - INCLUDES AUTH AND USER ENDPOINTS for testing.
+Updated main.py - INCLUDES AUTH, USER, AND SESSIONS ENDPOINTS.
 
-This version imports auth and user endpoints with proper error handling.
+This version includes session management with Vertex AI integration.
 """
 
 import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import structlog
 
 from app.config import get_settings
-# Import health for basic testing
+from app.utils.logging import get_logger  # UPDATED IMPORT
+
+# Import all working endpoints
 from app.api.endpoints import health
-# Import auth and users for testing your new endpoints
 from app.api.endpoints import auth
 from app.api.endpoints import user
+from app.api.endpoints import sessions  # ADDED
 
 # Initialize settings
 settings = get_settings()
 
 # Setup logging
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)  # UPDATED
 
 # Create FastAPI app
 app = FastAPI(
     title=settings.API_V1_STR if hasattr(settings, 'API_V1_STR') else "Oprina API",
     version="1.0.0",
-    description="AI Agent API - Auth & User Testing Mode",
+    description="AI Agent API - Full Session Management",  # UPDATED
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -90,6 +91,13 @@ app.include_router(
     tags=["users"]
 )
 
+# 4. Session endpoints (session management)  # ADDED
+app.include_router(
+    sessions.router,
+    prefix="/api/v1/sessions",
+    tags=["sessions"]
+)
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -97,7 +105,7 @@ async def root():
     return {
         "name": "Oprina API",
         "version": "1.0.0",
-        "status": "running - auth & user testing mode",
+        "status": "running - full session management",  # UPDATED
         "docs": "/docs",
         "redoc": "/redoc",
         "available_endpoints": {
@@ -117,6 +125,14 @@ async def root():
                 "GET /api/v1/users/me",
                 "PUT /api/v1/users/me",
                 "POST /api/v1/users/change-password"
+            ],
+            "sessions": [  # ADDED
+                "POST /api/v1/sessions",
+                "GET /api/v1/sessions",
+                "GET /api/v1/sessions/{id}",
+                "DELETE /api/v1/sessions/{id}",
+                "GET /api/v1/sessions/{id}/messages",
+                "POST /api/v1/sessions/{id}/end"
             ]
         }
     }
@@ -131,7 +147,7 @@ async def ping():
 @app.on_event("startup")
 async def startup_event():
     """Startup event to log available endpoints."""
-    logger.info("🎯 Starting Oprina API in AUTH & USER testing mode")
+    logger.info("🎯 Starting Oprina API with Session Management")  # UPDATED
     logger.info("Available endpoints:")
     logger.info("  📋 Health: GET /api/v1/health/")
     logger.info("  🔐 Auth: POST /api/v1/auth/register")
@@ -142,6 +158,11 @@ async def startup_event():
     logger.info("  👤 Users: GET /api/v1/users/me")
     logger.info("  👤 Users: PUT /api/v1/users/me")
     logger.info("  👤 Users: POST /api/v1/users/change-password")
+    logger.info("  💬 Sessions: POST /api/v1/sessions")  # ADDED
+    logger.info("  💬 Sessions: GET /api/v1/sessions")   # ADDED
+    logger.info("  💬 Sessions: GET /api/v1/sessions/{id}")  # ADDED
+    logger.info("  💬 Sessions: DELETE /api/v1/sessions/{id}")  # ADDED
+    logger.info("  💬 Sessions: GET /api/v1/sessions/{id}/messages")  # ADDED
     logger.info("  📖 Docs: /docs")
 
 # Shutdown event
