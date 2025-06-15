@@ -1,10 +1,10 @@
 """
 User service for user management and authentication.
+FIXED VERSION - All methods properly indented inside the class.
 """
 
 from typing import Dict, Any, Optional
-import structlog
-from datetime import datetime
+import structlog, bcrypt
 
 from app.core.database.repositories.user_repository import UserRepository
 
@@ -132,23 +132,6 @@ class UserService:
             logger.error(f"Failed to verify access for user {user_id}: {e}")
             return False
     
-    async def deactivate_user(self, user_id: str) -> bool:
-        """Deactivate a user account."""
-        try:
-            # Update user status to inactive
-            update_data = {
-                "status": "inactive",
-                "deactivated_at": datetime.utcnow().isoformat()
-            }
-            
-            await self.user_repo.update_user(user_id, update_data)
-            logger.info(f"Deactivated user {user_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to deactivate user {user_id}: {e}")
-            return False
-    
     async def validate_user_session(
         self, 
         user_id: str, 
@@ -174,3 +157,113 @@ class UserService:
         except Exception as e:
             logger.error(f"Failed to validate session for user {user_id}: {e}")
             return False
+
+    # ✅ FIXED: These methods are now properly indented INSIDE the class
+    async def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new user (for registration)."""
+        try:
+            # Create new user via repository
+            new_user = await self.user_repo.create_user(user_data)
+            logger.info(f"Created new user {new_user.get('email')}")
+            return new_user
+            
+        except Exception as e:
+            logger.error(f"Failed to create user: {e}")
+            raise
+
+    async def update_last_login(self, user_id: str) -> Dict[str, Any]:
+        """Update user's last login timestamp."""
+        try:
+            updated_user = await self.user_repo.update_last_login(user_id)
+            logger.info(f"Updated last login for user {user_id}")
+            return updated_user
+            
+        except Exception as e:
+            logger.error(f"Failed to update last login for user {user_id}: {e}")
+            raise
+
+    async def deactivate_user(self, user_id: str) -> bool:
+        """Deactivate user account."""
+        try:
+            await self.user_repo.deactivate_user(user_id)
+            logger.info(f"Deactivated user {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to deactivate user {user_id}: {e}")
+            raise
+
+    async def update_user_profile(self, user_id: str, profile_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user profile - matches your UI form exactly."""
+        try:
+            # Prepare update data with only the fields that can be updated
+            update_data = {}
+            
+            # Profile fields from your UI
+            if "full_name" in profile_data and profile_data["full_name"] is not None:
+                update_data["full_name"] = profile_data["full_name"]
+                
+            if "preferred_name" in profile_data and profile_data["preferred_name"] is not None:
+                update_data["preferred_name"] = profile_data["preferred_name"]
+                
+            if "work_type" in profile_data and profile_data["work_type"] is not None:
+                update_data["work_type"] = profile_data["work_type"]
+                
+            if "ai_preferences" in profile_data and profile_data["ai_preferences"] is not None:
+                update_data["ai_preferences"] = profile_data["ai_preferences"]
+            
+            # Optional system fields
+            if "avatar_url" in profile_data and profile_data["avatar_url"] is not None:
+                update_data["avatar_url"] = profile_data["avatar_url"]
+                
+            if "timezone" in profile_data and profile_data["timezone"] is not None:
+                update_data["timezone"] = profile_data["timezone"]
+                
+            if "language" in profile_data and profile_data["language"] is not None:
+                update_data["language"] = profile_data["language"]
+            
+            # Also update display_name to match full_name for compatibility
+            if "full_name" in update_data:
+                update_data["display_name"] = update_data["full_name"]
+            
+            if not update_data:
+                raise ValueError("No valid fields to update")
+            
+            # Update user via repository
+            updated_user = await self.user_repo.update_user(user_id, update_data)
+            logger.info(f"Updated profile for user {user_id}")
+            return updated_user
+            
+        except Exception as e:
+            logger.error(f"Failed to update profile for user {user_id}: {e}")
+            raise
+
+    async def change_user_password(self, user_id: str, current_password: str, new_password: str) -> bool:
+        """Change user password with current password validation."""
+        try:
+            # Get current user
+            user = await self.user_repo.get_user_by_id(user_id)
+            if not user:
+                raise ValueError(f"User {user_id} not found")
+            
+            # Check if user has a password (might be OAuth-only)
+            if not user.get("password_hash"):
+                raise ValueError("User does not have a password set (OAuth-only account)")
+            
+            # Verify current password
+            if not bcrypt.checkpw(current_password.encode('utf-8'), user["password_hash"].encode('utf-8')):
+                raise ValueError("Current password is incorrect")
+            
+            # Hash new password using the same utils as auth endpoints
+            from app.utils.encryption import hash_password
+            new_password_hash = hash_password(new_password)
+            
+            # Update password via repository
+            await self.user_repo.change_password(user_id, new_password_hash)
+            
+            logger.info(f"Password changed for user {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to change password for user {user_id}: {e}")
+            raise

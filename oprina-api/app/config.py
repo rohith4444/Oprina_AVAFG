@@ -2,8 +2,8 @@
 Configuration settings for Oprina API.
 """
 
-from typing import List
-from pydantic import BaseSettings
+from typing import List, Optional
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -19,14 +19,15 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # API settings
-    API_V1_STR: str = "/api/v1"
+    API_TITLE: str = "Oprina API"
+    API_VERSION: str = "1.0.0"
+    API_DESCRIPTION: str = "AI Agent API with HeyGen Avatar Integration"
     ALLOWED_HOSTS: List[str] = ["*"]
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
     
     # Database settings (Supabase)
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
-    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
     
     # Vertex AI Agent settings
     VERTEX_AI_AGENT_ID: str = ""
@@ -59,7 +60,7 @@ class Settings(BaseSettings):
     # JWT settings
     JWT_SECRET_KEY: str = "jwt-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     
     # Admin settings
     ADMIN_TOKEN: str = "admin-token-change-in-production"
@@ -81,12 +82,15 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "allow"
 
 
-# Create settings instance
-settings = Settings()
-
+# Simple singleton pattern
+_settings: Optional[Settings] = None
 
 def get_settings() -> Settings:
-    """Get application settings."""
-    return settings 
+    """Get settings - simple implementation."""
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings

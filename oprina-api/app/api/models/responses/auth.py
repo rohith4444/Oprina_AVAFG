@@ -10,32 +10,49 @@ from datetime import datetime
 
 
 class UserResponse(BaseModel):
-    """Response model for user information."""
+    """Response model for user information with UI fields."""
     id: str = Field(..., description="User ID")
     email: str = Field(..., description="User email")
-    display_name: Optional[str] = Field(None, description="User display name")
+    
+    # Profile fields
+    full_name: Optional[str] = Field(None, description="User's full name")
+    preferred_name: Optional[str] = Field(None, description="User's preferred name")
+    display_name: Optional[str] = Field(None, description="User display name (legacy)")
     avatar_url: Optional[str] = Field(None, description="User avatar URL")
-    preferences: Optional[Dict[str, Any]] = Field(None, description="User preferences")
-    created_at: Optional[str] = Field(None, description="Account creation timestamp")
-    last_login_at: Optional[str] = Field(None, description="Last login timestamp")
+    
+    # UI specific fields
+    work_type: Optional[str] = Field(None, description="User's work type")
+    ai_preferences: Optional[str] = Field(None, description="User's AI preferences")
+    
+    # System fields
+    preferences: Optional[Dict[str, Any]] = Field(None, description="Additional user preferences")
+    timezone: Optional[str] = Field(None, description="User timezone")
+    language: Optional[str] = Field(None, description="User language")
+    
+    # Status fields
     is_active: Optional[bool] = Field(None, description="Whether user account is active")
     is_verified: Optional[bool] = Field(None, description="Whether user email is verified")
+    
+    # Timestamps
+    created_at: Optional[str] = Field(None, description="Account creation timestamp")
+    last_login_at: Optional[str] = Field(None, description="Last login timestamp")
 
     class Config:
         schema_extra = {
             "example": {
                 "id": "user-123",
                 "email": "user@example.com",
-                "display_name": "John Doe",
+                "full_name": "John Doe",
+                "preferred_name": "Johnny",
+                "work_type": "Software Developer",
+                "ai_preferences": "Please provide detailed explanations",
                 "avatar_url": "https://example.com/avatar.jpg",
-                "preferences": {
-                    "theme": "dark",
-                    "notifications": True
-                },
-                "created_at": "2024-01-01T00:00:00Z",
-                "last_login_at": "2024-01-15T10:30:00Z",
+                "timezone": "America/New_York",
+                "language": "en",
                 "is_active": True,
-                "is_verified": True
+                "is_verified": True,
+                "created_at": "2024-01-01T00:00:00Z",
+                "last_login_at": "2024-01-15T10:30:00Z"
             }
         }
 
@@ -57,46 +74,6 @@ class AuthResponse(BaseModel):
                     "id": "user-123",
                     "email": "user@example.com",
                     "display_name": "John Doe"
-                }
-            }
-        }
-
-
-class LoginResponse(AuthResponse):
-    """Response model for user login (extends AuthResponse)."""
-    last_login_at: Optional[str] = Field(None, description="Previous login timestamp")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                "token_type": "bearer",
-                "expires_in": 3600,
-                "last_login_at": "2024-01-14T08:15:00Z",
-                "user": {
-                    "id": "user-123",
-                    "email": "user@example.com",
-                    "display_name": "John Doe"
-                }
-            }
-        }
-
-
-class RegisterResponse(AuthResponse):
-    """Response model for user registration (extends AuthResponse)."""
-    is_new_user: bool = Field(..., description="Whether this is a newly created user")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                "token_type": "bearer",
-                "expires_in": 3600,
-                "is_new_user": True,
-                "user": {
-                    "id": "user-456",
-                    "email": "newuser@example.com",
-                    "display_name": "New User"
                 }
             }
         }
@@ -132,75 +109,5 @@ class LogoutResponse(BaseModel):
                 "message": "Successfully logged out",
                 "user_id": "user-123",
                 "logged_out_at": "2024-01-15T11:45:00Z"
-            }
-        }
-
-
-class UserStatsResponse(BaseModel):
-    """Response model for user statistics."""
-    user_id: str = Field(..., description="User ID")
-    total_sessions: int = Field(..., description="Total number of chat sessions")
-    total_messages: int = Field(..., description="Total number of messages sent")
-    account_age_days: int = Field(..., description="Account age in days")
-    last_activity_at: Optional[str] = Field(None, description="Last activity timestamp")
-    preferences_updated_at: Optional[str] = Field(None, description="Last preferences update")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "user_id": "user-123",
-                "total_sessions": 25,
-                "total_messages": 150,
-                "account_age_days": 30,
-                "last_activity_at": "2024-01-15T10:30:00Z",
-                "preferences_updated_at": "2024-01-10T14:20:00Z"
-            }
-        }
-
-
-class PasswordChangeResponse(BaseModel):
-    """Response model for password change."""
-    message: str = Field(..., description="Password change confirmation message")
-    changed_at: str = Field(..., description="Password change timestamp")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "message": "Password changed successfully",
-                "changed_at": "2024-01-15T11:30:00Z"
-            }
-        }
-
-
-class PasswordResetResponse(BaseModel):
-    """Response model for password reset initiation."""
-    message: str = Field(..., description="Password reset confirmation message")
-    email: str = Field(..., description="Email address where reset link was sent")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "message": "Password reset link sent to your email",
-                "email": "user@example.com"
-            }
-        }
-
-
-class PreferencesUpdateResponse(BaseModel):
-    """Response model for preferences update."""
-    message: str = Field(..., description="Update confirmation message")
-    preferences: Dict[str, Any] = Field(..., description="Updated preferences")
-    updated_at: str = Field(..., description="Update timestamp")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "message": "Preferences updated successfully",
-                "preferences": {
-                    "theme": "dark",
-                    "notifications": True,
-                    "language": "en"
-                },
-                "updated_at": "2024-01-15T11:45:00Z"
             }
         }
