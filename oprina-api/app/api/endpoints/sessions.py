@@ -37,7 +37,7 @@ async def verify_session_ownership(
     return session
 
 
-@router.post("/")
+@router.post("/create")
 async def create_session(
     title: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -107,7 +107,7 @@ async def create_session(
         )
 
 
-@router.get("/")
+@router.get("/list")
 async def get_user_sessions(
     active_only: bool = True,
     limit: int = 50,
