@@ -1,6 +1,6 @@
 """
-Clean dependencies.py - ONLY health, auth, and user endpoints support.
-Removed all complex service chains that cause import errors.
+Clean dependencies.py - ONLY health, auth, user, and avatar endpoints support.
+Added avatar service dependencies while keeping existing structure.
 """
 
 from typing import Optional
@@ -13,10 +13,12 @@ from app.core.database.connection import get_database_client
 from app.core.database.repositories.user_repository import UserRepository
 from app.core.database.repositories.session_repository import SessionRepository
 from app.core.database.repositories.message_repository import MessageRepository
+from app.core.database.repositories.avatar_repository import AvatarRepository  # Added avatar repository
 from app.core.services.user_service import UserService
 from app.core.services.agent_service import AgentService
 from app.core.services.voice_service import VoiceService
 from app.core.services.google_oauth_service import GoogleOAuthService
+from app.core.services.avatar_service import AvatarService  # Added avatar service
 from app.utils.auth import AuthManager
 from app.utils.errors import AuthenticationError
 from app.utils.logging import get_logger
@@ -33,7 +35,7 @@ def get_db() -> Client:
     """Get database client dependency."""
     return get_database_client()
 
-# Repository Dependencies - ONLY USER
+# Repository Dependencies
 def get_user_repository(db: Client = Depends(get_db)) -> UserRepository:
     """Get user repository dependency."""
     return UserRepository(db)
@@ -46,7 +48,11 @@ def get_message_repository(db: Client = Depends(get_db)) -> MessageRepository:
     """Get message repository dependency."""
     return MessageRepository(db)
 
-# Service Dependencies - ONLY USER
+def get_avatar_repository(db: Client = Depends(get_db)) -> AvatarRepository:
+    """Get avatar repository dependency."""
+    return AvatarRepository(db)
+
+# Service Dependencies
 def get_user_service(
     user_repository: UserRepository = Depends(get_user_repository)
 ) -> UserService:
@@ -73,6 +79,12 @@ def get_oauth_service(
 ) -> GoogleOAuthService:
     """Get OAuth service dependency."""
     return GoogleOAuthService(user_repository)
+
+def get_avatar_service(
+    avatar_repository: AvatarRepository = Depends(get_avatar_repository)
+) -> AvatarService:
+    """Get avatar service dependency."""
+    return AvatarService(avatar_repository)
 
 def get_auth_manager() -> AuthManager:
     """Get AuthManager instance."""
@@ -144,4 +156,3 @@ async def get_current_user(
 
 # Alias for compatibility with your auth endpoints
 get_optional_current_user = get_current_user_optional
-

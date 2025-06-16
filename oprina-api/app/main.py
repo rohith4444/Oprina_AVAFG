@@ -1,10 +1,10 @@
-# app/main.py - Updated with Background Token Service and Voice Endpoints
+# app/main.py - Updated with Avatar Endpoints
 
 """
-Updated main.py - INCLUDES AUTH, USER, SESSIONS, OAUTH, VOICE, AND BACKGROUND TOKEN REFRESH.
+Updated main.py - INCLUDES AUTH, USER, SESSIONS, OAUTH, VOICE, AVATAR, AND BACKGROUND TOKEN REFRESH.
 
 This version includes session management with Vertex AI integration, OAuth, 
-voice services, and automatic background token refresh.
+voice services, avatar session tracking, and automatic background token refresh.
 """
 
 import time
@@ -21,7 +21,8 @@ from app.api.endpoints import auth
 from app.api.endpoints import user
 from app.api.endpoints import sessions
 from app.api.endpoints import oauth
-from app.api.endpoints import voice  # Added voice endpoints
+from app.api.endpoints import voice
+from app.api.endpoints import avatar  # Added avatar endpoints
 
 # Import background service
 from app.core.services.background_tasks import (
@@ -40,7 +41,7 @@ logger = get_logger(__name__)
 app = FastAPI(
     title=settings.API_TITLE,
     version="1.0.0",
-    description="AI Agent API - Full Session Management with OAuth, Voice Services & Background Token Refresh",
+    description="AI Agent API - Full Session Management with OAuth, Voice Services, Avatar Tracking & Background Token Refresh",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -84,10 +85,11 @@ async def value_error_handler(request: Request, exc: ValueError):
 # Include routers
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
-app.include_router(user.router, prefix="/api/v1", tags=["users"])
+app.include_router(user.router, prefix="/api/v1/user", tags=["users"])
 app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
 app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["oauth"])
-app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])  # Added voice router
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
+app.include_router(avatar.router, prefix="/api/v1/avatar", tags=["avatar"])  # Added avatar router
 
 # Root endpoint
 @app.get("/")
@@ -100,7 +102,7 @@ async def root():
     return {
         "name": "Oprina API",
         "version": "1.0.0",
-        "status": "running - full session management with OAuth, Voice & background refresh",
+        "status": "running - full session management with OAuth, Voice, Avatar Tracking & background refresh",
         "docs": "/docs",
         "redoc": "/redoc",
         "oauth_configured": settings.oauth_configured,
@@ -152,6 +154,16 @@ async def root():
                 "POST /api/v1/voice/message",
                 "POST /api/v1/voice/transcribe",
                 "POST /api/v1/voice/synthesize"
+            ],
+            "avatar": [
+                "GET /api/v1/avatar/quota",
+                "POST /api/v1/avatar/check-quota",
+                "POST /api/v1/avatar/sessions/start",
+                "POST /api/v1/avatar/sessions/end",
+                "POST /api/v1/avatar/sessions/status",
+                "GET /api/v1/avatar/sessions",
+                "POST /api/v1/avatar/admin/cleanup",
+                "GET /api/v1/avatar/health"
             ]
         }
     }
@@ -173,7 +185,7 @@ async def background_service_status():
 @app.on_event("startup")
 async def startup_event():
     """Startup event to log available endpoints and start background service."""
-    logger.info("🎯 Starting Oprina API with Session Management, OAuth, Voice Services & Background Token Refresh")
+    logger.info("🎯 Starting Oprina API with Session Management, OAuth, Voice Services, Avatar Tracking & Background Token Refresh")
     logger.info("Available endpoints:")
     logger.info("  📋 Health: GET /api/v1/health/")
     logger.info("  🔐 Auth: POST /api/v1/auth/register")
@@ -195,9 +207,16 @@ async def startup_event():
     logger.info("  🔗 OAuth: GET /api/v1/oauth/callback")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/status")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/background-status")
-    logger.info("  🎤 Voice: POST /api/v1/voice/message")  # Added voice endpoints
+    logger.info("  🎤 Voice: POST /api/v1/voice/message")
     logger.info("  🎤 Voice: POST /api/v1/voice/transcribe")
     logger.info("  🎤 Voice: POST /api/v1/voice/synthesize")
+    logger.info("  🤖 Avatar: GET /api/v1/avatar/quota")  # Added avatar endpoints
+    logger.info("  🤖 Avatar: POST /api/v1/avatar/check-quota")
+    logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/start")
+    logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/end")
+    logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/status")
+    logger.info("  🤖 Avatar: GET /api/v1/avatar/sessions")
+    logger.info("  🤖 Avatar: GET /api/v1/avatar/health")
     
     # Log OAuth configuration status
     if settings.oauth_configured:
@@ -210,6 +229,10 @@ async def startup_event():
         logger.info("  ✅ Voice services are configured and ready")
     else:
         logger.warning("  ⚠️  Voice services not configured - check GOOGLE_CLOUD_PROJECT and credentials")
+    
+    # Log Avatar service status
+    logger.info("  ✅ Avatar tracking service is ready")
+    logger.info("     Features: 20-minute quota enforcement, session tracking")
     
     # Start background token refresh service
     try:
