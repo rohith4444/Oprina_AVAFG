@@ -24,7 +24,7 @@ from oprina.services.logging.logger import setup_logger
 from google import genai
 
 # Import simplified auth utils
-from oprina.tools_prod.auth_utils import get_gmail_service
+from oprina.tools.auth_utils import get_gmail_service
 
 # Import ADK utility functions
 from oprina.common.utils import (

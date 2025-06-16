@@ -27,7 +27,7 @@ from google.adk.tools import FunctionTool
 from oprina.services.logging.logger import setup_logger
 
 # Import simplified auth utils
-from oprina.tools_prod.auth_utils import get_calendar_service
+from oprina.tools.auth_utils import get_calendar_service
 
 # Import ADK utility functions
 from oprina.common.utils import (
