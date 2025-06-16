@@ -1,29 +1,25 @@
 """
-Enhanced authentication utilities for Oprina voice assistant.
-Direct database access - eliminates circular dependency.
-Supports both production (Supabase) and development (pickle file) modes.
+Production authentication utilities for Oprina voice assistant.
+Direct database access for multi-user OAuth token management.
+Eliminates circular dependency - agent connects directly to database.
 """
 
 import os
-import pickle
-from pathlib import Path
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from supabase import create_client, Client
 from oprina.services.logging.logger import setup_logger
 
-# Paths - tokens stored in oprina/ directory (fallback for development)
-OPRINA_DIR = Path(__file__).parent.parent  # tools/ -> oprina/
-GMAIL_TOKEN_PATH = OPRINA_DIR / 'gmail_token.pickle'
-CALENDAR_TOKEN_PATH = OPRINA_DIR / 'calendar_token.pickle'
+# Import session key constants
+from oprina.common.session_keys import USER_ID
 
 # Setup logger
 logger = setup_logger("auth_utils", console_output=True)
 
-# Global database client for production mode
+# Global database client
 _db_client: Optional[Client] = None
 
 def _get_database_client() -> Optional[Client]:
@@ -43,7 +39,7 @@ def _get_database_client() -> Optional[Client]:
         supabase_key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
         
         if not supabase_url or not supabase_key:
-            logger.debug("Supabase credentials not configured - using development mode")
+            logger.error("SUPABASE_URL and SUPABASE_SERVICE_KEY must be configured for production")
             return None
         
         _db_client = create_client(supabase_url, supabase_key)
@@ -54,13 +50,9 @@ def _get_database_client() -> Optional[Client]:
         logger.error(f"Failed to initialize database client: {e}")
         return None
 
-def _use_database() -> bool:
-    """Simple check: use database if available, otherwise use pickle files."""
-    return _get_database_client() is not None
-
 def _extract_user_id_from_context(tool_context) -> Optional[str]:
     """
-    Extract user_id from tool context session state.
+    Extract user_id from tool context session state using session key constants.
     
     Args:
         tool_context: ADK tool context
@@ -70,47 +62,29 @@ def _extract_user_id_from_context(tool_context) -> Optional[str]:
     """
     try:
         if tool_context and hasattr(tool_context, 'state'):
-            # Method 1: From session state (our preferred method)
-            user_id = tool_context.state.get("user:id")
+            # Use USER_ID constant from session_keys
+            user_id = tool_context.state.get(USER_ID)
             if user_id:
                 logger.debug(f"Found user_id in session state: {user_id}")
                 return user_id
         
-        # Method 2: Try session.user_id (ADK built-in)
+        # Fallback: Try session.user_id (ADK built-in)
         if tool_context and hasattr(tool_context, 'session'):
             if hasattr(tool_context.session, 'user_id'):
                 user_id = tool_context.session.user_id
                 logger.debug(f"Found user_id in session.user_id: {user_id}")
                 return user_id
         
-        logger.debug("No user_id found in tool context")
+        logger.warning("No user_id found in tool context - multi-user functionality disabled")
         return None
         
     except Exception as e:
         logger.error(f"Error extracting user_id from context: {e}")
         return None
 
-def _decrypt_token(encrypted_token: str) -> str:
+def _get_user_tokens_from_db(user_id: str, service: str) -> Optional[Dict[str, Any]]:
     """
-    Decrypt token using the same method as backend.
-    Simple implementation - in production, tokens are stored encrypted.
-    
-    Args:
-        encrypted_token: Encrypted token string
-        
-    Returns:
-        Decrypted token
-    """
-    # Note: In your backend, tokens are encrypted with bcrypt/encryption utils
-    # For now, this is a placeholder - you might need to import the decrypt function
-    # from your backend or implement a simple version here
-    
-    # If tokens are stored as plain text in JSONB for simplicity, return as-is
-    return encrypted_token
-
-async def _get_user_tokens_from_db(user_id: str, service: str) -> Optional[Dict[str, Any]]:
-    """
-    Get OAuth tokens directly from database.
+    Get OAuth tokens directly from database JSONB columns.
     
     Args:
         user_id: User identifier
@@ -122,21 +96,22 @@ async def _get_user_tokens_from_db(user_id: str, service: str) -> Optional[Dict[
     try:
         db_client = _get_database_client()
         if not db_client:
-            logger.debug("Database client not available")
+            logger.error("Database client not available")
             return None
         
-        # Query user tokens directly from database
-        result = db_client.table("users").select(f"{service}_tokens").eq("id", user_id).execute()
+        # Query user tokens directly from JSONB columns
+        column_name = f"{service}_tokens"
+        result = db_client.table("users").select(column_name).eq("id", user_id).execute()
         
         if not result.data:
-            logger.debug(f"No user found for ID: {user_id}")
+            logger.warning(f"No user found for ID: {user_id}")
             return None
         
         user_data = result.data[0]
-        tokens = user_data.get(f"{service}_tokens")
+        tokens = user_data.get(column_name)
         
         if not tokens:
-            logger.debug(f"No {service} tokens found for user {user_id}")
+            logger.warning(f"No {service} tokens found for user {user_id}")
             return None
         
         # Check if tokens are expired
@@ -156,6 +131,20 @@ async def _get_user_tokens_from_db(user_id: str, service: str) -> Optional[Dict[
         logger.error(f"Error getting {service} tokens from database: {e}")
         return None
 
+def _decrypt_token(encrypted_token: str) -> str:
+    """
+    Decrypt token - placeholder for actual decryption.
+    
+    Args:
+        encrypted_token: Encrypted token string
+        
+    Returns:
+        Decrypted token
+    """
+    # TODO: Implement actual decryption if tokens are encrypted in database
+    # For now, assume tokens are stored as plain text in JSONB
+    return encrypted_token
+
 def _get_credentials_from_db_tokens(tokens: Dict[str, Any]) -> Optional[Credentials]:
     """
     Convert database token data to Google Credentials object.
@@ -167,7 +156,7 @@ def _get_credentials_from_db_tokens(tokens: Dict[str, Any]) -> Optional[Credenti
         Google Credentials object or None
     """
     try:
-        # Decrypt tokens (implement decryption if needed)
+        # Decrypt tokens if needed
         access_token = _decrypt_token(tokens.get("access_token", ""))
         refresh_token = _decrypt_token(tokens.get("refresh_token", ""))
         
@@ -192,74 +181,7 @@ def _get_credentials_from_db_tokens(tokens: Dict[str, Any]) -> Optional[Credenti
         logger.error(f"Error creating credentials from database tokens: {e}")
         return None
 
-def _get_credentials_from_pickle(service: str) -> Optional[Credentials]:
-    """
-    Get OAuth credentials from pickle file (fallback for development).
-    
-    Args:
-        service: Service name ('gmail' or 'calendar')
-        
-    Returns:
-        Google OAuth2 Credentials object or None
-    """
-    token_path = GMAIL_TOKEN_PATH if service == 'gmail' else CALENDAR_TOKEN_PATH
-    
-    try:
-        if not token_path.exists():
-            logger.debug(f"{service} token file not found at {token_path}")
-            return None
-        
-        with open(token_path, 'rb') as token:
-            creds = pickle.load(token)
-        
-        # Refresh credentials if needed
-        if not creds.valid:
-            if creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    # Save refreshed credentials
-                    with open(token_path, 'wb') as token:
-                        pickle.dump(creds, token)
-                    logger.info(f"{service} credentials refreshed from pickle file")
-                except Exception as refresh_error:
-                    logger.error(f"Failed to refresh {service} credentials: {refresh_error}")
-                    return None
-            else:
-                logger.error(f"{service} credentials expired and cannot be refreshed")
-                return None
-        
-        logger.info(f"Retrieved {service} credentials from pickle file")
-        return creds
-        
-    except Exception as e:
-        logger.error(f"Error getting {service} credentials from pickle: {e}")
-        return None
-
-async def _get_credentials_for_service(service: str, user_id: Optional[str]) -> Optional[Credentials]:
-    """
-    Get credentials for a service - database first, then pickle fallback.
-    
-    Args:
-        service: Service name ('gmail' or 'calendar')
-        user_id: User identifier (None for development mode)
-        
-    Returns:
-        Google Credentials object or None
-    """
-    # Try database first if available and we have a user_id
-    if user_id and _use_database():
-        logger.debug(f"Using database for {service} service")
-        tokens = await _get_user_tokens_from_db(user_id, service)
-        if tokens:
-            credentials = _get_credentials_from_db_tokens(tokens)
-            if credentials:
-                return credentials
-    
-    # Fallback to pickle files
-    logger.debug(f"Using pickle files for {service} service")
-    return _get_credentials_from_pickle(service)
-
-def get_gmail_service(tool_context=None):
+def get_gmail_service(tool_context=None) -> Optional[Any]:
     """
     Get Gmail service with multi-user support via direct database access.
     
@@ -267,24 +189,26 @@ def get_gmail_service(tool_context=None):
         tool_context: ADK tool context (automatically provided)
         
     Returns:
-        Gmail service object or None
+        Gmail service object or None if not authenticated
     """
     try:
-        # Extract user_id from context for production mode
+        # Extract user_id from context for multi-user support
         user_id = _extract_user_id_from_context(tool_context)
         
-        # Get credentials using async call (wrap in sync for compatibility)
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        if not user_id:
+            logger.error("No user_id found - cannot retrieve Gmail tokens for multi-user system")
+            return None
         
-        credentials = loop.run_until_complete(_get_credentials_for_service('gmail', user_id))
+        # Get tokens from database
+        tokens = _get_user_tokens_from_db(user_id, 'gmail')
+        if not tokens:
+            logger.warning(f"No Gmail tokens available for user {user_id}")
+            return None
         
+        # Convert to Google Credentials
+        credentials = _get_credentials_from_db_tokens(tokens)
         if not credentials:
-            logger.warning("No Gmail authentication available")
+            logger.error(f"Failed to create Gmail credentials for user {user_id}")
             return None
         
         # Mark Gmail as connected in session state
@@ -293,16 +217,23 @@ def get_gmail_service(tool_context=None):
         
         # Refresh token if needed
         if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
+            try:
+                logger.info(f"Refreshing Gmail credentials for user {user_id}")
+                credentials.refresh(Request())
+            except Exception as refresh_error:
+                logger.error(f"Failed to refresh Gmail credentials for user {user_id}: {refresh_error}")
+                return None
         
-        logger.info(f"Gmail service created for user: {user_id or 'development'}")
-        return build('gmail', 'v1', credentials=credentials)
+        # Create and return service
+        service = build('gmail', 'v1', credentials=credentials)
+        logger.info(f"Gmail service created successfully for user {user_id}")
+        return service
         
     except Exception as e:
         logger.error(f"Error creating Gmail service: {e}")
         return None
 
-def get_calendar_service(tool_context=None):
+def get_calendar_service(tool_context=None) -> Optional[Any]:
     """
     Get Calendar service with multi-user support via direct database access.
     
@@ -310,24 +241,26 @@ def get_calendar_service(tool_context=None):
         tool_context: ADK tool context (automatically provided)
         
     Returns:
-        Calendar service object or None
+        Calendar service object or None if not authenticated
     """
     try:
-        # Extract user_id from context for production mode
+        # Extract user_id from context for multi-user support
         user_id = _extract_user_id_from_context(tool_context)
         
-        # Get credentials using async call (wrap in sync for compatibility)
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        if not user_id:
+            logger.error("No user_id found - cannot retrieve Calendar tokens for multi-user system")
+            return None
         
-        credentials = loop.run_until_complete(_get_credentials_for_service('calendar', user_id))
+        # Get tokens from database
+        tokens = _get_user_tokens_from_db(user_id, 'calendar')
+        if not tokens:
+            logger.warning(f"No Calendar tokens available for user {user_id}")
+            return None
         
+        # Convert to Google Credentials
+        credentials = _get_credentials_from_db_tokens(tokens)
         if not credentials:
-            logger.warning("No Calendar authentication available")
+            logger.error(f"Failed to create Calendar credentials for user {user_id}")
             return None
         
         # Mark Calendar as connected in session state
@@ -336,10 +269,17 @@ def get_calendar_service(tool_context=None):
         
         # Refresh token if needed
         if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
+            try:
+                logger.info(f"Refreshing Calendar credentials for user {user_id}")
+                credentials.refresh(Request())
+            except Exception as refresh_error:
+                logger.error(f"Failed to refresh Calendar credentials for user {user_id}: {refresh_error}")
+                return None
         
-        logger.info(f"Calendar service created for user: {user_id or 'development'}")
-        return build('calendar', 'v3', credentials=credentials)
+        # Create and return service
+        service = build('calendar', 'v3', credentials=credentials)
+        logger.info(f"Calendar service created successfully for user {user_id}")
+        return service
         
     except Exception as e:
         logger.error(f"Error creating Calendar service: {e}")
@@ -350,7 +290,7 @@ def check_gmail_connection(tool_context=None) -> bool:
     Check if Gmail is properly set up and accessible.
     
     Args:
-        tool_context: ADK tool context (for production mode)
+        tool_context: ADK tool context (for multi-user mode)
         
     Returns:
         True if Gmail service is available, False otherwise
@@ -376,7 +316,7 @@ def check_calendar_connection(tool_context=None) -> bool:
     Check if Calendar is properly set up and accessible.
     
     Args:
-        tool_context: ADK tool context (for production mode)
+        tool_context: ADK tool context (for multi-user mode)
         
     Returns:
         True if Calendar service is available, False otherwise
@@ -397,26 +337,10 @@ def check_calendar_connection(tool_context=None) -> bool:
         logger.error(f"Calendar connection test failed: {e}")
         return False
 
-def get_user_connection_status(tool_context=None) -> Dict[str, bool]:
-    """
-    Get connection status for all services for the current user.
-    
-    Args:
-        tool_context: ADK tool context
-        
-    Returns:
-        Dict with service connection status
-    """
-    return {
-        "gmail": check_gmail_connection(tool_context),
-        "calendar": check_calendar_connection(tool_context)
-    }
-
 # Export main functions
 __all__ = [
     "get_gmail_service",
     "get_calendar_service", 
     "check_gmail_connection",
-    "check_calendar_connection",
-    "get_user_connection_status"
+    "check_calendar_connection"
 ]

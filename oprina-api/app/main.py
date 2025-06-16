@@ -1,10 +1,10 @@
-# app/main.py - Updated with Background Token Service
+# app/main.py - Updated with Background Token Service and Voice Endpoints
 
 """
-Updated main.py - INCLUDES AUTH, USER, SESSIONS, OAUTH, AND BACKGROUND TOKEN REFRESH.
+Updated main.py - INCLUDES AUTH, USER, SESSIONS, OAUTH, VOICE, AND BACKGROUND TOKEN REFRESH.
 
 This version includes session management with Vertex AI integration, OAuth, 
-and automatic background token refresh.
+voice services, and automatic background token refresh.
 """
 
 import time
@@ -21,6 +21,7 @@ from app.api.endpoints import auth
 from app.api.endpoints import user
 from app.api.endpoints import sessions
 from app.api.endpoints import oauth
+from app.api.endpoints import voice  # Added voice endpoints
 
 # Import background service
 from app.core.services.background_tasks import (
@@ -39,7 +40,7 @@ logger = get_logger(__name__)
 app = FastAPI(
     title=settings.API_TITLE,
     version="1.0.0",
-    description="AI Agent API - Full Session Management with OAuth & Background Token Refresh",
+    description="AI Agent API - Full Session Management with OAuth, Voice Services & Background Token Refresh",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -86,6 +87,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
 app.include_router(user.router, prefix="/api/v1", tags=["users"])
 app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
 app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["oauth"])
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])  # Added voice router
 
 # Root endpoint
 @app.get("/")
@@ -98,10 +100,11 @@ async def root():
     return {
         "name": "Oprina API",
         "version": "1.0.0",
-        "status": "running - full session management with OAuth & background refresh",
+        "status": "running - full session management with OAuth, Voice & background refresh",
         "docs": "/docs",
         "redoc": "/redoc",
         "oauth_configured": settings.oauth_configured,
+        "voice_configured": hasattr(settings, 'GOOGLE_CLOUD_PROJECT') and bool(getattr(settings, 'GOOGLE_CLOUD_PROJECT', None)),
         "background_service": {
             "enabled": bg_stats["enabled"],
             "running": bg_stats["is_running"],
@@ -144,6 +147,11 @@ async def root():
                 "GET /api/v1/oauth/config",
                 "GET /api/v1/oauth/health",
                 "GET /api/v1/oauth/background-status"
+            ],
+            "voice": [
+                "POST /api/v1/voice/message",
+                "POST /api/v1/voice/transcribe",
+                "POST /api/v1/voice/synthesize"
             ]
         }
     }
@@ -165,7 +173,7 @@ async def background_service_status():
 @app.on_event("startup")
 async def startup_event():
     """Startup event to log available endpoints and start background service."""
-    logger.info("🎯 Starting Oprina API with Session Management, OAuth & Background Token Refresh")
+    logger.info("🎯 Starting Oprina API with Session Management, OAuth, Voice Services & Background Token Refresh")
     logger.info("Available endpoints:")
     logger.info("  📋 Health: GET /api/v1/health/")
     logger.info("  🔐 Auth: POST /api/v1/auth/register")
@@ -187,12 +195,21 @@ async def startup_event():
     logger.info("  🔗 OAuth: GET /api/v1/oauth/callback")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/status")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/background-status")
+    logger.info("  🎤 Voice: POST /api/v1/voice/message")  # Added voice endpoints
+    logger.info("  🎤 Voice: POST /api/v1/voice/transcribe")
+    logger.info("  🎤 Voice: POST /api/v1/voice/synthesize")
     
     # Log OAuth configuration status
     if settings.oauth_configured:
         logger.info("  ✅ OAuth is configured and ready")
     else:
         logger.warning("  ⚠️  OAuth not configured - check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
+    
+    # Log Voice service configuration status
+    if hasattr(settings, 'GOOGLE_CLOUD_PROJECT') and getattr(settings, 'GOOGLE_CLOUD_PROJECT', None):
+        logger.info("  ✅ Voice services are configured and ready")
+    else:
+        logger.warning("  ⚠️  Voice services not configured - check GOOGLE_CLOUD_PROJECT and credentials")
     
     # Start background token refresh service
     try:
