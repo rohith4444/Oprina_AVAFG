@@ -1,0 +1,288 @@
+/* DashboardPage.css - Fixed with Sidebar + 50/50 Layout */
+
+/* Main container - Grid with sidebar */
+.dashboard-page {
+  display: grid;
+  grid-template-columns: 260px 1fr; /* Sidebar + Main content */
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--background-alt) 0%, var(--background) 100%);
+}
+
+/* Main Content Area */
+.main-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  overflow: hidden;
+}
+
+/* Unified 50/50 Container - Now fits in main content area */
+.dashboard-unified {
+  width: 95%;
+  height: 650px;
+  background-color: var(--background);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px var(--shadow);
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+/* Left Side: Avatar + Controls (50%) */
+.avatar-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--background-alt) 0%, var(--background) 100%);
+  border-right: 1px solid var(--border);
+}
+
+.avatar-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Clean Voice Controls - Removed all status elements */
+.compact-voice-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background-color: var(--background);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
+}
+
+/* Voice Button - Using existing button system */
+.voice-button {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.mic-button {
+  background: linear-gradient(135deg, var(--primary-blue), var(--primary-teal));
+  color: white;
+}
+
+.mic-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(91, 124, 255, 0.4);
+}
+
+.mic-button.active {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  animation: pulse 2s infinite;
+}
+
+.mic-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Volume Control */
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--background-alt);
+  padding: 0.75rem 1rem;
+  border-radius: 2rem;
+  border: 1px solid var(--border);
+}
+
+.volume-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-teal), var(--primary-green));
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-button:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(79, 209, 197, 0.3);
+}
+
+.volume-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.volume-slider-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.volume-slider {
+  width: 100px;
+  height: 4px;
+  background-color: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-teal), var(--primary-green));
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(79, 209, 197, 0.3);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-teal), var(--primary-green));
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(79, 209, 197, 0.3);
+}
+
+.volume-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.volume-label {
+  font-size: 0.75rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* Right Side: Conversation (50%) */
+.conversation-section {
+  flex: 1;
+  background-color: var(--background);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Animations - Using existing system */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .dashboard-page {
+    grid-template-columns: 1fr; /* Remove sidebar on smaller screens */
+  }
+  
+  .main-content {
+    padding: 1rem;
+  }
+  
+  .dashboard-unified {
+    max-width: 100%;
+    height: auto;
+    min-height: 80vh;
+    flex-direction: column;
+  }
+  
+  .avatar-section {
+    flex: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .conversation-section {
+    flex: 1;
+    min-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+  }
+  
+  .dashboard-unified {
+    height: auto;
+    min-height: 70vh;
+  }
+  
+  .avatar-section {
+    padding: 1.5rem;
+  }
+  
+  .compact-voice-controls {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .volume-control {
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .volume-slider {
+    width: 80px;
+  }
+  
+  .voice-button {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  
+  .volume-button {
+    width: 35px;
+    height: 35px;
+    font-size: 14px;
+  }
+  
+  .dashboard-unified {
+    border-radius: 0.5rem;
+  }
+  
+  .avatar-section {
+    padding: 1rem;
+  }
+}

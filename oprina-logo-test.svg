@@ -1,0 +1,44 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="oprina-gradient" x1="0" y1="128" x2="256" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Main ring - almost complete circle with gap at 9 o'clock -->
+  <path
+    d="M 58 128
+       A 70 70 0 0 1 128 58
+       A 70 70 0 0 1 198 128
+       A 70 70 0 0 1 128 198
+       A 70 70 0 0 1 78 148"
+    stroke="url(#oprina-gradient)"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  
+  <!-- Angular cuts at the gap for Halo-style mechanical look -->
+  <path
+    d="M 58 128 L 48 118 M 58 128 L 48 138"
+    stroke="url(#oprina-gradient)"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+  
+  <!-- Central node (voice/AI) -->
+  <circle cx="128" cy="128" r="16" fill="url(#oprina-gradient)" />
+  
+  <!-- Connection bar (extending rightward from center) -->
+  <rect x="144" y="124" width="24" height="8" rx="4" fill="url(#oprina-gradient)" />
+  
+  <!-- Optional: Small antenna-like projections for tech aesthetic -->
+  <path
+    d="M 108 78 L 98 58 M 148 78 L 158 58"
+    stroke="url(#oprina-gradient)"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+</svg> 

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oprina Logo Variations</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            padding: 2rem;
+            margin: 0;
+        }
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .logo-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .logo-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+        h1 {
+            text-align: center;
+            color: #1e293b;
+            margin-bottom: 3rem;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <h1>Oprina Logo Variations</h1>
+    <div class="logo-grid">
+        
+        <!-- Logo 1: Classic Gap at 3 o'clock -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 1: Classic Right Gap</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Main ring with gap at 3 o'clock -->
+                    <path d="M 60 15 A 45 45 0 1 1 95 75" stroke="url(#grad1)" stroke-width="8" stroke-linecap="round" fill="none"/>
+                    <!-- Central AI core -->
+                    <circle cx="60" cy="60" r="8" fill="url(#grad1)"/>
+                    <!-- Connection lines -->
+                    <line x1="52" y1="60" x2="68" y2="60" stroke="url(#grad1)" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="60" y1="52" x2="60" y2="68" stroke="url(#grad1)" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 2: Angular Cuts with Gap -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 2: Angular Cuts</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Angular ring with sharp cuts -->
+                    <path d="M 60 15 A 45 45 0 1 1 90 80 L 85 75 M 95 75 L 100 80" stroke="url(#grad2)" stroke-width="8" stroke-linecap="square" fill="none"/>
+                    <!-- Central node -->
+                    <polygon points="60,52 68,60 60,68 52,60" fill="url(#grad2)"/>
+                    <!-- Tech connectors -->
+                    <rect x="56" y="58" width="8" height="4" rx="2" fill="url(#grad2)"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 3: Double Ring System -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 3: Double Ring</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Outer ring with gap -->
+                    <path d="M 60 10 A 50 50 0 1 1 100 80" stroke="url(#grad3)" stroke-width="6" stroke-linecap="round" fill="none"/>
+                    <!-- Inner ring -->
+                    <path d="M 60 25 A 35 35 0 1 1 85 75" stroke="url(#grad3)" stroke-width="4" stroke-linecap="round" fill="none"/>
+                    <!-- Central core -->
+                    <circle cx="60" cy="60" r="6" fill="url(#grad3)"/>
+                    <!-- Orbital elements -->
+                    <circle cx="45" cy="45" r="2" fill="url(#grad3)"/>
+                    <circle cx="75" cy="75" r="2" fill="url(#grad3)"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 4: Hexagonal Tech Style -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 4: Hexagonal Tech</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad4" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Hexagonal ring with gap -->
+                    <path d="M 82 25 L 98 45 L 98 75 L 82 95 L 38 95 L 22 75 L 22 45 L 38 25 L 70 25" stroke="url(#grad4)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <!-- Central hexagon -->
+                    <polygon points="60,45 70,52 70,68 60,75 50,68 50,52" fill="url(#grad4)"/>
+                    <!-- Connection nodes -->
+                    <circle cx="76" cy="25" r="3" fill="url(#grad4)"/>
+                    <circle cx="82" cy="25" r="2" fill="#ffffff"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 5: Minimalist Gap -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 5: Minimalist</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad5" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Simple ring with clean gap -->
+                    <path d="M 60 20 A 40 40 0 1 1 90 70" stroke="url(#grad5)" stroke-width="10" stroke-linecap="round" fill="none"/>
+                    <!-- Minimal center dot -->
+                    <circle cx="60" cy="60" r="4" fill="url(#grad5)"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 6: Circuit Board Style -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 6: Circuit Board</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad6" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Circuit-style ring -->
+                    <path d="M 60 15 A 45 45 0 1 1 95 75 L 90 75 L 90 70 L 95 70" stroke="url(#grad6)" stroke-width="6" stroke-linecap="square" fill="none"/>
+                    <!-- Circuit nodes -->
+                    <rect x="56" y="56" width="8" height="8" rx="1" fill="url(#grad6)"/>
+                    <rect x="25" y="56" width="4" height="4" rx="1" fill="url(#grad6)"/>
+                    <rect x="91" y="56" width="4" height="4" rx="1" fill="url(#grad6)"/>
+                    <!-- Connection traces -->
+                    <line x1="29" y1="58" x2="56" y2="58" stroke="url(#grad6)" stroke-width="2"/>
+                    <line x1="64" y1="58" x2="91" y2="58" stroke="url(#grad6)" stroke-width="2"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 7: Orbital System -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 7: Orbital System</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad7" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Main orbital ring -->
+                    <path d="M 60 15 A 45 45 0 1 1 95 75" stroke="url(#grad7)" stroke-width="7" stroke-linecap="round" fill="none"/>
+                    <!-- Orbital path -->
+                    <path d="M 35 35 A 25 25 0 0 1 85 85" stroke="url(#grad7)" stroke-width="2" stroke-dasharray="3,3" fill="none" opacity="0.6"/>
+                    <!-- Central star -->
+                    <polygon points="60,52 64,58 60,68 56,58" fill="url(#grad7)"/>
+                    <!-- Orbiting elements -->
+                    <circle cx="40" cy="40" r="3" fill="url(#grad7)"/>
+                    <circle cx="80" cy="80" r="2" fill="url(#grad7)" opacity="0.7"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 8: Quantum Style -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 8: Quantum</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad8" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Quantum ring with probability gaps -->
+                    <path d="M 60 15 A 45 45 0 1 1 95 75" stroke="url(#grad8)" stroke-width="6" stroke-linecap="round" fill="none" stroke-dasharray="8,2"/>
+                    <!-- Quantum core -->
+                    <circle cx="60" cy="60" r="8" fill="none" stroke="url(#grad8)" stroke-width="3"/>
+                    <circle cx="60" cy="60" r="3" fill="url(#grad8)"/>
+                    <!-- Probability clouds -->
+                    <circle cx="45" cy="45" r="1.5" fill="url(#grad8)" opacity="0.6"/>
+                    <circle cx="75" cy="45" r="1" fill="url(#grad8)" opacity="0.4"/>
+                    <circle cx="45" cy="75" r="1" fill="url(#grad8)" opacity="0.4"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 9: Neural Network -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 9: Neural Network</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad9" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Neural ring -->
+                    <path d="M 60 15 A 45 45 0 1 1 95 75" stroke="url(#grad9)" stroke-width="5" stroke-linecap="round" fill="none"/>
+                    <!-- Neural nodes -->
+                    <circle cx="60" cy="60" r="6" fill="url(#grad9)"/>
+                    <circle cx="35" cy="45" r="4" fill="url(#grad9)"/>
+                    <circle cx="85" cy="45" r="4" fill="url(#grad9)"/>
+                    <circle cx="35" cy="75" r="4" fill="url(#grad9)"/>
+                    <!-- Neural connections -->
+                    <line x1="60" y1="60" x2="35" y2="45" stroke="url(#grad9)" stroke-width="2" opacity="0.6"/>
+                    <line x1="60" y1="60" x2="85" y2="45" stroke="url(#grad9)" stroke-width="2" opacity="0.6"/>
+                    <line x1="60" y1="60" x2="35" y2="75" stroke="url(#grad9)" stroke-width="2" opacity="0.6"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Logo 10: Futuristic Segments -->
+        <div class="logo-card">
+            <div class="logo-title">Logo 10: Futuristic Segments</div>
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="grad10" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#3B82F6"/>
+                            <stop offset="100%" stop-color="#10B981"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Segmented ring -->
+                    <path d="M 60 15 A 45 45 0 0 1 90 35" stroke="url(#grad10)" stroke-width="8" stroke-linecap="round" fill="none"/>
+                    <path d="M 95 45 A 45 45 0 0 1 90 85" stroke="url(#grad10)" stroke-width="8" stroke-linecap="round" fill="none"/>
+                    <path d="M 80 95 A 45 45 0 0 1 40 95" stroke="url(#grad10)" stroke-width="8" stroke-linecap="round" fill="none"/>
+                    <path d="M 30 85 A 45 45 0 0 1 25 45" stroke="url(#grad10)" stroke-width="8" stroke-linecap="round" fill="none"/>
+                    <path d="M 30 35 A 45 45 0 0 1 50 20" stroke="url(#grad10)" stroke-width="8" stroke-linecap="round" fill="none"/>
+                    <!-- Central AI processor -->
+                    <rect x="54" y="54" width="12" height="12" rx="2" fill="url(#grad10)"/>
+                    <rect x="57" y="57" width="6" height="6" rx="1" fill="#ffffff"/>
+                </svg>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html> 
