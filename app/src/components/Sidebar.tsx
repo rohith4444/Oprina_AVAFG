@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
 import {
   Mail,
@@ -6,7 +7,6 @@ import {
   User,
   MessageSquarePlus,
   ChevronLeft,
-  ChevronRight,
   Send,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -31,13 +31,14 @@ interface SidebarProps {
   conversations: Conversation[];
   onNewChat: () => void;
   onSelectChat: (id: string) => void;
+  activeConversationId: string | null; // Add this
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewChat, onSelectChat }) => {
+const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewChat, onSelectChat, activeConversationId }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isGmailConnected, setIsGmailConnected] = useState(false);
+  const [isGmailConnected] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleGmailConnect = () => {
@@ -106,7 +107,9 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewC
                 return (
                   <li
                     key={conversation.id}
-                    className="conversation-item"
+                    className={`conversation-item ${
+                      conversation.id === activeConversationId ? 'active' : ''
+                    }`}
                     onClick={() => onSelectChat(conversation.id)}
                   >
                     <Send size={16} />

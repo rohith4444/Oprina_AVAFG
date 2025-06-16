@@ -18,7 +18,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import the functions we're testing
-from oprina.tools.calendar import (
+from oprina.tools_prod.calendar import (
     calendar_create_event, calendar_list_events, calendar_update_event,
     calendar_delete_event, _parse_datetime, _format_event_time
 )

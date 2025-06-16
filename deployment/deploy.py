@@ -126,6 +126,9 @@ def send_message(resource_id: str, user_id: str, session_id: str, message: str) 
     """Sends a message to the deployed agent."""
     remote_app = agent_engines.get(resource_id)
 
+    print("Full remote_session object:")
+    print(remote_app)
+
     print(f"Sending message to session {session_id}:")
     print(f"Message: {message}")
     print("\nResponse:")

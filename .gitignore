@@ -340,7 +340,6 @@ Dockerfile.prod
 *.model
 *.pkl
 *.pickle
-models/
 checkpoints/
 
 # Data files
@@ -394,7 +393,6 @@ secrets/
 *.jwt
 
 # OAuth tokens
-*token*
 *secret*
 *credential*
 
