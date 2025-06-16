@@ -145,22 +145,3 @@ async def get_current_user(
 # Alias for compatibility with your auth endpoints
 get_optional_current_user = get_current_user_optional
 
-
-# REMOVED ALL COMPLEX DEPENDENCIES:
-# - No ChatService (imports AgentService)
-# - No AgentService (imports client.py which fails)
-# - No TokenService (imports complex dependencies)
-# - No OAuthService (imports complex dependencies)
-# - No VoiceService (imports complex dependencies)
-# - No SessionRepository (might have dependencies)
-# - No MessageRepository (might have dependencies)
-# - No admin/API key authentication (complex)
-# - No rate limiting (complex)
-# - No pagination validation (not needed for basic endpoints)
-# - No health checks (not needed for basic endpoints)
-# - No request context (not needed for basic endpoints)
-
-# This minimal version should only support:
-# ✅ Health endpoints (no dependencies needed)
-# ✅ Auth endpoints (user repository + auth manager)
-# ✅ User endpoints (user repository + user service)
