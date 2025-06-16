@@ -3,7 +3,7 @@
 from google.adk.agents import Agent
 
 from oprina.sub_agents.email import prompt
-from oprina.tools.gmail import GMAIL_TOOLS
+from oprina.tools_prod.gmail import GMAIL_TOOLS
 
 email_agent = Agent(
     model="gemini-2.0-flash",

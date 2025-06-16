@@ -3,7 +3,7 @@
 from google.adk.agents import Agent
 
 from oprina.sub_agents.calendar import prompt
-from oprina.tools.calendar import CALENDAR_TOOLS
+from oprina.tools_prod.calendar import CALENDAR_TOOLS
 
 calendar_agent = Agent(
     model="gemini-2.0-flash",

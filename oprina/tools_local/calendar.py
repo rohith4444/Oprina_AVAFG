@@ -27,7 +27,7 @@ from google.adk.tools import FunctionTool
 from oprina.services.logging.logger import setup_logger
 
 # Import simplified auth utils
-from oprina.tools.auth_utils import get_calendar_service
+from oprina.tools_prod.auth_utils import get_calendar_service
 
 # Import ADK utility functions
 from oprina.common.utils import (
@@ -72,7 +72,7 @@ def calendar_create_event(
         update_agent_activity(tool_context, "calendar_agent", "creating_event")
         
         # Get Calendar service
-        service = get_calendar_service(tool_context)
+        service = get_calendar_service()
         if not service:
             return {"error": "Calendar not set up. Please run: python setup_calendar.py"}
         
@@ -172,7 +172,7 @@ def calendar_list_events(
         update_agent_activity(tool_context, "calendar_agent", "listing_events")
         
         # Get Calendar service
-        service = get_calendar_service(tool_context)
+        service = get_calendar_service()
         if not service:
             return "Calendar not set up. Please run: python setup_calendar.py"
         
@@ -293,7 +293,7 @@ def calendar_update_event(
         update_agent_activity(tool_context, "calendar_agent", "updating_event")
         
         # Get Calendar service
-        service = get_calendar_service(tool_context)
+        service = get_calendar_service()
         if not service:
             return {"error": "Calendar not set up. Please run: python setup_calendar.py"}
         
@@ -395,7 +395,7 @@ def calendar_delete_event(
         update_agent_activity(tool_context, "calendar_agent", "deleting_event")
         
         # Get Calendar service
-        service = get_calendar_service(tool_context )
+        service = get_calendar_service()
         if not service:
             return {"error": "Calendar not set up. Please run: python setup_calendar.py"}
         

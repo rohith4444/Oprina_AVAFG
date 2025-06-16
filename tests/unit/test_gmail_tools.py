@@ -18,7 +18,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import the functions we're testing
-from oprina.tools.gmail import (
+from oprina.tools_prod.gmail import (
     gmail_list_messages, gmail_get_message, gmail_search_messages,
     gmail_send_message, gmail_reply_to_message, gmail_mark_as_read,
     gmail_archive_message, gmail_delete_message, gmail_generate_email,
