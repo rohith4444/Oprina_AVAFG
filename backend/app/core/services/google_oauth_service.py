@@ -168,7 +168,7 @@ class GoogleOAuthService:
             return {
                 "success": True,
                 "service": "gmail",
-                "action": "connect",
+                "action": "gmail_connect",
                 "user_id": user_id,
                 "connected_email": user_info.get("email"),
                 "redirect_url": settings.FRONTEND_SETTINGS_URL
@@ -203,7 +203,7 @@ class GoogleOAuthService:
             return {
                 "success": True,
                 "service": "calendar",
-                "action": "connect",
+                "action": "calendar_connect",
                 "user_id": user_id,
                 "connected_email": user_info.get("email"),
                 "redirect_url": settings.FRONTEND_SETTINGS_URL
@@ -303,59 +303,36 @@ class GoogleOAuthService:
     # TOKEN MANAGEMENT
     # =============================================================================
     
-    async def get_service_connection_status(self, user_id: str) -> Dict[str, Any]:
-        """Get connection status for Gmail and Calendar."""
-        try:
-            user = await self.user_repository.get_user_by_id(user_id)
-            if not user:
-                raise ValidationError("User not found")
-            
-            gmail_connected = bool(user.get("gmail_tokens"))
-            calendar_connected = bool(user.get("calendar_tokens"))
-            
-            # Check if tokens are expired
-            if gmail_connected:
-                gmail_tokens = user["gmail_tokens"]
-                if gmail_tokens.get("expires_at"):
-                    expires_at = datetime.fromisoformat(gmail_tokens["expires_at"])
-                    gmail_connected = expires_at > datetime.utcnow()
-            
-            if calendar_connected:
-                calendar_tokens = user["calendar_tokens"]
-                if calendar_tokens.get("expires_at"):
-                    expires_at = datetime.fromisoformat(calendar_tokens["expires_at"])
-                    calendar_connected = expires_at > datetime.utcnow()
-            
-            return {
-                "gmail": {
-                    "connected": gmail_connected,
-                    "email": user.get("gmail_tokens", {}).get("user_email") if gmail_connected else None
-                },
-                "calendar": {
-                    "connected": calendar_connected,
-                    "email": user.get("calendar_tokens", {}).get("user_email") if calendar_connected else None
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to get connection status for user {user_id}: {str(e)}")
-            raise
-    
     async def disconnect_service(self, user_id: str, service: str) -> Dict[str, Any]:
         """Disconnect a service (Gmail or Calendar)."""
         try:
             if service not in ["gmail", "calendar"]:
                 raise ValidationError("Service must be 'gmail' or 'calendar'")
             
-            # Clear service tokens
+            # Get current user to verify they exist
+            user = await self.user_repository.get_user_by_id(user_id)
+            if not user:
+                raise ValidationError("User not found")
+            
+            # Log current state
+            current_tokens = user.get(f"{service}_tokens")
+            logger.info(f"🔄 Disconnecting {service} for user {user_id}")
+            logger.debug(f"Current {service}_tokens exists: {bool(current_tokens)}")
+            
+            # Clear service tokens - use empty dict instead of None
             update_data = {
-                f"{service}_tokens": None,
+                f"{service}_tokens": {},  # ← Use empty dict instead of None
                 "updated_at": datetime.utcnow().isoformat()
             }
             
             await self.user_repository.update_user(user_id, update_data)
             
-            logger.info(f"{service.title()} disconnected for user {user_id}")
+            # Verify the disconnect worked
+            updated_user = await self.user_repository.get_user_by_id(user_id)
+            updated_tokens = updated_user.get(f"{service}_tokens")
+            
+            logger.info(f"✅ {service.title()} disconnected for user {user_id}")
+            logger.debug(f"After disconnect - {service}_tokens: {updated_tokens}")
             
             return {
                 "success": True,
@@ -367,7 +344,54 @@ class GoogleOAuthService:
         except Exception as e:
             logger.error(f"Failed to disconnect {service} for user {user_id}: {str(e)}")
             raise
-    
+
+    async def get_service_connection_status(self, user_id: str) -> Dict[str, Any]:
+        """Get connection status for Gmail and Calendar."""
+        try:
+            user = await self.user_repository.get_user_by_id(user_id)
+            if not user:
+                raise ValidationError("User not found")
+            
+            # Get tokens safely
+            gmail_tokens = user.get("gmail_tokens") or {}
+            calendar_tokens = user.get("calendar_tokens") or {}
+            
+            # Check if tokens exist and have access token
+            gmail_connected = bool(gmail_tokens and gmail_tokens.get("access_token"))
+            calendar_connected = bool(calendar_tokens and calendar_tokens.get("access_token"))
+            
+            # Check if tokens are expired (only if connected)
+            if gmail_connected and gmail_tokens.get("expires_at"):
+                try:
+                    expires_at = datetime.fromisoformat(gmail_tokens["expires_at"])
+                    gmail_connected = expires_at > datetime.utcnow()
+                except (ValueError, TypeError):
+                    gmail_connected = False
+            
+            if calendar_connected and calendar_tokens.get("expires_at"):
+                try:
+                    expires_at = datetime.fromisoformat(calendar_tokens["expires_at"])
+                    calendar_connected = expires_at > datetime.utcnow()
+                except (ValueError, TypeError):
+                    calendar_connected = False
+            
+            logger.debug(f"Status check - Gmail: {gmail_connected}, Calendar: {calendar_connected}")
+            
+            return {
+                "gmail": {
+                    "connected": gmail_connected,
+                    "email": gmail_tokens.get("user_email") if gmail_connected else None
+                },
+                "calendar": {
+                    "connected": calendar_connected,
+                    "email": calendar_tokens.get("user_email") if calendar_connected else None
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get connection status for user {user_id}: {str(e)}")
+            raise
+        
     # =============================================================================
     # PRIVATE HELPER METHODS
     # =============================================================================
