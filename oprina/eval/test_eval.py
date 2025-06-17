@@ -1,6 +1,6 @@
 import pathlib
 import dotenv
-from google.adk.evaluation import AgentEvaluator
+from google.adk.evaluation.agent_evaluator import AgentEvaluator
 import pytest
 
 
@@ -13,7 +13,7 @@ def load_env():
 async def test_email_workflows():
     """Test the email agent's basic operations and workflows."""
     await AgentEvaluator.evaluate(
-        "email_agent",
+        "oprina.sub_agents.email",
         str(pathlib.Path(__file__).parent / "data/email_workflows.test.json"),
         num_runs=3
     )
@@ -23,7 +23,7 @@ async def test_email_workflows():
 async def test_calendar_workflows():
     """Test the calendar agent's event management capabilities."""
     await AgentEvaluator.evaluate(
-        "calendar_agent",
+        "oprina.sub_agents.calendar",
         str(pathlib.Path(__file__).parent / "data/calendar_workflows.test.json"),
         num_runs=3
     )
@@ -33,7 +33,7 @@ async def test_calendar_workflows():
 async def test_cross_agent_workflows():
     """Test workflows that coordinate between email and calendar agents."""
     await AgentEvaluator.evaluate(
-        "oprina_root_agent",
+        "oprina",
         str(pathlib.Path(__file__).parent / "data/cross_agent_workflows.test.json"),
         num_runs=2
     )
