@@ -22,6 +22,7 @@ from app.core.services.avatar_service import AvatarService  # Added avatar servi
 from app.utils.auth import AuthManager
 from app.utils.errors import AuthenticationError
 from app.utils.logging import get_logger
+from app.utils.supabase_auth import validate_supabase_token, extract_user_profile, SupabaseAuthError
 from app.config import get_settings
 
 logger = get_logger(__name__)
@@ -154,5 +155,102 @@ async def get_current_user(
     
     return user
 
+async def get_current_user_supabase(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user_repository: UserRepository = Depends(get_user_repository)
+) -> dict:
+    """
+    Get current user from Supabase token and sync with backend.
+    This is the main auth dependency for Supabase frontend integration.
+    """
+    try:
+        logger.debug("Validating Supabase token for user authentication")
+        
+        # Validate Supabase token
+        supabase_user = validate_supabase_token(credentials.credentials)
+        
+        # Extract profile information
+        user_profile = extract_user_profile(supabase_user)
+        
+        # Try to get existing backend user
+        backend_user = await user_repository.get_user_by_id(supabase_user["id"])
+        
+        if not backend_user:
+            logger.info(f"Creating new backend user for Supabase user: {user_profile['email']}")
+            # Create new backend user with Supabase data
+            backend_user = await user_repository.create_user({
+                "id": user_profile["id"],  # Use Supabase UUID
+                "email": user_profile["email"],
+                "full_name": user_profile.get("full_name"),
+                "preferred_name": user_profile.get("preferred_name"),
+                "display_name": user_profile.get("display_name"),
+                "avatar_url": user_profile.get("avatar_url"),
+                "work_type": user_profile.get("work_type"),
+                "ai_preferences": user_profile.get("ai_preferences"),
+                "is_active": True,
+                "is_verified": user_profile.get("email_verified", False),
+                "created_at": user_profile.get("created_at")
+            })
+        else:
+            # Update last activity for existing user
+            await user_repository.update_last_login(backend_user["id"])
+            logger.debug(f"Updated activity for existing user: {backend_user['email']}")
+        
+        # Return backend user format
+        return backend_user
+        
+    except SupabaseAuthError as e:
+        logger.warning(f"Supabase authentication failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Supabase authentication failed: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in Supabase authentication: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication service error"
+        )
+
+
+async def get_current_user_supabase_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    user_repository: UserRepository = Depends(get_user_repository)
+) -> Optional[dict]:
+    """
+    Optional Supabase user authentication.
+    Returns None if no credentials provided, raises exception if credentials invalid.
+    """
+    if not credentials:
+        return None
+    
+    # Use the main Supabase auth function
+    return await get_current_user_supabase(credentials, user_repository)
+
+
+async def get_current_user_flexible(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user_repository: UserRepository = Depends(get_user_repository)
+) -> dict:
+    """
+    Flexible authentication that tries both Supabase and JWT tokens.
+    Useful during transition period.
+    """
+    try:
+        # First try Supabase authentication
+        return await get_current_user_supabase(credentials, user_repository)
+    except HTTPException as supabase_error:
+        logger.debug("Supabase auth failed, trying JWT auth")
+        
+        try:
+            # Fall back to original JWT authentication
+            return await get_current_user(credentials, user_repository)
+        except HTTPException as jwt_error:
+            logger.warning("Both Supabase and JWT authentication failed")
+            # Return the more specific Supabase error
+            raise supabase_error
+        
+        
 # Alias for compatibility with your auth endpoints
 get_optional_current_user = get_current_user_optional

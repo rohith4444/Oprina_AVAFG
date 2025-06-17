@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 from datetime import datetime
 
-from app.api.dependencies import get_current_user, get_user_service
+from app.api.dependencies import get_current_user, get_user_service, get_current_user_supabase, get_current_user_supabase_optional
 from app.api.models.requests.user import UpdateProfileRequest, ChangePasswordRequest
 from app.api.models.responses.user import (
     UserProfileResponse, ProfileUpdateResponse, PasswordChangeResponse
@@ -24,7 +24,7 @@ router = APIRouter()
 
 @router.get("/me", response_model=UserProfileResponse)
 async def get_user_profile(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     user_service: UserService = Depends(get_user_service)
 ):
     """
@@ -96,7 +96,7 @@ async def get_user_profile(
 @router.put("/me", response_model=ProfileUpdateResponse)
 async def update_user_profile(
     profile_data: UpdateProfileRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     user_service: UserService = Depends(get_user_service)
 ):
     """
@@ -186,7 +186,7 @@ async def update_user_profile(
 @router.post("/change-password", response_model=PasswordChangeResponse)
 async def change_password(
     password_data: ChangePasswordRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     user_service: UserService = Depends(get_user_service)
 ):
     """

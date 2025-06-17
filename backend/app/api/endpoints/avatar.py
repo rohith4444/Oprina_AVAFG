@@ -6,7 +6,7 @@ Simple REST endpoints for avatar session management and quota tracking.
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 
-from app.api.dependencies import get_current_user, get_avatar_service
+from app.api.dependencies import get_current_user, get_avatar_service, get_current_user_supabase, get_current_user_supabase_optional
 from app.core.services.avatar_service import AvatarService
 from app.api.models.requests.avatar import (
     StartSessionRequest, 
@@ -33,7 +33,7 @@ router = APIRouter()
 
 @router.get("/quota", response_model=QuotaStatusResponse)
 async def get_quota_status(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """
@@ -64,7 +64,7 @@ async def get_quota_status(
 
 @router.post("/check-quota")
 async def check_quota(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """
@@ -107,7 +107,7 @@ async def check_quota(
 @router.post("/sessions/start", response_model=SessionResponse)
 async def start_avatar_session(
     request: StartSessionRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """
@@ -167,7 +167,7 @@ async def start_avatar_session(
 @router.post("/sessions/end", response_model=SessionResponse)
 async def end_avatar_session(
     request: EndSessionRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """
@@ -231,7 +231,7 @@ async def end_avatar_session(
 @router.post("/sessions/status", response_model=SessionStatusResponse)
 async def get_session_status(
     request: SessionStatusRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """
@@ -265,7 +265,7 @@ async def get_session_status(
 @router.get("/sessions", response_model=UserSessionsResponse)
 async def get_user_sessions(
     active_only: bool = False,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """
@@ -319,7 +319,7 @@ async def get_user_sessions(
 
 @router.post("/admin/cleanup")
 async def cleanup_sessions(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     avatar_service: AvatarService = Depends(get_avatar_service)
 ):
     """

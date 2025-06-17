@@ -10,7 +10,8 @@ from app.api.dependencies import (
     get_current_user,
     get_session_repository,
     get_message_repository,
-    get_agent_service  # ADDED FOR VERTEX AI INTEGRATION
+    get_agent_service,  # ADDED FOR VERTEX AI INTEGRATION
+    get_current_user_supabase, get_current_user_supabase_optional
 )
 from app.core.database.repositories.session_repository import SessionRepository
 from app.core.database.repositories.message_repository import MessageRepository
@@ -40,7 +41,7 @@ async def verify_session_ownership(
 @router.post("/create")
 async def create_session(
     title: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     agent_service: AgentService = Depends(get_agent_service)  # ADDED VERTEX AI SERVICE
 ):
@@ -111,7 +112,7 @@ async def create_session(
 async def get_user_sessions(
     active_only: bool = True,
     limit: int = 50,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     message_repo: MessageRepository = Depends(get_message_repository)
 ):
@@ -165,7 +166,7 @@ async def get_user_sessions(
 @router.get("/{session_id}")
 async def get_session_details(
     session_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     message_repo: MessageRepository = Depends(get_message_repository)
 ):
@@ -212,7 +213,7 @@ async def get_session_details(
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository)
 ):
     """Delete a session (soft delete - sets status to 'deleted')."""
@@ -253,7 +254,7 @@ async def get_session_messages(
     session_id: str,
     limit: int = 50,
     message_type: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     message_repo: MessageRepository = Depends(get_message_repository)
 ):
@@ -301,7 +302,7 @@ async def get_session_messages(
 @router.post("/{session_id}/end")
 async def end_session(
     session_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository)
 ):
     """End a session gracefully (sets status to 'ended')."""

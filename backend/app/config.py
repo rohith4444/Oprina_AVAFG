@@ -23,11 +23,13 @@ class Settings(BaseSettings):
     API_VERSION: str = "1.0.0"
     API_DESCRIPTION: str = "AI Agent API with HeyGen Avatar Integration"
     ALLOWED_HOSTS: List[str] = ["*"]
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001"]
     
-    # Database settings (Supabase)
-    SUPABASE_URL: Optional[str] = None
-    SUPABASE_SERVICE_KEY: Optional[str] = None
+    # Supabase Configuration
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_JWT_SECRET: str = ""
     
     # Vertex AI Agent settings
     VERTEX_AI_AGENT_ID: str = ""
@@ -51,7 +53,7 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.compose",
         "https://www.googleapis.com/auth/gmail.labels",
-        "https://www.googleapis.com/auth/gmail.metadata"
+        "https://www.googleapis.com/auth/gmail.metadata",
     ])
 
     GOOGLE_CALENDAR_SCOPES: str = " ".join([
@@ -59,13 +61,14 @@ class Settings(BaseSettings):
         "email",
         "profile", 
         "https://www.googleapis.com/auth/calendar",
-        "https://www.googleapis.com/auth/calendar.settings.readonly"
+        "https://www.googleapis.com/auth/calendar.settings.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
     ])
 
     GOOGLE_AUTH_SCOPES: str = "openid email profile"
         
     # Frontend URLs (for redirects after OAuth)
-    FRONTEND_URL: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:5173"
     
     # Voice Services Configuration
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -95,7 +98,6 @@ class Settings(BaseSettings):
     CLEANUP_INTERVAL_HOURS: int = 6
 
     BACKEND_API_URL: str = "http://localhost:8000"  # Your backend URL
-    INTERNAL_API_KEY: str = "your-internal-api-key"  # Your internal API key
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -103,9 +105,9 @@ class Settings(BaseSettings):
     # Properties that depend on other settings
     @property
     def FRONTEND_SETTINGS_URL(self) -> str:
-        return f"{self.FRONTEND_URL}/settings"
-    
-    @property
+        return f"{self.FRONTEND_URL}/settings/connected-apps"
+
+    @property  
     def FRONTEND_DASHBOARD_URL(self) -> str:
         return f"{self.FRONTEND_URL}/dashboard"
     

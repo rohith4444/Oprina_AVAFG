@@ -23,6 +23,7 @@ from app.api.endpoints import sessions
 from app.api.endpoints import oauth
 from app.api.endpoints import voice
 from app.api.endpoints import avatar  # Added avatar endpoints
+from app.api.endpoints import test_supabase
 
 # Import background service
 from app.core.services.background_tasks import (
@@ -90,6 +91,7 @@ app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"]
 app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["oauth"])
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(avatar.router, prefix="/api/v1/avatar", tags=["avatar"])  # Added avatar router
+app.include_router(test_supabase.router, prefix="/api/v1/test", tags=["testing"])
 
 # Root endpoint
 @app.get("/")
