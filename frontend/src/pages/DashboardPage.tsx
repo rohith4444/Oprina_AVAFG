@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.tsx - Updated with Session API Integration
+// src/pages/DashboardPage.tsx - Updated with Session API Integration & Audio Recording
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -24,13 +24,6 @@ interface Session {
   message_count: number;
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
-
 // Backend API URL - Update this to match your backend
 const BACKEND_API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
@@ -39,7 +32,6 @@ const DashboardPage: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
-  const [recognition, setRecognition] = useState<InstanceType<typeof window.SpeechRecognition> | null>(null);
   
   // Session management - Updated for API integration
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -53,6 +45,15 @@ const DashboardPage: React.FC = () => {
   const [avatarReady, setAvatarReady] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   
+  // NEW: Voice recording states
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessingVoice, setIsProcessingVoice] = useState(false);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  
   // Refs for both avatar types
   const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
   const staticAvatarRef = useRef<StaticAvatarRef>(null);
@@ -63,6 +64,62 @@ const DashboardPage: React.FC = () => {
   const getUserToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
+  };
+
+  // NEW: Play audio response from base64 content
+  const playAudioResponse = async (base64Audio: string) => {
+    try {
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+      
+      // Convert base64 to blob
+      const audioData = atob(base64Audio);
+      const audioArray = new Uint8Array(audioData.length);
+      for (let i = 0; i < audioData.length; i++) {
+        audioArray[i] = audioData.charCodeAt(i);
+      }
+      const audioBlob = new Blob([audioArray], { type: 'audio/mp3' });
+      
+      // Create audio URL and play
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      // Set volume based on UI control
+      audio.volume = isMuted ? 0 : volume / 100;
+      
+      // Store reference to current audio
+      setCurrentAudio(audio);
+      
+      // Handle avatar speaking states
+      audio.onplay = () => {
+        console.log('🔊 Audio response started playing');
+        setIsSpeaking(true);
+      };
+      
+      audio.onended = () => {
+        console.log('🔇 Audio response finished playing');
+        setIsSpeaking(false);
+        setCurrentAudio(null);
+        URL.revokeObjectURL(audioUrl); // Clean up
+      };
+      
+      audio.onerror = (error) => {
+        console.error('Audio playback error:', error);
+        setIsSpeaking(false);
+        setCurrentAudio(null);
+        URL.revokeObjectURL(audioUrl); // Clean up
+      };
+      
+      await audio.play();
+      
+    } catch (error) {
+      console.error('Failed to play audio response:', error);
+      setIsSpeaking(false);
+      setCurrentAudio(null);
+    }
   };
 
   // API Methods
@@ -199,6 +256,32 @@ const DashboardPage: React.FC = () => {
     }
   }, [activeSessionId]);
 
+  // NEW: Process audio when chunks are available
+  useEffect(() => {
+    if (audioChunks.length > 0 && !isRecording) {
+      processRecordedAudio(audioChunks);
+    }
+  }, [audioChunks, isRecording]);
+
+  // NEW: Cleanup audio resources on unmount
+  useEffect(() => {
+    return () => {
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
+      if (currentAudio) {
+        currentAudio.pause();
+      }
+    };
+  }, [audioStream, currentAudio]);
+
+  // NEW: Update audio volume when volume control changes
+  useEffect(() => {
+    if (currentAudio) {
+      currentAudio.volume = isMuted ? 0 : volume / 100;
+    }
+  }, [volume, isMuted, currentAudio]);
+
   // Avatar event handlers
   const handleAvatarReady = useCallback(() => {
     console.log('✅ Avatar ready');
@@ -222,7 +305,203 @@ const DashboardPage: React.FC = () => {
     setIsSpeaking(false);
   }, []);
 
-  // Voice interaction handlers
+  // NEW: Audio Recording Functions
+  const startAudioRecording = async () => {
+    try {
+      setRecordingError(null);
+      
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      setAudioStream(stream);
+      
+      // Create MediaRecorder with WebM format (preferred by backend)
+      const recorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
+      const chunks: Blob[] = [];
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      recorder.onstop = () => {
+        setAudioChunks(chunks);
+        // Stop all tracks to free up microphone
+        stream.getTracks().forEach(track => track.stop());
+        setAudioStream(null);
+      };
+      
+      recorder.onerror = (event) => {
+        console.error('Recording error:', event);
+        setRecordingError('Recording failed. Please try again.');
+        setIsRecording(false);
+      };
+      
+      setMediaRecorder(recorder);
+      setAudioChunks([]);
+      
+      // Start recording
+      recorder.start();
+      setIsRecording(true);
+      
+      console.log('🎙️ Audio recording started');
+      
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      setRecordingError('Microphone access denied. Please allow microphone access.');
+      setIsRecording(false);
+    }
+  };
+
+  const stopAudioRecording = async () => {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      return;
+    }
+    
+    try {
+      setIsRecording(false);
+      
+      // Stop recording
+      mediaRecorder.stop();
+      
+      console.log('🛑 Audio recording stopped');
+      
+      // Processing will happen when recorder.onstop fires
+      
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      setRecordingError('Failed to stop recording');
+    }
+  };
+
+  // NEW: Send voice message to API
+  const sendVoiceMessage = async (audioBlob: Blob, sessionId: string) => {
+    try {
+      const token = await getUserToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('session_id', sessionId);
+      formData.append('audio_format', 'webm');
+      formData.append('include_audio_response', 'true');
+      formData.append('audio_file', audioBlob, 'recording.webm');
+
+      console.log('📤 Sending voice message to API...');
+
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/voice/message`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log('📨 Voice API response:', result);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Voice processing failed');
+      }
+
+      return result;
+
+    } catch (error) {
+      console.error('Voice API error:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Process recorded audio and send to API
+  const processRecordedAudio = async (chunks: Blob[]) => {
+    if (chunks.length === 0) {
+      console.warn('No audio chunks to process');
+      return;
+    }
+    
+    if (!activeSessionId) {
+      console.error('No active session for voice message');
+      setRecordingError('No active session. Please start a new conversation.');
+      return;
+    }
+    
+    try {
+      setIsProcessingVoice(true);
+      setRecordingError(null);
+      
+      // Create audio blob
+      const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+      
+      // Validate audio size (must be > 0 and < 10MB)
+      if (audioBlob.size === 0) {
+        throw new Error('Recording is empty');
+      }
+      
+      if (audioBlob.size > 10 * 1024 * 1024) {
+        throw new Error('Recording too large (max 10MB)');
+      }
+      
+      console.log('🎵 Processing audio blob:', audioBlob.size, 'bytes');
+      
+      // Send to voice API
+      const apiResponse = await sendVoiceMessage(audioBlob, activeSessionId);
+      
+      // Add user message (transcription) to conversation
+      const userMessage: Message = {
+        id: apiResponse.chat_response.message_id + '_user' || Date.now().toString() + '_user',
+        sender: 'user',
+        text: apiResponse.transcription.text,
+        timestamp: new Date(),
+      };
+      
+      // Add assistant response to conversation
+      const assistantMessage: Message = {
+        id: apiResponse.chat_response.message_id || Date.now().toString() + '_assistant',
+        sender: 'assistant',
+        text: apiResponse.chat_response.text,
+        timestamp: new Date(),
+      };
+      
+      // Update messages in UI
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
+      
+      // Handle audio response if provided
+      if (apiResponse.audio_response && !isMuted) {
+        console.log('🔊 Playing audio response...');
+        await playAudioResponse(apiResponse.audio_response.audio_content);
+      }
+      
+      // Clear chunks
+      setAudioChunks([]);
+      
+      console.log('✅ Voice message processed successfully');
+      
+    } catch (error) {
+      console.error('Voice processing error:', error);
+      setRecordingError(error instanceof Error ? error.message : 'Voice processing failed');
+    } finally {
+      setIsProcessingVoice(false);
+    }
+  };
+
+  // UPDATED: Voice interaction handlers
   const handleStartListening = useCallback(async () => {
     // Auto-create session when user starts talking if none exists
     if (!activeSessionId && !isCreatingSession) {
@@ -231,18 +510,13 @@ const DashboardPage: React.FC = () => {
     }
     
     setIsListening(true);
-    console.log('🎙️ Started listening');
-    
-    // TODO: Add actual voice recognition logic here
-    // This would integrate with speech-to-text and send to session API
+    await startAudioRecording();
   }, [activeSessionId, isCreatingSession]);
 
-  const handleStopListening = useCallback(() => {
+  const handleStopListening = useCallback(async () => {
     setIsListening(false);
-    console.log('🛑 Stopped listening');
-    
-    // TODO: Add logic to process voice input and send to API
-  }, []);
+    await stopAudioRecording();
+  }, [mediaRecorder]);
 
   // Session management handlers
   const handleNewChat = useCallback(async () => {
@@ -268,7 +542,7 @@ const DashboardPage: React.FC = () => {
     console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
   };
 
-  // Add message to active session (for voice interactions)
+  // Add message to active session (for manual text interactions)
   const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
     if (!activeSessionId) return;
     
@@ -281,7 +555,6 @@ const DashboardPage: React.FC = () => {
     
     setMessages(prev => [...prev, newMessage]);
     
-    // TODO: Send message to session API here
     console.log('💬 Message added:', sender, text);
   }, [activeSessionId]);
 
@@ -350,9 +623,9 @@ const DashboardPage: React.FC = () => {
                 <button
                   className={`voice-button mic-button ${isListening ? 'listening' : ''}`}
                   onClick={isListening ? handleStopListening : handleStartListening}
-                  disabled={!avatarReady || isCreatingSession}
+                  disabled={!avatarReady || isCreatingSession || isProcessingVoice}
                 >
-                  🎙️
+                  {isRecording ? '🔴' : '🎙️'}
                 </button>
                 
                 <div className="volume-control">
@@ -373,6 +646,21 @@ const DashboardPage: React.FC = () => {
                   {isMuted ? '🔇' : '🔊'}
                 </button>
               </div>
+
+              {/* NEW: Recording Feedback */}
+              {(isRecording || isProcessingVoice || recordingError) && (
+                <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' }}>
+                  {isRecording && (
+                    <div style={{ color: '#ef4444' }}>🔴 Recording...</div>
+                  )}
+                  {isProcessingVoice && (
+                    <div style={{ color: '#3b82f6' }}>⚡ Processing with AI...</div>
+                  )}
+                  {recordingError && (
+                    <div style={{ color: '#ef4444' }}>❌ {recordingError}</div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right Side: Conversation Display (50%) */}

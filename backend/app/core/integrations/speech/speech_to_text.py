@@ -73,26 +73,30 @@ class SpeechToTextService:
             if len(audio_data) > 10 * 1024 * 1024:  # 10MB limit
                 raise ValidationError("Audio file too large (max 10MB)")
             
-            # Simple configuration - hardcoded defaults
-            config = RecognitionConfig(
-                encoding=self._get_encoding_from_format(audio_format),
-                sample_rate_hertz=16000,  # Fixed sample rate
-                language_code="en-US",   # Fixed language
-                enable_automatic_punctuation=True,
-                model="latest_long",
-                use_enhanced=True,
-            )
+            # FIXED: Dynamic configuration based on audio format
+            config_params = {
+                "encoding": self._get_encoding_from_format(audio_format),
+                "language_code": "en-US",
+                "enable_automatic_punctuation": True,
+                "model": "latest_long",
+                "use_enhanced": True,
+            }
+            
+            # Only specify sample rate for non-WebM formats
+            # WebM OPUS should auto-detect sample rate to avoid mismatch
+            if audio_format.lower() not in ["webm", "ogg"]:
+                config_params["sample_rate_hertz"] = 16000
+            
+            config = RecognitionConfig(**config_params)
             
             # Create audio object
             audio = RecognitionAudio(content=audio_data)
             
-            # Perform transcription in thread pool to avoid blocking
+            # FIXED: Perform transcription with correct API call format
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 self.executor,
-                self.client.recognize,
-                config,
-                audio
+                lambda: self.client.recognize(request={"config": config, "audio": audio})
             )
             
             # Process results - simplified

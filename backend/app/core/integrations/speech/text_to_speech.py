@@ -90,16 +90,17 @@ class TextToSpeechService:
                 speaking_rate=speaking_rate
             )
             
-            # Perform synthesis in thread pool to avoid blocking
+            # FIXED: Perform synthesis with correct API call format
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 self.executor,
-                self.client.synthesize_speech,
-                {
-                    "input": synthesis_input,
-                    "voice": voice_config,
-                    "audio_config": audio_config
-                }
+                lambda: self.client.synthesize_speech(
+                    request={
+                        "input": synthesis_input,
+                        "voice": voice_config,
+                        "audio_config": audio_config
+                    }
+                )
             )
             
             # Encode audio data
