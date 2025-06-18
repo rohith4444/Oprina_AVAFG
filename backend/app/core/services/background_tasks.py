@@ -325,7 +325,6 @@ class BackgroundTokenService:
             refresh_result = await self.oauth_service.refresh_access_token(
                 user_id=user_id,
                 service="gmail",
-                refresh_token=gmail_tokens.get("refresh_token")
             )
             
             return refresh_result.get("success", False)
@@ -350,7 +349,6 @@ class BackgroundTokenService:
             refresh_result = await self.oauth_service.refresh_access_token(
                 user_id=user_id,
                 service="calendar",
-                refresh_token=calendar_tokens.get("refresh_token")
             )
             
             return refresh_result.get("success", False)

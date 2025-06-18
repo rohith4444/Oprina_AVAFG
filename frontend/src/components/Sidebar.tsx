@@ -5,9 +5,9 @@ import {
   User,
   MessageSquarePlus,
   ChevronLeft,
-  ChevronRight,
   Send,
   Plug,
+  Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -15,29 +15,34 @@ import Logo from './Logo';
 import Button from './Button';
 import '../styles/Sidebar.css';
 
-interface Conversation {
+interface Session {
   id: string;
-  messages: {
-    id: string;
-    sender: 'user' | 'assistant';
-    text: string;
-    timestamp: Date;
-  }[];
-  timestamp: Date;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
 }
 
 interface SidebarProps {
   className?: string;
-  conversations: Conversation[];
+  sessions: Session[];
+  activeSessionId: string | null;
   onNewChat: () => void;
-  onSelectChat: (id: string) => void;
+  onSessionSelect: (sessionId: string) => void;
+  onSessionDelete: (sessionId: string) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewChat, onSelectChat }) => {
-  const { user, userProfile, logout } = useAuth(); // Get userProfile from AuthContext
+const Sidebar: React.FC<SidebarProps> = ({ 
+  className = '', 
+  sessions, 
+  activeSessionId,
+  onNewChat, 
+  onSessionSelect,
+  onSessionDelete 
+}) => {
+  const { user, userProfile, logout } = useAuth();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleConnectApps = () => {
@@ -75,18 +80,33 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewC
     return userProfile?.email || user?.email || 'user@example.com';
   };
 
-  const formatTimestamp = (timestamp: Date) => {
+  const formatTimestamp = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now.getTime() - timestamp.getTime();
+    const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
-      return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
       return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
     } else {
-      return timestamp.toLocaleDateString();
+      return date.toLocaleDateString();
     }
+  };
+
+  const getSessionPreview = (session: Session) => {
+    if (session.message_count === 0) {
+      return "New conversation";
+    }
+    return session.title || "Untitled conversation";
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation(); // Prevent session selection
+    onSessionDelete(sessionId);
   };
 
   const toggleSidebar = () => {
@@ -119,31 +139,48 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewC
 
         <div className="conversations-section">
           {!isCollapsed && <h3 className="section-title">Recent Conversations</h3>}
-          {conversations.length > 0 ? (
+          {sessions.length > 0 ? (
             <ul className="conversations-list">
-              {conversations.map((conversation) => {
-                const firstUserMessage = conversation.messages.find(m => m.sender === 'user');
-                const title = firstUserMessage ? firstUserMessage.text : 'Untitled Chat';
-                return (
-                  <li
-                    key={conversation.id}
-                    className="conversation-item"
-                    onClick={() => onSelectChat(conversation.id)}
-                  >
-                    <Send size={16} />
+              {sessions.map((session) => (
+                <li
+                  key={session.id}
+                  className={`conversation-item ${activeSessionId === session.id ? 'active' : ''}`}
+                  onClick={() => onSessionSelect(session.id)}
+                >
+                  <div className="conversation-content">
+                    <Send size={16} className="conversation-icon" />
                     {!isCollapsed && (
-                      <>
-                        <div className="conversation-preview">{title}</div>
-                        <div className="conversation-time">{formatTimestamp(conversation.timestamp)}</div>
-                      </>
+                      <div className="conversation-details">
+                        <div className="conversation-preview">
+                          {getSessionPreview(session)}
+                        </div>
+                        <div className="conversation-time">
+                          {formatTimestamp(session.updated_at)}
+                        </div>
+                      </div>
                     )}
-                  </li>
-                );
-              })}
+                  </div>
+                  
+                  {!isCollapsed && (
+                    <button
+                      className="delete-session-button"
+                      onClick={(e) => handleDeleteClick(e, session.id)}
+                      title="Delete conversation"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </li>
+              ))}
             </ul>
           ) : (
             <div className="no-conversations">
-              {!isCollapsed && <p>No recent conversations</p>}
+              {!isCollapsed && (
+                <div className="no-conversations-content">
+                  <p>No conversations yet.</p>
+                  <small>Start a new chat to get started!</small>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -171,7 +208,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewC
             </div>
           )}
 
-          {showUserMenu && (
+          {showUserMenu && !isCollapsed && (
             <div className="user-menu">
               <button className="menu-item" onClick={() => navigate('/settings/profile')}>
                 <Settings size={16} />

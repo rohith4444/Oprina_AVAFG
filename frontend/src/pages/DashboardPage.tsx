@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.tsx - Updated Integration
+// src/pages/DashboardPage.tsx - Updated with Session API Integration
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -15,11 +15,13 @@ interface Message {
   text: string;
   timestamp: Date;
 }
-  
-interface Conversation {
+
+interface Session {
   id: string;
-  messages: Message[];
-  timestamp: Date;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
 }
 
 const DashboardPage: React.FC = () => {
@@ -28,11 +30,16 @@ const DashboardPage: React.FC = () => {
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
   const [recognition, setRecognition] = useState<InstanceType<typeof window.SpeechRecognition> | null>(null);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  
+  // Session management - Updated for API integration
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   
   // Avatar configuration - Feature flag for static vs streaming
-  const [useStaticAvatar, setUseStaticAvatar] = useState(true); // Toggle this to switch modes
+  const [useStaticAvatar, setUseStaticAvatar] = useState(true);
   const [avatarReady, setAvatarReady] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   
@@ -42,171 +49,132 @@ const DashboardPage: React.FC = () => {
   
   const navigate = useNavigate();
 
-  const activeMessages = conversations.find(c => c.id === activeConversationId)?.messages || [];
+  // Get user token for API calls
+  const getUserToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token;
+  };
 
-  // Initialize with a default conversation
-  useEffect(() => {
-    if (conversations.length === 0) {
-      const defaultConversation: Conversation = {
-        id: Date.now().toString(),
-        messages: [],
-        timestamp: new Date(),
-      };
-      setConversations([defaultConversation]);
-      setActiveConversationId(defaultConversation.id);
-    }
-  }, [conversations.length]);
-
-  const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
-    setConversations(prev => {
-      return prev.map(conv =>
-        conv.id === activeConversationId
-          ? {
-              ...conv,
-              messages: [...conv.messages, {
-                id: Date.now().toString(),
-                sender,
-                text,
-                timestamp: new Date()
-              }]
-            }
-          : conv
-      );
-    });
-
-    // Make avatar speak (works for both static and streaming)
-    if (sender === 'assistant' && avatarReady) {
-      console.log('🗣️ Making avatar speak:', text);
-      
-      if (useStaticAvatar && staticAvatarRef.current) {
-        staticAvatarRef.current.speak(text);
-      } else if (!useStaticAvatar && streamingAvatarRef.current) {
-        streamingAvatarRef.current.speak(text);
-      }
-    }
-  }, [activeConversationId, avatarReady, useStaticAvatar]);
-
-  useEffect(() => {
-    // Handle Gmail OAuth callback
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.substring(1));
-    const gmailToken = params.get('access_token');
-    if (gmailToken) {
-      localStorage.setItem('gmail_token', gmailToken);
-      localStorage.setItem('gmail_connected', 'true');
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-
-    // Restore user session
-    const restoreSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-
-      if (user) {
-        localStorage.setItem('user', JSON.stringify({
-          uid: user.id,
-          email: user.email,
-        }));
-      } else {
-        navigate('/login');
-        return;
-      }
-    };
-
-    restoreSession();
-
-    // Set up speech recognition
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognitionInstance = new SpeechRecognition();
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = false;
-      recognitionInstance.lang = 'en-US';
-
-      recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
-        console.log('🎤 Speech recognized:', transcript);
-        
-        // Add user message
-        addMessage('user', transcript);
-        
-        // Generate response after a brief delay
-        setTimeout(() => {
-          const response = generateDummyResponse(transcript);
-          addMessage('assistant', response);
-        }, 1000);
-      };
-
-      recognitionInstance.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-
-      recognitionInstance.onend = () => {
-        console.log('🎤 Speech recognition ended');
-        setIsListening(false);
-      };
-
-      setRecognition(recognitionInstance);
-    }
-  }, [navigate, addMessage]);
-
-  // Enhanced dummy response generator
-  const generateDummyResponse = (transcript: string): string => {
-    const lowerCommand = transcript.toLowerCase();
+  // API Methods
+  const createNewSession = async () => {
+    if (isCreatingSession) return null;
     
-    if (lowerCommand.includes('email') || lowerCommand.includes('gmail')) {
-      return "I found 3 new emails in your inbox. You have one urgent message from your manager about tomorrow's meeting, and two newsletter updates. The urgent email is about the quarterly review preparation. Would you like me to read the full content?";
-    } else if (lowerCommand.includes('calendar') || lowerCommand.includes('schedule')) {
-      return "I've checked your calendar for today and the rest of the week. You have a team meeting at 2 PM today with the development team, and a client call scheduled for tomorrow at 10 AM with the marketing team. Your Thursday is completely free if you'd like to schedule something new.";
-    } else if (lowerCommand.includes('summary') || lowerCommand.includes('summarize')) {
-      return "Here's your daily summary: You have 5 new emails including 2 requiring immediate attention, 2 calendar events today including the important team meeting, and 3 pending tasks on your to-do list. Your highest priority item is reviewing the project proposal before the 2 PM meeting starts.";
-    } else if (lowerCommand.includes('hello') || lowerCommand.includes('hi')) {
-      return "Hello! I'm your Oprina voice assistant. I'm here to help you manage your emails, calendar, and daily tasks efficiently. You can ask me to check your emails, review your schedule, or summarize your day. What would you like me to help you with?";
-    } else if (lowerCommand.includes('test') || lowerCommand.includes('testing')) {
-      return "This is a test of my speech capabilities. I can speak any text you send to me with perfect lip synchronization. The avatar technology uses advanced AI to match my mouth movements with the spoken words in real-time.";
-    } else {
-      return `I understand you said: "${transcript}". I'm your intelligent voice assistant powered by advanced AI technology. I can help you with email management, calendar scheduling, task organization, and much more. Try asking me to check your emails or review your calendar!`;
+    try {
+      setIsCreatingSession(true);
+      const token = await getUserToken();
+      
+      const response = await fetch('/api/v1/sessions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: "New Conversation",
+          avatar_settings: { type: "static" }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create session');
+      }
+      
+      const newSession = await response.json();
+      setSessions(prev => [newSession, ...prev]);
+      setActiveSessionId(newSession.id);
+      setMessages([]);
+      
+      console.log('💬 New session created:', newSession.id);
+      return newSession;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      return null;
+    } finally {
+      setIsCreatingSession(false);
     }
   };
 
-  const handleStartListening = useCallback(() => {
-    if (recognition && !isListening && avatarReady) {
-      console.log('🎤 Starting speech recognition...');
-      recognition.start();
-      setIsListening(true);
-    } else if (!avatarReady) {
-      console.warn('⚠️ Avatar not ready yet, please wait...');
-    }
-  }, [recognition, isListening, avatarReady]);
+  const loadSessions = async () => {
+    try {
+      const token = await getUserToken();
+      
+      const response = await fetch('/api/v1/sessions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
 
-  const handleStopListening = useCallback(() => {
-    if (recognition && isListening) {
-      console.log('🎤 Stopping speech recognition...');
-      recognition.stop();
-      setIsListening(false);
+      if (response.ok) {
+        const sessionData = await response.json();
+        setSessions(sessionData);
+        console.log('📋 Loaded sessions:', sessionData.length);
+      }
+    } catch (error) {
+      console.error('Error loading sessions:', error);
     }
-  }, [recognition, isListening]);
+  };
 
-  const handleVolumeChange = useCallback((newVolume: number) => {
-    setVolume(newVolume);
-    setIsMuted(newVolume === 0);
-    console.log('🔊 Volume changed to:', newVolume);
+  const loadSessionMessages = async (sessionId: string) => {
+    try {
+      setIsLoadingMessages(true);
+      const token = await getUserToken();
+      
+      const response = await fetch(`/api/v1/sessions/${sessionId}/messages`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const messagesData = await response.json();
+        setMessages(messagesData);
+        console.log('💬 Loaded messages for session:', sessionId, messagesData.length);
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    try {
+      const token = await getUserToken();
+      
+      const response = await fetch(`/api/v1/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setSessions(prev => prev.filter(s => s.id !== sessionId));
+        
+        // If deleting active session, clear it
+        if (activeSessionId === sessionId) {
+          setActiveSessionId(null);
+          setMessages([]);
+        }
+        
+        console.log('🗑️ Session deleted:', sessionId);
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+    }
+  };
+
+  // Load sessions on component mount
+  useEffect(() => {
+    loadSessions();
   }, []);
 
-  const handleVolumeIncrement = useCallback(() => {
-    const newVolume = Math.min(100, volume + 10);
-    handleVolumeChange(newVolume);
-  }, [volume, handleVolumeChange]);
+  // Load messages when active session changes
+  useEffect(() => {
+    if (activeSessionId) {
+      loadSessionMessages(activeSessionId);
+    } else {
+      setMessages([]);
+    }
+  }, [activeSessionId]);
 
-  const handleVolumeDecrement = useCallback(() => {
-    const newVolume = Math.max(0, volume - 10);
-    handleVolumeChange(newVolume);
-  }, [volume, handleVolumeChange]);
-
-  // Unified avatar event handlers (work for both static and streaming)
+  // Avatar event handlers
   const handleAvatarReady = useCallback(() => {
-    console.log('🎉 Avatar is ready for interaction!');
+    console.log('✅ Avatar ready');
     setAvatarReady(true);
     setAvatarError(null);
   }, []);
@@ -227,23 +195,43 @@ const DashboardPage: React.FC = () => {
     setIsSpeaking(false);
   }, []);
 
-  // Conversation management for sidebar
-  const handleNewChat = () => {
-    const newId = Date.now().toString();
-    const newConversation: Conversation = {
-      id: newId,
-      messages: [],
-      timestamp: new Date(),
-    };
-    setConversations(prev => [newConversation, ...prev]);
-    setActiveConversationId(newId);
-    console.log('💬 New conversation created:', newId);
-  };
+  // Voice interaction handlers
+  const handleStartListening = useCallback(async () => {
+    // Auto-create session when user starts talking if none exists
+    if (!activeSessionId && !isCreatingSession) {
+      console.log('🎙️ Auto-creating session for voice interaction');
+      await createNewSession();
+    }
+    
+    setIsListening(true);
+    console.log('🎙️ Started listening');
+    
+    // TODO: Add actual voice recognition logic here
+    // This would integrate with speech-to-text and send to session API
+  }, [activeSessionId, isCreatingSession]);
 
-  const handleSelectChat = (id: string) => {
-    setActiveConversationId(id);
-    console.log('💬 Conversation selected:', id);
-  };
+  const handleStopListening = useCallback(() => {
+    setIsListening(false);
+    console.log('🛑 Stopped listening');
+    
+    // TODO: Add logic to process voice input and send to API
+  }, []);
+
+  // Session management handlers
+  const handleNewChat = useCallback(async () => {
+    await createNewSession();
+  }, []);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    setActiveSessionId(sessionId);
+    console.log('💬 Session selected:', sessionId);
+  }, []);
+
+  const handleDeleteSession = useCallback(async (sessionId: string) => {
+    if (window.confirm('Are you sure you want to delete this conversation?')) {
+      await deleteSession(sessionId);
+    }
+  }, []);
 
   // Avatar mode toggle (for testing/development)
   const toggleAvatarMode = () => {
@@ -253,14 +241,33 @@ const DashboardPage: React.FC = () => {
     console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
   };
 
+  // Add message to active session (for voice interactions)
+  const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
+    if (!activeSessionId) return;
+    
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      sender,
+      text,
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+    
+    // TODO: Send message to session API here
+    console.log('💬 Message added:', sender, text);
+  }, [activeSessionId]);
+
   return (
     <div className="dashboard-page min-h-screen flex flex-col">
       <div className="flex flex-1">
         {/* Sidebar */}
         <Sidebar
-          conversations={conversations}
+          sessions={sessions}
+          activeSessionId={activeSessionId}
           onNewChat={handleNewChat}
-          onSelectChat={handleSelectChat}
+          onSessionSelect={handleSelectSession}
+          onSessionDelete={handleDeleteSession}
         />
         
         {/* Main Content Area - 50/50 Layout */}
@@ -297,7 +304,6 @@ const DashboardPage: React.FC = () => {
                     isListening={isListening}
                     isSpeaking={isSpeaking}
                     onAvatarReady={handleAvatarReady}
-                    onAvatarError={handleAvatarError}
                     onAvatarStartTalking={handleAvatarStartTalking}
                     onAvatarStopTalking={handleAvatarStopTalking}
                   />
@@ -308,81 +314,50 @@ const DashboardPage: React.FC = () => {
                     isSpeaking={isSpeaking}
                     onAvatarReady={handleAvatarReady}
                     onAvatarError={handleAvatarError}
-                    onAvatarStartTalking={handleAvatarStartTalking}
-                    onAvatarStopTalking={handleAvatarStopTalking}
                   />
                 )}
               </div>
 
-              {/* Error Display */}
-              {avatarError && (
-                <div className="avatar-error-message">
-                  <p>⚠️ Avatar connection issue</p>
-                  <small>{avatarError}</small>
-                </div>
-              )}
-
-              {/* Clean Voice Controls */}
+              {/* Voice Controls */}
               <div className="compact-voice-controls">
-                {/* Microphone Button */}
-                <button 
-                  className={`btn voice-button mic-button ${isListening ? 'active' : ''}`}
+                <button
+                  className={`voice-button mic-button ${isListening ? 'listening' : ''}`}
                   onClick={isListening ? handleStopListening : handleStartListening}
-                  disabled={!avatarReady}
-                  title={isListening ? 'Stop listening' : 'Start listening'}
+                  disabled={!avatarReady || isCreatingSession}
                 >
-                  {isListening ? '🎙️' : '🎤'}
+                  🎙️
                 </button>
-
-                {/* Volume Control */}
+                
                 <div className="volume-control">
-                  <button 
-                    className="btn volume-button"
-                    onClick={handleVolumeDecrement}
-                    disabled={volume === 0}
-                    title="Volume down"
-                  >
-                    🔉
-                  </button>
-                  
-                  <div className="volume-slider-container">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={volume}
-                      onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                      className="volume-slider"
-                      title={`Volume: ${volume}%`}
-                      disabled={isMuted}
-                    />
-                    <div className="volume-label">
-                      {isMuted ? 'Muted' : `${volume}%`}
-                    </div>
-                  </div>
-                  
-                  <button 
-                    className="btn volume-button"
-                    onClick={handleVolumeIncrement}
-                    disabled={volume === 100}
-                    title="Volume up"
-                  >
-                    🔊
-                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volume}
+                    onChange={(e) => setVolume(Number(e.target.value))}
+                  />
+                  <span>{volume}%</span>
                 </div>
+                
+                <button
+                  className="mute-button"
+                  onClick={() => setIsMuted(!isMuted)}
+                >
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
               </div>
             </div>
 
-            {/* Right Side: Conversation (50%) */}
-            <div className="conversation-section">
-              <ConversationDisplay
-                messages={activeMessages}
-              />
-            </div>
+            {/* Right Side: Conversation Display (50%) */}
+            <ConversationDisplay 
+              messages={messages}
+              activeSessionId={activeSessionId}
+              isLoading={isLoadingMessages}
+            />
           </div>
         </div>
       </div>
-      {/* Footer - Same component used in settings page */}
+
       <MinimalFooter />
     </div>
   );
