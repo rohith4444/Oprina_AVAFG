@@ -194,6 +194,166 @@ def update_user_preferences(tool_context, preferences: Dict[str, Any]) -> bool:
         logger.error(f"Failed to update user preferences: {e}")
         return False
 
+# =============================================================================
+# Cross-Agent Workflow Coordination
+# =============================================================================
+
+def start_workflow(tool_context, workflow_name: str, workflow_data: Dict[str, Any]) -> str:
+    """
+    Start a multi-step workflow and store its state.
+    
+    Args:
+        tool_context: ADK tool context
+        workflow_name: Unique name for the workflow
+        workflow_data: Initial workflow data
+        
+    Returns:
+        str: Workflow ID for tracking
+    """
+    if not validate_tool_context(tool_context, "start_workflow"):
+        return "workflow_fallback"
+    
+    try:
+        workflow_id = f"workflow_{workflow_name}_{format_timestamp().replace(':', '_')}"
+        
+        workflow_state = {
+            "id": workflow_id,
+            "name": workflow_name,
+            "status": "started",
+            "steps_completed": 0,
+            "total_steps": workflow_data.get("total_steps", 1),
+            "current_step": workflow_data.get("current_step", 1),
+            "data": workflow_data,
+            "results": {},
+            "started_at": format_timestamp(),
+            "last_updated": format_timestamp()
+        }
+        
+        # Store in session state
+        if hasattr(tool_context, 'state'):
+            tool_context.state[f"workflow:{workflow_id}"] = workflow_state
+            tool_context.state["active_workflow"] = workflow_id
+        
+        logger.info(f"Started workflow: {workflow_name} ({workflow_id})")
+        return workflow_id
+        
+    except Exception as e:
+        logger.error(f"Failed to start workflow {workflow_name}: {e}")
+        return "workflow_error"
+
+def update_workflow(tool_context, workflow_id: str, step_result: Dict[str, Any]) -> bool:
+    """
+    Update workflow progress with step results.
+    
+    Args:
+        tool_context: ADK tool context
+        workflow_id: Workflow identifier
+        step_result: Results from the completed step
+        
+    Returns:
+        bool: True if successful
+    """
+    if not validate_tool_context(tool_context, "update_workflow"):
+        return False
+    
+    try:
+        if not hasattr(tool_context, 'state'):
+            return False
+            
+        workflow_key = f"workflow:{workflow_id}"
+        if workflow_key not in tool_context.state:
+            logger.warning(f"Workflow {workflow_id} not found in session")
+            return False
+        
+        workflow = tool_context.state[workflow_key]
+        
+        # Update workflow state
+        workflow["steps_completed"] += 1
+        workflow["current_step"] += 1
+        workflow["last_updated"] = format_timestamp()
+        workflow["results"][f"step_{workflow['steps_completed']}"] = step_result
+        
+        # Check if workflow is complete
+        if workflow["steps_completed"] >= workflow["total_steps"]:
+            workflow["status"] = "completed"
+            workflow["completed_at"] = format_timestamp()
+            
+        tool_context.state[workflow_key] = workflow
+        
+        logger.info(f"Updated workflow {workflow_id}: step {workflow['steps_completed']}/{workflow['total_steps']}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to update workflow {workflow_id}: {e}")
+        return False
+
+def get_workflow_data(tool_context, workflow_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Get workflow data and current state.
+    
+    Args:
+        tool_context: ADK tool context
+        workflow_id: Workflow identifier
+        
+    Returns:
+        Dict containing workflow data or None
+    """
+    if not validate_tool_context(tool_context, "get_workflow_data"):
+        return None
+    
+    try:
+        if not hasattr(tool_context, 'state'):
+            return None
+            
+        workflow_key = f"workflow:{workflow_id}"
+        return tool_context.state.get(workflow_key)
+        
+    except Exception as e:
+        logger.error(f"Failed to get workflow data {workflow_id}: {e}")
+        return None
+
+def pass_data_between_agents(tool_context, from_agent: str, to_agent: str, 
+                           data: Dict[str, Any], operation: str) -> bool:
+    """
+    Pass data between agents for cross-agent workflows.
+    
+    Args:
+        tool_context: ADK tool context
+        from_agent: Source agent name
+        to_agent: Target agent name  
+        data: Data to pass
+        operation: Description of the operation
+        
+    Returns:
+        bool: True if successful
+    """
+    if not validate_tool_context(tool_context, "pass_data_between_agents"):
+        return False
+    
+    try:
+        if not hasattr(tool_context, 'state'):
+            return False
+        
+        # Create cross-agent data transfer record
+        transfer_key = f"transfer:{from_agent}_to_{to_agent}"
+        transfer_data = {
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "operation": operation,
+            "data": data,
+            "timestamp": format_timestamp()
+        }
+        
+        tool_context.state[transfer_key] = transfer_data
+        tool_context.state["last_agent_transfer"] = transfer_key
+        
+        logger.info(f"Data passed from {from_agent} to {to_agent} for {operation}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to pass data between agents: {e}")
+        return False
+
 def log_tool_execution(tool_context, tool_name: str, operation: str, 
                       success: bool, details: str = "") -> None:
     """

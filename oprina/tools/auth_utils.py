@@ -1,3 +1,4 @@
+# oprina/tools/auth_utils.py
 """
 Simple authentication utilities for Oprina voice assistant.
 Provides direct service access for Gmail and Calendar.
@@ -8,7 +9,10 @@ import pickle
 from pathlib import Path
 from typing import Optional, Any
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+
+# Import logging system
 from oprina.services.logging.logger import setup_logger
 
 # Paths - tokens stored in oprina/ directory
