@@ -24,6 +24,16 @@ interface Session {
   message_count: number;
 }
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
+// Backend API URL - Update this to match your backend
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+
 const DashboardPage: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -63,7 +73,7 @@ const DashboardPage: React.FC = () => {
       setIsCreatingSession(true);
       const token = await getUserToken();
       
-      const response = await fetch('/api/v1/sessions/create', {
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions/create`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -80,8 +90,17 @@ const DashboardPage: React.FC = () => {
       }
       
       const newSession = await response.json();
-      setSessions(prev => [newSession, ...prev]);
-      setActiveSessionId(newSession.id);
+      // Map backend response to frontend format
+      const sessionForFrontend = {
+        id: newSession.session_id,  // Map session_id to id
+        title: newSession.title,
+        created_at: newSession.created_at,
+        updated_at: newSession.created_at,  // Use created_at as initial updated_at
+        message_count: 0
+      };
+
+      setSessions(prev => [sessionForFrontend, ...(prev || [])]);  // Handle prev being null
+      setActiveSessionId(newSession.session_id);  // Use session_id
       setMessages([]);
       
       console.log('💬 New session created:', newSession.id);
@@ -98,14 +117,22 @@ const DashboardPage: React.FC = () => {
     try {
       const token = await getUserToken();
       
-      const response = await fetch('/api/v1/sessions', {
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions/list`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
-        const sessionData = await response.json();
-        setSessions(sessionData);
-        console.log('📋 Loaded sessions:', sessionData.length);
+          const data = await response.json();
+          // Map backend format to frontend format
+          const mappedSessions = data.sessions.map(session => ({
+            id: session.session_id,                    // Map session_id to id
+            title: session.title,
+            created_at: session.created_at,
+            updated_at: session.last_activity_at,     // Map last_activity_at to updated_at
+            message_count: session.message_count
+          }));
+          setSessions(mappedSessions);
+        console.log('📋 Loaded sessions:', mappedSessions.length);
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
@@ -117,14 +144,14 @@ const DashboardPage: React.FC = () => {
       setIsLoadingMessages(true);
       const token = await getUserToken();
       
-      const response = await fetch(`/api/v1/sessions/${sessionId}/messages`, {
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions/${sessionId}/messages`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
-        const messagesData = await response.json();
-        setMessages(messagesData);
-        console.log('💬 Loaded messages for session:', sessionId, messagesData.length);
+        const data = await response.json();
+        setMessages(data.messages);  // Extract messages from response
+        console.log('💬 Loaded messages for session:', sessionId, data.messages.length);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -137,7 +164,7 @@ const DashboardPage: React.FC = () => {
     try {
       const token = await getUserToken();
       
-      const response = await fetch(`/api/v1/sessions/${sessionId}`, {
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions/${sessionId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
