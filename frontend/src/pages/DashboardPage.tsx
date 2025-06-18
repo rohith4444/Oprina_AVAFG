@@ -63,7 +63,7 @@ const DashboardPage: React.FC = () => {
       setIsCreatingSession(true);
       const token = await getUserToken();
       
-      const response = await fetch('/api/v1/sessions', {
+      const response = await fetch('/api/v1/sessions/create', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

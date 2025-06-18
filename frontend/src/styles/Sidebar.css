@@ -69,7 +69,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .new-chat-button:hover {
@@ -86,6 +86,7 @@
   text-transform: uppercase;
   color: var(--text);
   opacity: 0.7;
+  margin-top: 1.5rem;        /* Add top margin for spacing */
   margin-bottom: 0.75rem;
   padding: 0 0.5rem;
 }
@@ -237,8 +238,65 @@
   justify-content: center;
 }
 
-.sidebar.collapsed .connect-apps-button span {
+/* Fix New Chat Button */
+.sidebar.collapsed .new-chat-button {
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+}
+
+.sidebar.collapsed .new-chat-button svg {
+  width: 20px !important;
+  height: 20px !important;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .new-chat-button span {
   display: none;
+}
+
+/* Fix Connect Apps Button */
+.sidebar.collapsed .connect-apps-button {
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex !important;
+}
+
+.sidebar.collapsed .connect-apps-button svg {
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0;
+}
+
+/* General icon sizing for collapsed sidebar */
+.sidebar.collapsed button svg {
+  flex-shrink: 0;
+}
+
+
+/* Ensure the Button component itself centers content when collapsed */
+.sidebar.collapsed .connect-apps-button .button-content {
+  justify-content: center;
+  align-items: center;
+}
+
+/* If your Button component has internal wrapper, target it */
+.sidebar.collapsed .connect-apps-button > * {
+  justify-content: center;
+  align-items: center;
+}
+
+
+/* Make sure conversation icons stay visible too */
+.sidebar.collapsed .conversation-icon {
+  width: 16px !important;
+  height: 16px !important;
 }
 
 @media (max-width: 768px) {
@@ -274,3 +332,14 @@
 .sidebar.collapsed .collapse-button {
   right: -14px;
 }
+
+.sidebar.collapsed button {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.sidebar.collapsed button * {
+  margin: 0 auto;
+}
+
