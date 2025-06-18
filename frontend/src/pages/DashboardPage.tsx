@@ -6,7 +6,6 @@ import Sidebar from '../components/Sidebar';
 import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
 import StaticAvatar, { StaticAvatarRef } from '../components/StaticAvatar';
 import ConversationDisplay from '../components/ConversationDisplay';
-import MinimalFooter from '../components/MinimalFooter';
 import '../styles/DashboardPage.css';
 
 interface Message {
@@ -207,8 +206,17 @@ const DashboardPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.messages);  // Extract messages from response
-        console.log('💬 Loaded messages for session:', sessionId, data.messages.length);
+        
+        // Transform backend format to frontend format
+        const transformedMessages = data.messages.map(msg => ({
+          id: msg.id,
+          sender: msg.role === 'user' ? 'user' : 'assistant',  // role → sender
+          text: msg.content,                                   // content → text
+          timestamp: new Date(msg.created_at)                  // created_at string → Date object
+        }));
+        
+        setMessages(transformedMessages);
+        console.log('📋 Loaded and transformed messages:', transformedMessages.length);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -578,21 +586,19 @@ const DashboardPage: React.FC = () => {
             <div className="avatar-section">
               {/* Avatar Mode Toggle (Development Only) */}
               {process.env.NODE_ENV === 'development' && (
-                <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+                <div className="avatar-mode-toggle">
                   <button 
-                    onClick={toggleAvatarMode}
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      fontSize: '0.75rem',
-                      backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.25rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
-                  </button>
+                      className="mode-status-box"
+                      onClick={toggleAvatarMode}
+                      style={{
+                        backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF'
+                      }}
+                    >
+                      {useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'}
+                    </button>
+                    <span className="mode-label">
+                      {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
+                    </span>
                 </div>
               )}
 
@@ -672,8 +678,6 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <MinimalFooter />
     </div>
   );
 };

@@ -554,7 +554,7 @@ body, html, .home-page {
 }
 
 /* Image optimization */
-.hero-avatar-container img, .logo img, .static-avatar img {
+.hero-avatar-container img, .logo img {
   max-width: 100%;
   height: auto;
   border-radius: 50%;

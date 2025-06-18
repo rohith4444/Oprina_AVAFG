@@ -286,3 +286,34 @@
     padding: 1rem;
   }
 }
+
+.avatar-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12rem;  /* Fixed gap between button and text */
+  margin-bottom: 1rem;
+  justify-content: flex-start;  /* Keeps them close together on the left */
+}
+
+.mode-status-box {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 70px;
+}
+
+.mode-status-box:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.mode-label {
+  font-size: 0.875rem;
+  color: var(--heading);
+  font-weight: 500;
+}
