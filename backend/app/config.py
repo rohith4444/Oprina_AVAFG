@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     # Application settings
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str = "your-secret-key-change-in-production"
     
     # Server settings
     HOST: str = "0.0.0.0"

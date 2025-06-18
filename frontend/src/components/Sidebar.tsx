@@ -34,19 +34,45 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewChat, onSelectChat }) => {
-  const { user, logout } = useAuth();
+  const { user, userProfile, logout } = useAuth(); // Get userProfile from AuthContext
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isGmailConnected, setIsGmailConnected] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleConnectApps = () => {
-          navigate('/settings/profile');
+    navigate('/settings/connected-apps');
   };
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
+  };
+
+  // Get display name with proper priority
+  const getDisplayName = () => {
+    // Priority: Backend preferred_name > Backend full_name > localStorage fallback > Email prefix
+    if (userProfile?.preferred_name?.trim()) {
+      return userProfile.preferred_name.trim();
+    }
+    
+    if (userProfile?.full_name?.trim()) {
+      return userProfile.full_name.trim();
+    }
+    
+    // Fallback to localStorage for backward compatibility
+    const localDisplayName = localStorage.getItem('user_display_name');
+    if (localDisplayName?.trim()) {
+      return localDisplayName.trim();
+    }
+    
+    // Final fallback to email prefix
+    return user?.email?.split('@')[0] || 'User';
+  };
+
+  // Get user email with backend priority
+  const getUserEmail = () => {
+    return userProfile?.email || user?.email || 'user@example.com';
   };
 
   const formatTimestamp = (timestamp: Date) => {
@@ -140,8 +166,8 @@ const Sidebar: React.FC<SidebarProps> = ({ className = '', conversations, onNewC
           </div>
           {!isCollapsed && (
             <div className="user-info">
-              <div className="user-name">{user?.displayName || user?.email?.split('@')[0] || 'User'}</div>
-              <div className="user-email">{user?.email || 'user@example.com'}</div>
+              <div className="user-name">{getDisplayName()}</div>
+              <div className="user-email">{getUserEmail()}</div>
             </div>
           )}
 
