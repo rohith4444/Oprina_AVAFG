@@ -7,6 +7,7 @@ import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
 import StaticAvatar, { StaticAvatarRef } from '../components/StaticAvatar';
 import ConversationDisplay from '../components/ConversationDisplay';
 import '../styles/DashboardPage.css';
+import QuotaDisplay from '../components/QuotaDisplay';
 
 interface Message {
   id: string;
@@ -585,20 +586,27 @@ const DashboardPage: React.FC = () => {
             {/* Left Side: Avatar + Controls (50%) */}
             <div className="avatar-section">
               {/* Avatar Mode Toggle (Development Only) */}
+              {/* Avatar Mode Toggle with Quota Display */}
               {process.env.NODE_ENV === 'development' && (
                 <div className="avatar-mode-toggle">
-                  <button 
-                      className="mode-status-box"
-                      onClick={toggleAvatarMode}
-                      style={{
-                        backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF'
-                      }}
-                    >
-                      {useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'}
-                    </button>
-                    <span className="mode-label">
-                      {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
-                    </span>
+                  <div className="left-section">
+                    <button 
+                        className="mode-status-box"
+                        onClick={toggleAvatarMode}
+                        style={{
+                          backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF'
+                        }}
+                      >
+                        {useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'}
+                      </button>
+                      <span className="mode-label">
+                        {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
+                      </span>
+                  </div>
+                  
+                  <div className="right-section">
+                    <QuotaDisplay isVisible={!useStaticAvatar} />
+                  </div>
                 </div>
               )}
 

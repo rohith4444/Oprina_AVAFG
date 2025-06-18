@@ -289,10 +289,27 @@
 
 .avatar-mode-toggle {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12rem;  /* Fixed gap between button and text */
+  width: 100%;
   margin-bottom: 1rem;
-  justify-content: flex-start;  /* Keeps them close together on the left */
+}
+
+.left-section {
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+}
+
+.right-section {
+  display: flex;
+  align-items: center;
+}
+
+.quota-display {
+  font-size: 0.875rem;
+  color: #FB923C; /* Light orange color */
+  font-weight: 500;
 }
 
 .mode-status-box {
