@@ -3,6 +3,9 @@ import { supabase } from '../supabaseClient';
 
 interface QuotaDisplayProps {
   isVisible: boolean;
+  refreshTrigger?: number; // NEW: Trigger quota refresh from parent
+  isSessionActive?: boolean; // NEW: Whether session is currently active
+  sessionStartTime?: Date | null; // NEW: When current session started
 }
 
 interface QuotaData {
@@ -13,7 +16,12 @@ interface QuotaData {
   quota_percentage: number;
 }
 
-const QuotaDisplay: React.FC<QuotaDisplayProps> = ({ isVisible }) => {
+const QuotaDisplay: React.FC<QuotaDisplayProps> = ({ 
+  isVisible, 
+  refreshTrigger = 0,
+  isSessionActive = false,
+  sessionStartTime = null
+}) => {
   const [quotaData, setQuotaData] = useState<QuotaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

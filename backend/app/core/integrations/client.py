@@ -155,21 +155,100 @@ class VertexAgentClient:
     
     def _process_response_events(self, events: list) -> str:
         """Process response events into a single response string."""
+        
+        # ADD THIS DEBUG LINE
+        logger.info(f"🔍 DEBUG: Processing {len(events)} events")
+        
         response_parts = []
         
-        for event in events:
-            # Extract text content from event
-            if hasattr(event, 'content'):
-                response_parts.append(str(event.content))
-            elif isinstance(event, dict) and 'content' in event:
-                response_parts.append(str(event['content']))
-            elif isinstance(event, str):
-                response_parts.append(event)
-            else:
-                # Try to convert to string
-                response_parts.append(str(event))
+        for i, event in enumerate(events):
+            # ADD THIS DEBUG LINE  
+            logger.info(f"🔍 DEBUG: Event {i} type: {type(event)}, content: {str(event)[:200]}...")
+            
+            extracted_text = self._extract_text_from_event(event)
+            
+            # ADD THIS DEBUG LINE
+            logger.info(f"🔍 DEBUG: Extracted text: '{extracted_text}'")
+            
+            if extracted_text:
+                response_parts.append(extracted_text)
         
-        return " ".join(response_parts).strip()
+        final_response = " ".join(response_parts).strip()
+        
+        # ADD THIS DEBUG LINE
+        logger.info(f"🔍 DEBUG: Final response: '{final_response}'")
+        
+        return final_response
+
+    def _extract_text_from_event(self, event) -> str:
+        """Extract clean text from various event formats."""
+        try:
+            # Handle string events
+            if isinstance(event, str):
+                return event
+            
+            # Handle dict events
+            if isinstance(event, dict):
+                # NEW: Handle nested content structure
+                if 'content' in event and isinstance(event['content'], dict):
+                    content = event['content']
+                    if 'parts' in content and isinstance(content['parts'], list):
+                        text_parts = []
+                        for part in content['parts']:
+                            if isinstance(part, dict) and 'text' in part:
+                                text_parts.append(str(part['text']))
+                        if text_parts:
+                            return " ".join(text_parts).strip()
+                
+                # Check for direct 'content' field
+                if 'content' in event:
+                    return str(event['content'])
+                
+                # Check for 'text' field  
+                if 'text' in event:
+                    return str(event['text'])
+                
+                # Check for direct 'parts' structure
+                if 'parts' in event:
+                    text_parts = []
+                    for part in event['parts']:
+                        if isinstance(part, dict) and 'text' in part:
+                            text_parts.append(str(part['text']))
+                    if text_parts:
+                        return " ".join(text_parts).strip()
+            
+            # Handle objects with attributes
+            if hasattr(event, 'content'):
+                content = event.content
+                # If content has parts
+                if hasattr(content, 'parts'):
+                    text_parts = []
+                    for part in content.parts:
+                        if hasattr(part, 'text'):
+                            text_parts.append(str(part.text))
+                    if text_parts:
+                        return " ".join(text_parts).strip()
+                else:
+                    return str(content)
+            
+            # Handle objects with text attribute
+            if hasattr(event, 'text'):
+                return str(event.text)
+            
+            # Handle objects with parts attribute
+            if hasattr(event, 'parts'):
+                text_parts = []
+                for part in event.parts:
+                    if hasattr(part, 'text'):
+                        text_parts.append(str(part.text))
+                if text_parts:
+                    return " ".join(text_parts).strip()
+            
+            return ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract text from event: {e}")
+            return ""
     
     async def health_check(self) -> bool:
         """Check if the agent is healthy and responding."""

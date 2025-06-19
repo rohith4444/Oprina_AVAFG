@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.tsx - Updated with Phase 4 Voice-Only Activity Tracking
+// src/pages/DashboardPage.tsx - Updated with Session Lifecycle Tracking
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +45,14 @@ const DashboardPage: React.FC = () => {
   const [avatarReady, setAvatarReady] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   
-  // NEW: Voice recording states
+  // NEW: HeyGen Session Tracking State
+  const [heygenSessionId, setHeygenSessionId] = useState<string | null>(null);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [quotaRefreshTrigger, setQuotaRefreshTrigger] = useState(0);
+  
+  // Voice recording states
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
@@ -58,27 +65,17 @@ const DashboardPage: React.FC = () => {
   const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
   const staticAvatarRef = useRef<StaticAvatarRef>(null);
 
-  // Add this state at the top with other states
+  // Existing state
   const [lastSwitchTime, setLastSwitchTime] = useState(0);
   const [isSwitching, setIsSwitching] = useState(false);
-
-  // Phase 3: Quota feedback
   const [quotaMessage, setQuotaMessage] = useState<string | null>(null);
-
-  // Phase 4: Idle timeout management (VOICE-ONLY)
-  const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
-  const [lastActivity, setLastActivity] = useState<Date>(new Date());
-  const [isIdleTimeoutActive, setIsIdleTimeoutActive] = useState(false);
-
-  // Phase 4: Enhanced error handling
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
-
-  // Phase 4: Loading states
   const [isCheckingQuota, setIsCheckingQuota] = useState(false);
   const [isSwitchingAvatar, setIsSwitchingAvatar] = useState(false);
   const [operationStatus, setOperationStatus] = useState<string | null>(null);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   
   const navigate = useNavigate();
 
@@ -87,6 +84,211 @@ const DashboardPage: React.FC = () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
   };
+
+  // NEW: Generate unique session ID
+  const generateSessionId = (): string => {
+    return `heygen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  // NEW: Trigger quota refresh
+  const triggerQuotaRefresh = () => {
+    setQuotaRefreshTrigger(prev => prev + 1);
+    console.log('🔄 Quota refresh triggered');
+  };
+
+  // NEW: Start Avatar Session Tracking
+  const startAvatarSession = async (sessionId: string): Promise<boolean> => {
+    try {
+      setSessionError(null);
+      
+      const token = await getUserToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      console.log('🚀 Starting avatar session tracking:', sessionId);
+
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/sessions/start`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          heygen_session_id: sessionId,
+          avatar_name: "Ann_Therapist_public"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `Session start failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Session start failed');
+      }
+
+      // Update state
+      setHeygenSessionId(sessionId);
+      setIsSessionActive(true);
+      setSessionStartTime(new Date());
+      
+      // Trigger quota refresh to show updated remaining time
+      triggerQuotaRefresh();
+      
+      console.log('✅ Avatar session started successfully:', result);
+      return true;
+
+    } catch (error) {
+      console.error('❌ Failed to start avatar session:', error);
+      setSessionError(error instanceof Error ? error.message : 'Session start failed');
+      return false;
+    }
+  };
+
+  // UPDATED: End Avatar Session Tracking with guard
+  const endAvatarSession = async (sessionId: string): Promise<boolean> => {
+    // Prevent double calls
+    if (isEndingSession) {
+      console.log('🚫 Session end already in progress, skipping...');
+      return true;
+    }
+
+    // Check if session is still active
+    if (!isSessionActive || heygenSessionId !== sessionId) {
+      console.log('🚫 Session not active or ID mismatch, skipping end call');
+      return true;
+    }
+
+    try {
+      setIsEndingSession(true); // Set guard
+      setSessionError(null);
+      
+      const token = await getUserToken();
+      if (!token) {
+        console.warn('No auth token for ending session');
+        return false;
+      }
+
+      console.log('🛑 Ending avatar session tracking:', sessionId);
+
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/sessions/end`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          heygen_session_id: sessionId
+        })
+      });
+
+      if (!response.ok) {
+        // Handle 400 errors gracefully (session already ended)
+        if (response.status === 400) {
+          console.log('ℹ️ Session already ended (400 status) - this is OK');
+          // Clear session state even if API call failed
+          setHeygenSessionId(null);
+          setIsSessionActive(false);
+          setSessionStartTime(null);
+          return true;
+        }
+        
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `Session end failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Session end failed');
+      }
+
+      // Clear session state
+      setHeygenSessionId(null);
+      setIsSessionActive(false);
+      setSessionStartTime(null);
+      
+      // Trigger quota refresh to show updated remaining time
+      triggerQuotaRefresh();
+      
+      console.log('✅ Avatar session ended successfully:', result);
+      
+      // Show quota update message if quota exhausted
+      if (result.quota_exhausted) {
+        setQuotaMessage('Avatar quota exhausted - switching to static avatar');
+      }
+      
+      return true;
+
+    } catch (error) {
+      console.error('❌ Failed to end avatar session:', error);
+      setSessionError(error instanceof Error ? error.message : 'Session end failed');
+      
+      // Even if API call fails, clear local state to prevent stuck state
+      setHeygenSessionId(null);
+      setIsSessionActive(false);
+      setSessionStartTime(null);
+      
+      return false;
+    } finally {
+      setIsEndingSession(false); // Clear guard
+    }
+  };
+
+  // NEW: Handle session errors
+  const handleSessionError = (error: string) => {
+    console.error('🚨 Session error:', error);
+    setSessionError(error);
+    setOperationStatus(`Session error: ${error}`);
+    
+    // Clear error after 5 seconds
+    setTimeout(() => {
+      setSessionError(null);
+      if (operationStatus?.includes('Session error')) {
+        setOperationStatus(null);
+      }
+    }, 5000);
+  };
+
+  // UPDATED: Browser cleanup with guard
+  useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      if (isSessionActive && heygenSessionId && !isEndingSession) {
+        console.log('🧹 Page unload - ending active avatar session');
+        
+        // Use sendBeacon for reliable cleanup on page unload
+        const token = await getUserToken();
+        if (token) {
+          const data = JSON.stringify({
+            heygen_session_id: heygenSessionId
+          });
+          
+          const beaconSent = navigator.sendBeacon(
+            `${BACKEND_API_URL}/api/v1/avatar/sessions/end`,
+            new Blob([data], { type: 'application/json' })
+          );
+          
+          console.log('📡 Beacon sent:', beaconSent);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Component unmount cleanup with guard
+      if (isSessionActive && heygenSessionId && !isEndingSession) {
+        console.log('🧹 Component unmount - ending active avatar session');
+        endAvatarSession(heygenSessionId);
+      }
+    };
+  }, [isSessionActive, heygenSessionId, isEndingSession]);
 
   // Phase 4: Retry logic for failed API calls
   const retryOperation = async (
@@ -124,49 +326,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // Phase 4: Reset idle timer on VOICE activity only
-  const resetIdleTimer = useCallback(() => {
-    setLastActivity(new Date());
-    
-    // Only track idle time when using streaming avatar
-    if (!useStaticAvatar) {
-      // Clear existing timer
-      if (idleTimer) {
-        clearTimeout(idleTimer);
-      }
-      
-      // Set new 25-second timer
-      const newTimer = setTimeout(() => {
-        console.log('🕒 25-second voice idle timeout - switching to static avatar');
-        handleIdleTimeout();
-      }, 25000); // 25 seconds
-      
-      setIdleTimer(newTimer);
-      setIsIdleTimeoutActive(true);
-      console.log('🔄 Voice activity detected - idle timer reset');
-    }
-  }, [useStaticAvatar, idleTimer]);
-
-  // Phase 4: Handle idle timeout
-  const handleIdleTimeout = useCallback(async () => {
-    if (!useStaticAvatar) {
-      console.log('🔄 Auto-switching to static avatar due to inactivity');
-      
-      // Switch to static avatar
-      setUseStaticAvatar(true);
-      setAvatarReady(false);
-      setAvatarError(null);
-      
-      // Show user feedback
-      setQuotaMessage('Switched to static avatar due to 25 seconds of voice inactivity');
-      
-      // Clear timer
-      setIdleTimer(null);
-      setIsIdleTimeoutActive(false);
-    }
-  }, [useStaticAvatar]);
-
-  // NEW: Play audio response from base64 content
+  // Play audio response from base64 content
   const playAudioResponse = async (base64Audio: string) => {
     try {
       // Stop any currently playing audio
@@ -260,7 +420,7 @@ const DashboardPage: React.FC = () => {
       setActiveSessionId(newSession.session_id);  // Use session_id
       setMessages([]);
       
-      console.log('💬 New session created:', newSession.id);
+      console.log('💬 New session created:', newSession.session_id);
       return newSession;
     } catch (error) {
       console.error('Error creating session:', error);
@@ -365,14 +525,14 @@ const DashboardPage: React.FC = () => {
     }
   }, [activeSessionId]);
 
-  // NEW: Process audio when chunks are available
+  // Process audio when chunks are available
   useEffect(() => {
     if (audioChunks.length > 0 && !isRecording) {
       processRecordedAudio(audioChunks);
     }
   }, [audioChunks, isRecording]);
 
-  // NEW: Cleanup audio resources on unmount
+  // Cleanup audio resources on unmount
   useEffect(() => {
     return () => {
       if (audioStream) {
@@ -384,7 +544,7 @@ const DashboardPage: React.FC = () => {
     };
   }, [audioStream, currentAudio]);
 
-  // Phase 3: Auto-clear quota message after 5 seconds
+  // Auto-clear quota message after 5 seconds
   useEffect(() => {
     if (quotaMessage) {
       const timer = setTimeout(() => {
@@ -395,30 +555,7 @@ const DashboardPage: React.FC = () => {
     }
   }, [quotaMessage]);
 
-  // Phase 4: Voice-only activity tracking (no mouse/keyboard)
-  useEffect(() => {
-    if (!useStaticAvatar && avatarReady) {
-      // Start idle timer when streaming avatar becomes ready
-      resetIdleTimer();
-      
-      return () => {
-        // Cleanup timer when switching away from streaming
-        if (idleTimer) {
-          clearTimeout(idleTimer);
-          console.log('🧹 Idle timer cleared - no longer using streaming avatar');
-        }
-      };
-    } else {
-      // Clear timer when not using streaming avatar
-      if (idleTimer) {
-        clearTimeout(idleTimer);
-        setIdleTimer(null);
-        setIsIdleTimeoutActive(false);
-      }
-    }
-  }, [useStaticAvatar, avatarReady, resetIdleTimer, idleTimer]);
-
-  // NEW: Update audio volume when volume control changes
+  // Update audio volume when volume control changes
   useEffect(() => {
     if (currentAudio) {
       currentAudio.volume = isMuted ? 0 : volume / 100;
@@ -438,26 +575,19 @@ const DashboardPage: React.FC = () => {
     setAvatarReady(false);
   }, []);
 
-  // Phase 4: Updated avatar speaking handlers with voice activity tracking
+  // Updated avatar speaking handlers with voice activity tracking
   const handleAvatarStartTalking = useCallback(() => {
     console.log('🗣️ Avatar started talking');
     setIsSpeaking(true);
-    
-    // Reset idle timer when avatar starts speaking
-    resetIdleTimer();
-    console.log('🗣️ Avatar started speaking - idle timer reset');
-  }, [resetIdleTimer]);
+  }, []);
 
   const handleAvatarStopTalking = useCallback(() => {
     console.log('🤐 Avatar stopped talking');
     setIsSpeaking(false);
-    
-    // Reset idle timer when avatar stops speaking
-    resetIdleTimer();
-    console.log('🗣️ Avatar stopped speaking - idle timer reset');
-  }, [resetIdleTimer]);
+ 
+  }, []);
 
-  // NEW: Audio Recording Functions
+  // Audio Recording Functions
   const startAudioRecording = async () => {
     try {
       setRecordingError(null);
@@ -536,7 +666,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // NEW: Send voice message to API
+  // Send voice message to API
   const sendVoiceMessage = async (audioBlob: Blob, sessionId: string) => {
     try {
       const token = await getUserToken();
@@ -581,7 +711,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // NEW: Process recorded audio and send to API
+  // Process recorded audio and send to API
   const processRecordedAudio = async (chunks: Blob[]) => {
     if (chunks.length === 0) {
       console.warn('No audio chunks to process');
@@ -635,9 +765,30 @@ const DashboardPage: React.FC = () => {
       setMessages(prev => [...prev, userMessage, assistantMessage]);
       
       // Handle audio response if provided
+      // Handle audio response based on avatar mode
       if (apiResponse.audio_response && !isMuted) {
-        console.log('🔊 Playing audio response...');
-        await playAudioResponse(apiResponse.audio_response.audio_content);
+        if (useStaticAvatar) {
+          // Static mode: Play background audio as before
+          console.log('🔊 Playing background audio (Static mode)...');
+          await playAudioResponse(apiResponse.audio_response.audio_content);
+        } else {
+          // Streaming mode: Make avatar speak the text instead
+          console.log('🗣️ Making avatar speak (Streaming mode)...');
+          if (streamingAvatarRef.current && avatarReady) {
+            try {
+              await streamingAvatarRef.current.speak(apiResponse.chat_response.text);
+              console.log('✅ Avatar speech initiated');
+            } catch (speakError) {
+              console.error('❌ Avatar speak failed, falling back to background audio:', speakError);
+              // Fallback to background audio if avatar speak fails
+              await playAudioResponse(apiResponse.audio_response.audio_content);
+            }
+          } else {
+            console.warn('⚠️ Avatar not ready, playing background audio as fallback');
+            // Fallback to background audio if avatar not ready
+            await playAudioResponse(apiResponse.audio_response.audio_content);
+          }
+        }
       }
       
       // Clear chunks
@@ -653,7 +804,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // Phase 4: Updated voice interaction handlers with activity tracking
+  // Updated voice interaction handlers with activity tracking
   const handleStartListening = useCallback(async () => {
     // Auto-create session when user starts talking if none exists
     if (!activeSessionId && !isCreatingSession) {
@@ -663,20 +814,12 @@ const DashboardPage: React.FC = () => {
     
     setIsListening(true);
     await startAudioRecording();
-    
-    // Reset idle timer on voice input START
-    resetIdleTimer();
-    console.log('🎙️ Voice input started - idle timer reset');
-  }, [activeSessionId, isCreatingSession, resetIdleTimer]);
+  }, [activeSessionId, isCreatingSession]);
 
   const handleStopListening = useCallback(async () => {
     setIsListening(false);
     await stopAudioRecording();
-    
-    // Reset idle timer on voice input END
-    resetIdleTimer();
-    console.log('🎙️ Voice input ended - idle timer reset');
-  }, [mediaRecorder, resetIdleTimer]);
+  }, [mediaRecorder]);
 
   // Session management handlers
   const handleNewChat = useCallback(async () => {
@@ -694,7 +837,7 @@ const DashboardPage: React.FC = () => {
     }
   }, []);
 
-  // Phase 4: Updated quota check with retry logic
+  // Updated quota check with retry logic
   const checkQuotaBeforeSwitch = async (): Promise<boolean> => {
     try {
       const result = await retryOperation(async () => {
@@ -729,17 +872,18 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // Phase 4: Updated avatar mode toggle with enhanced UX
+  // UPDATED: Avatar mode toggle with complete session lifecycle
   const toggleAvatarMode = async () => {
     // Clear any previous messages
     setQuotaMessage(null);
     setLastError(null);
     setOperationStatus(null);
+    setSessionError(null);
     
     try {
       setIsSwitchingAvatar(true);
       
-      // If switching FROM static TO streaming, check quota first
+      // If switching FROM static TO streaming, check quota and start session
       if (useStaticAvatar) {
         setOperationStatus('Checking quota...');
         setIsCheckingQuota(true);
@@ -757,13 +901,34 @@ const DashboardPage: React.FC = () => {
           return; // Don't switch
         }
         
-        setOperationStatus('Quota check passed - initializing streaming avatar...');
-        console.log('✅ Quota check passed - switching to streaming');
+        setOperationStatus('Quota check passed - starting session tracking...');
+        console.log('✅ Quota check passed - starting session tracking');
+        
+        // Generate new session ID and start tracking
+        const newSessionId = generateSessionId();
+        const sessionStarted = await startAvatarSession(newSessionId);
+        
+        if (!sessionStarted) {
+          setQuotaMessage('Failed to start session tracking - please try again');
+          console.error('❌ Session tracking failed');
+          return; // Don't switch if session tracking fails
+        }
+        
+        setOperationStatus('Session tracking started - switching to streaming...');
+        
       } else {
-        setOperationStatus('Switching to static avatar...');
+        // Switching FROM streaming TO static - end session first
+        setOperationStatus('Ending session tracking...');
+        
+        if (isSessionActive && heygenSessionId) {
+          console.log('🛑 Ending session before switching to static');
+          await endAvatarSession(heygenSessionId);
+        }
+        
+        setOperationStatus('Session ended - switching to static avatar...');
       }
       
-      // Proceed with the switch
+      // Proceed with the UI switch
       setUseStaticAvatar(!useStaticAvatar);
       setAvatarReady(false);
       setAvatarError(null);
@@ -780,13 +945,14 @@ const DashboardPage: React.FC = () => {
       console.error('Error during avatar switch:', error);
       setQuotaMessage('Error switching avatar - please try again');
       setLastError('Avatar switch failed');
+      handleSessionError('Avatar switch failed');
     } finally {
       setIsSwitchingAvatar(false);
       setIsCheckingQuota(false);
     }
   };
 
-  // Phase 4: Add message with voice activity tracking
+  // Add message with voice activity tracking
   const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
     if (!activeSessionId) return;
     
@@ -798,15 +964,9 @@ const DashboardPage: React.FC = () => {
     };
     
     setMessages(prev => [...prev, newMessage]);
-    
-    // Reset idle timer on text message activity
-    if (sender === 'user') {
-      resetIdleTimer();
-      console.log('💬 User text message sent - idle timer reset');
-    }
-    
+
     console.log('💬 Message added:', sender, text);
-  }, [activeSessionId, resetIdleTimer]);
+  }, [activeSessionId]);
 
   return (
     <div className="dashboard-page min-h-screen flex flex-col">
@@ -826,7 +986,7 @@ const DashboardPage: React.FC = () => {
             
             {/* Left Side: Avatar + Controls (50%) */}
             <div className="avatar-section">
-              {/* Phase 4: Enhanced Avatar Mode Toggle with Loading States */}
+              {/* Enhanced Avatar Mode Toggle with Session Status */}
               {process.env.NODE_ENV === 'development' && (
                 <div className="avatar-mode-toggle">
                   <div className="left-section">
@@ -849,16 +1009,21 @@ const DashboardPage: React.FC = () => {
                     </button>
                     <span className="mode-label">
                       {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
-                      {isIdleTimeoutActive && !useStaticAvatar && (
-                        <span style={{ color: '#f59e0b', fontSize: '10px', marginLeft: '5px' }}>
-                          (Auto-switch after 25s without voice activity)
+                      {isSessionActive && (
+                        <span style={{ color: '#10b981', fontSize: '10px', marginLeft: '5px' }}>
+                          (Session Active)
                         </span>
                       )}
                     </span>
                   </div>
                   
                   <div className="right-section">
-                    <QuotaDisplay isVisible={!useStaticAvatar} />
+                    <QuotaDisplay 
+                      isVisible={!useStaticAvatar} 
+                      refreshTrigger={quotaRefreshTrigger}
+                      isSessionActive={isSessionActive}
+                      sessionStartTime={sessionStartTime}
+                    />
                     {isRetrying && (
                       <span style={{ color: '#f59e0b', fontSize: '10px' }}>
                         Retrying... (Attempt {retryCount + 1})
@@ -897,6 +1062,18 @@ const DashboardPage: React.FC = () => {
                       textAlign: 'center' 
                     }}>
                       {lastError}
+                    </div>
+                  )}
+                  
+                  {sessionError && (
+                    <div className="session-error" style={{ 
+                      color: '#dc2626', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center',
+                      fontWeight: 'bold'
+                    }}>
+                      Session Error: {sessionError}
                     </div>
                   )}
                 </div>
@@ -953,7 +1130,7 @@ const DashboardPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* NEW: Recording Feedback */}
+              {/* Recording Feedback */}
               {(isRecording || isProcessingVoice || recordingError) && (
                 <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' }}>
                   {isRecording && (
