@@ -165,6 +165,7 @@ async def root():
                 "POST /api/v1/avatar/sessions/status",
                 "GET /api/v1/avatar/sessions",
                 "POST /api/v1/avatar/admin/cleanup",
+                "POST /api/v1/avatar/token",
                 "GET /api/v1/avatar/health"
             ]
         }
@@ -218,6 +219,7 @@ async def startup_event():
     logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/end")
     logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/status")
     logger.info("  🤖 Avatar: GET /api/v1/avatar/sessions")
+    logger.info("  🤖 Avatar: POST /api/v1/avatar/token")
     logger.info("  🤖 Avatar: GET /api/v1/avatar/health")
     
     # Log OAuth configuration status

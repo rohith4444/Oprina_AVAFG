@@ -57,6 +57,10 @@ const DashboardPage: React.FC = () => {
   // Refs for both avatar types
   const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
   const staticAvatarRef = useRef<StaticAvatarRef>(null);
+
+  // Add this state at the top with other states
+  const [lastSwitchTime, setLastSwitchTime] = useState(0);
+  const [isSwitching, setIsSwitching] = useState(false)
   
   const navigate = useNavigate();
 

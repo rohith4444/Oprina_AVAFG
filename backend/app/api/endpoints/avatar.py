@@ -5,6 +5,8 @@ Simple REST endpoints for avatar session management and quota tracking.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
+import requests
+from app.config import get_settings
 
 from app.api.dependencies import get_current_user, get_avatar_service, get_current_user_supabase, get_current_user_supabase_optional
 from app.core.services.avatar_service import AvatarService
@@ -360,3 +362,88 @@ async def avatar_health_check():
             "20_minute_limit_enforcement"
         ]
     }
+
+# =============================================================================
+# HEYGEN TOKEN ENDPOINT
+# =============================================================================
+
+@router.post("/token")
+async def get_heygen_token():
+    """
+    Get HeyGen access token for streaming avatar sessions.
+    
+    This endpoint replaces the separate Express server (server.js).
+    Called by frontend before creating HeyGen avatar sessions.
+    """
+    try:
+        settings = get_settings()
+        
+        # Check if HeyGen API key is configured
+        if not settings.HEYGEN_API_KEY:
+            logger.error("HEYGEN_API_KEY not found in environment variables")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="HeyGen API key not configured on server"
+            )
+        
+        logger.info("🔑 Creating HeyGen access token...")
+        logger.debug(f"🔍 API Key exists: {bool(settings.HEYGEN_API_KEY)}")
+        logger.debug(f"🔍 API Key length: {len(settings.HEYGEN_API_KEY)}")
+        logger.debug(f"🔍 API Key first 10 chars: {settings.HEYGEN_API_KEY[:10]}")
+        
+        # Make request to HeyGen API
+        response = requests.post(
+            'https://api.heygen.com/v1/streaming.create_token',
+            headers={
+                'x-api-key': settings.HEYGEN_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            timeout=30  # Add timeout for safety
+        )
+        
+        logger.info(f"📡 HeyGen API response status: {response.status_code}")
+        
+        # Handle non-200 responses
+        if not response.ok:
+            error_text = response.text
+            logger.error(f"❌ HeyGen API Error: {response.status_code} - {error_text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"HeyGen API error: {response.status_code}"
+            )
+        
+        # Parse response
+        data = response.json()
+        
+        # Validate response structure
+        if not data.get('data') or not data['data'].get('token'):
+            logger.error("❌ Invalid response from HeyGen API - missing token")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Invalid response from HeyGen API"
+            )
+        
+        token = data['data']['token']
+        logger.info("✅ Token created successfully")
+        logger.debug(f"🎫 Token length: {len(token)}")
+        
+        return {
+            "token": token,
+            "success": True
+        }
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Network error calling HeyGen API: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to connect to HeyGen API"
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        logger.error(f"❌ Unexpected error creating token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create access token"
+        )

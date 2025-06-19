@@ -5,6 +5,9 @@ import StreamingAvatar, {
   TaskType
 } from '@heygen/streaming-avatar';
 import '../styles/HeyGenAvatar.css';
+import { supabase } from '../supabaseClient';
+
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 interface HeyGenAvatarProps {
   isListening: boolean;
@@ -57,79 +60,105 @@ const HeyGenAvatar = forwardRef<HeyGenAvatarRef, HeyGenAvatarProps>(({
     }
   }, [isSpeaking, isAvatarTalking]);
 
-  // Get session token from our backend
-  const createSessionToken = async (): Promise<string> => {
-    try {
-      const response = await fetch('http://localhost:3001/api/get-access-token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Backend error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.token;
-    } catch (error) {
-      console.error('❌ Error getting session token from backend:', error);
-      throw error;
-    }
-  };
-
   const initializeAvatar = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setConnectionStatus('connecting');
+  try {
+    setIsLoading(true);
+    setError(null);
+    setConnectionStatus('connecting');
 
-      // Get session token from our backend
-      const sessionToken = await createSessionToken();
-
-      // Create StreamingAvatar with session token
-      const streamingAvatar = new StreamingAvatar({
-        token: sessionToken
-      });
-
-      // Set up event handlers BEFORE creating session
-      setupAvatarEvents(streamingAvatar);
-
-      // Create avatar session with minimal config (no voice to avoid errors)
-      const sessionInfo = await streamingAvatar.createStartAvatar({
-        quality: AvatarQuality.High,
-        avatarName: "Ann_Therapist_public"
-        // Removed voice configuration to avoid "voice_not_found" error
-      });
-
-      // Set avatar session state
-      setAvatarSession({
-        streamingAvatar,
-        sessionId: sessionInfo.session_id,
-        isReady: true
-      });
-
-      setConnectionStatus('connected');
-      setIsLoading(false);
-
-      // Notify parent component
-      if (onAvatarReady) {
-        onAvatarReady();
+    console.log('⏳ Waiting before creating session...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
       }
+    });
 
-    } catch (err: any) {
-      const errorMessage = err?.message || 'Failed to initialize avatar';
-      setError(errorMessage);
-      setIsLoading(false);
-      setConnectionStatus('error');
-      
-      if (onAvatarError) {
-        onAvatarError(errorMessage);
-      }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Backend error: ${response.status}`);
     }
-  };
+
+    const data = await response.json();
+    const sessionToken = data.token;
+
+    // Add another small delay after getting token
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Create StreamingAvatar with session token
+    const streamingAvatar = new StreamingAvatar({
+      token: sessionToken
+    });
+
+    // Set up event handlers BEFORE creating session
+    setupAvatarEvents(streamingAvatar);
+
+    // Create avatar session with minimal config
+    const sessionInfo = await streamingAvatar.createStartAvatar({
+      quality: AvatarQuality.High,
+      avatarName: "Ann_Therapist_public"
+    });
+
+    console.log('✅ HeyGen session created:', sessionInfo.session_id);
+
+    // 🚨 NEW: Notify backend that session started
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (token) {
+        const backendResponse = await fetch(`${BACKEND_API_URL}/api/v1/avatar/sessions/start`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            heygen_session_id: sessionInfo.session_id,
+            avatar_name: "Ann_Therapist_public"
+          })
+        });
+        
+        if (backendResponse.ok) {
+          console.log('✅ Backend session tracking started');
+        } else {
+          const errorData = await backendResponse.json();
+          console.warn('⚠️ Failed to start backend session tracking:', errorData);
+        }
+      }
+    } catch (trackingError) {
+      console.error('❌ Error starting backend session tracking:', trackingError);
+      // Don't fail the whole avatar initialization for tracking errors
+    }
+
+    // Set avatar session state
+    setAvatarSession({
+      streamingAvatar,
+      sessionId: sessionInfo.session_id,
+      isReady: true
+    });
+
+    setConnectionStatus('connected');
+    setIsLoading(false);
+
+    // Notify parent component
+    if (onAvatarReady) {
+      onAvatarReady();
+    }
+
+  } catch (err: any) {
+    const errorMessage = err?.message || 'Failed to initialize avatar';
+    setError(errorMessage);
+    setIsLoading(false);
+    setConnectionStatus('error');
+    
+    if (onAvatarError) {
+      onAvatarError(errorMessage);
+    }
+  }
+};
 
   const setupAvatarEvents = (streamingAvatar: StreamingAvatar) => {
     // Stream ready event
@@ -165,18 +194,58 @@ const HeyGenAvatar = forwardRef<HeyGenAvatarRef, HeyGenAvatarProps>(({
   };
 
   const cleanup = async () => {
-    try {
-      if (avatarSession?.streamingAvatar) {
-        await avatarSession.streamingAvatar.stopAvatar();
+  try {
+    // 🚨 NEW: First, notify backend that session is ending
+    if (avatarSession?.sessionId) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        
+        if (token) {
+          const endResponse = await fetch(`${BACKEND_API_URL}/api/v1/avatar/sessions/end`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              heygen_session_id: avatarSession.sessionId
+            })
+          });
+          
+          if (endResponse.ok) {
+            console.log('✅ Backend session tracking ended');
+          } else {
+            console.warn('⚠️ Failed to end backend session tracking');
+          }
+        }
+      } catch (trackingError) {
+        console.error('❌ Error ending backend session tracking:', trackingError);
       }
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-    } catch (err) {
-      console.error('Error during cleanup:', err);
     }
-  };
+    
+    // Then cleanup HeyGen session
+    if (avatarSession?.streamingAvatar) {
+      console.log('🧹 Stopping HeyGen avatar session...');
+      await avatarSession.streamingAvatar.stopAvatar();
+
+      // Add a small delay to ensure cleanup completes
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    // Clear state
+    setAvatarSession(null);
+    setConnectionStatus('disconnected');
+    console.log('✅ Avatar cleanup completed');
+    
+  } catch (err) {
+    console.error('Error during cleanup:', err);
+  }
+};
 
   // Method to make avatar speak
   const speak = async (text: string) => {
