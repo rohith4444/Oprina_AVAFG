@@ -102,13 +102,16 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 30%; /* Position face in the frame */
   border-radius: 1rem;
   opacity: 0;
   transition: opacity 0.5s ease;
+  transform: scale(0.9); /* Scale down slightly to show full head */
 }
 
 .avatar-image.loaded {
   opacity: 1;
+  transform: scale(0.9); /* Maintain scaling when loaded */
 }
 
 /* Loading Overlay - Same as HeyGenAvatar */
@@ -197,6 +200,48 @@
 .retry-button:hover {
   background: rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* CSS Fallback Avatar - Always works when images fail */
+.css-avatar-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--primary-blue), var(--primary-teal));
+  color: white;
+  text-align: center;
+}
+
+.avatar-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.avatar-letter {
+  font-size: 3rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-family: 'Inter', sans-serif;
+}
+
+.css-avatar-fallback .avatar-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  opacity: 0.9;
+  margin: 0;
 }
 
 /* Listening Animation Rings - Same as HeyGenAvatar */

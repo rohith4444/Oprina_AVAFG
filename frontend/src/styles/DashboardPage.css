@@ -17,6 +17,33 @@
   justify-content: center;
   padding: 0.5rem;
   overflow: hidden;
+  position: relative;
+}
+
+/* Mobile Menu Button */
+.mobile-menu-button {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 100;
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  display: none;
+}
+
+.mobile-menu-button:hover {
+  background-color: var(--background-alt);
+  transform: scale(1.05);
+}
+
+.mobile-menu-button:active {
+  transform: scale(0.95);
 }
 
 /* Unified 50/50 Container - Now fits in main content area */
@@ -208,7 +235,7 @@
 /* Responsive Design */
 @media (max-width: 1200px) {
   .dashboard-page {
-    grid-template-columns: 1fr; /* Remove sidebar on smaller screens */
+    grid-template-columns: 1fr; /* Single column layout */
   }
   
   .main-content {
@@ -235,8 +262,18 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-page {
+    grid-template-columns: 1fr; /* Ensure single column on mobile */
+  }
+  
   .main-content {
     padding: 1rem;
+    width: 100%; /* Take full width */
+  }
+  
+  /* Show mobile menu button on mobile */
+  .mobile-menu-button {
+    display: block;
   }
   
   .dashboard-unified {

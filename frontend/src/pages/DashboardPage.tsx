@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
 import StaticAvatar, { StaticAvatarRef } from '../components/StaticAvatar';
@@ -253,6 +254,40 @@ const DashboardPage: React.FC = () => {
     console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
   };
 
+  // Sidebar state management
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768;
+    }
+    return false;
+  });
+  
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 768; // Default to collapsed on mobile
+    }
+    return false;
+  });
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setSidebarCollapsed(true); // Auto-collapse on mobile
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Toggle sidebar
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
   return (
     <div className="dashboard-page min-h-screen flex flex-col">
       <div className="flex flex-1">
@@ -261,10 +296,22 @@ const DashboardPage: React.FC = () => {
           conversations={conversations}
           onNewChat={handleNewChat}
           onSelectChat={handleSelectChat}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
         />
         
         {/* Main Content Area - 50/50 Layout */}
         <div className="main-content flex-1">
+          {/* Mobile Menu Button */}
+          {isMobile && sidebarCollapsed && (
+            <button
+              className="mobile-menu-button"
+              onClick={toggleSidebar}
+              title="Open menu"
+            >
+              <Menu size={24} />
+            </button>
+          )}
           <div className="dashboard-unified">
             
             {/* Left Side: Avatar + Controls (50%) */}
