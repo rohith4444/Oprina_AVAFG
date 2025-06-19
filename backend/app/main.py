@@ -204,6 +204,7 @@ async def startup_event():
     logger.info("  💬 Sessions: GET /api/v1/sessions/{id}")
     logger.info("  💬 Sessions: DELETE /api/v1/sessions/{id}")
     logger.info("  💬 Sessions: GET /api/v1/sessions/{id}/messages")
+    logger.info("  💬 Sessions: PATCH /api/v1/sessions/{id}")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/connect/{service}")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/google/login")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/google/signup")

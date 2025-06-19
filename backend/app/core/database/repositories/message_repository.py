@@ -74,6 +74,28 @@ class MessageRepository:
         except Exception as e:
             logger.error(f"Failed to get message {message_id}: {e}")
             raise
+
+    async def get_first_user_message(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get the first user message in a session for title generation."""
+        try:
+            response = (
+                self.db.table(self.table_name)
+                .select("*")
+                .eq("session_id", session_id)
+                .eq("role", "user")
+                .order("message_index", desc=False)  # First message first
+                .limit(1)
+                .execute()
+            )
+            
+            if not response.data:
+                return None
+            
+            return response.data[0]
+            
+        except Exception as e:
+            logger.error(f"Failed to get first user message {session_id}: {e}")
+            raise
     
     async def get_session_messages(
         self, 

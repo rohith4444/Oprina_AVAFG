@@ -6,6 +6,7 @@ Updated for simplified schema and proper field alignment.
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from supabase import Client
+import re
 
 from app.core.database.models import BaseDBModel, RecordNotFoundError, serialize_for_db, handle_supabase_response
 from app.core.database.schema_validator import TableNames
@@ -148,7 +149,102 @@ class SessionRepository:
         except Exception as e:
             logger.error(f"Failed to update last activity {session_id}: {e}")
             raise
+
+    async def update_session_title(self, session_id: str, new_title: str) -> Dict[str, Any]:
+        """Update session title with validation."""
+        try:
+            # Validate title length (15-20 chars as per your requirement)
+            if len(new_title) < 1 or len(new_title) > 20:
+                raise ValueError("Title must be between 1 and 20 characters")
+            
+            # Clean the title (remove extra spaces, etc.)
+            cleaned_title = new_title.strip()
+            
+            update_data = {
+                "title": cleaned_title,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Serialize data
+            serialized_data = serialize_for_db(update_data)
+            
+            # Update session
+            response = (
+                self.db.table(self.table_name)
+                .update(serialized_data)
+                .eq("id", session_id)
+                .execute()
+            )
+            
+            if not response.data:
+                raise RecordNotFoundError(f"Session {session_id} not found")
+            
+            result = handle_supabase_response(response)
+            logger.info(f"Updated session title for {session_id}: '{cleaned_title}'")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to update session title {session_id}: {e}")
+            raise
     
+
+    async def auto_generate_title_from_message(self, session_id: str, message_content: str) -> Dict[str, Any]:
+        """Auto-generate session title from first message content."""
+        try:
+            # Generate title from message content (15-20 chars)
+            title = self._generate_title_from_content(message_content)
+            
+            # Update session title
+            return await self.update_session_title(session_id, title)
+            
+        except Exception as e:
+            logger.error(f"Failed to auto-generate title for session {session_id}: {e}")
+            raise
+
+    def _generate_title_from_content(self, content: str) -> str:
+        """Generate a 15-20 character title from message content."""
+        if not content or not content.strip():
+            return "New Chat"
+        
+        # Clean the content
+        cleaned = content.strip()
+        
+        # Remove common voice patterns
+        patterns_to_remove = [
+            r'^(hi|hello|hey)\s+',
+            r'^(can you|could you|please)\s+',
+            r'^(i need|i want)\s+(to|help with)\s+',
+            r'[.!?]+$'  # Remove ending punctuation
+        ]
+        
+        for pattern in patterns_to_remove:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+        
+        cleaned = cleaned.strip()
+        
+        # If too short after cleaning, use original
+        if len(cleaned) < 3:
+            cleaned = content.strip()
+        
+        # Truncate to 15-20 characters
+        if len(cleaned) <= 20:
+            return cleaned
+        
+        # Smart truncation - try to break at word boundaries
+        if len(cleaned) > 20:
+            # Find last space before 18 chars to leave room for "..."
+            truncate_pos = 17
+            last_space = cleaned.rfind(' ', 0, truncate_pos)
+            
+            if last_space > 10:  # Only use space if it's not too early
+                return cleaned[:last_space] + "..."
+            else:
+                return cleaned[:17] + "..."
+        
+        return cleaned
+
+
     async def get_user_sessions(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
         """Get all sessions for a user, ordered by recent activity."""
         try:

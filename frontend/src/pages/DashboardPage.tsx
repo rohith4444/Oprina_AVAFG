@@ -383,22 +383,22 @@ const DashboardPage: React.FC = () => {
   };
 
   // API Methods
+  // MODIFY the existing createNewSession function:
   const createNewSession = async () => {
-    if (isCreatingSession) return null;
-    
+    if (isCreatingSession) return;
+
     try {
       setIsCreatingSession(true);
       const token = await getUserToken();
       
-      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions/create`, {
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: "New Conversation",
-          avatar_settings: { type: "static" }
+          title: "New Chat" // Backend will auto-update this when first message is sent
         })
       });
 
@@ -409,15 +409,15 @@ const DashboardPage: React.FC = () => {
       const newSession = await response.json();
       // Map backend response to frontend format
       const sessionForFrontend = {
-        id: newSession.session_id,  // Map session_id to id
-        title: newSession.title,
+        id: newSession.session_id,
+        title: newSession.title, // Will be "New Chat" initially, then auto-updated
         created_at: newSession.created_at,
-        updated_at: newSession.created_at,  // Use created_at as initial updated_at
+        updated_at: newSession.created_at,
         message_count: 0
       };
 
-      setSessions(prev => [sessionForFrontend, ...(prev || [])]);  // Handle prev being null
-      setActiveSessionId(newSession.session_id);  // Use session_id
+      setSessions(prev => [sessionForFrontend, ...(prev || [])]);
+      setActiveSessionId(newSession.session_id);
       setMessages([]);
       
       console.log('💬 New session created:', newSession.session_id);
@@ -509,6 +509,15 @@ const DashboardPage: React.FC = () => {
     } catch (error) {
       console.error('Error deleting session:', error);
     }
+  };
+
+  const handleSessionUpdate = (sessionId: string, newTitle: string) => {
+    setSessions(prev => prev.map(s => 
+      s.id === sessionId 
+        ? { ...s, title: newTitle }
+        : s
+    ));
+    console.log(`📝 Updated session ${sessionId} title to: ${newTitle}`);
   };
 
   // Load sessions on component mount
@@ -978,6 +987,7 @@ const DashboardPage: React.FC = () => {
           onNewChat={handleNewChat}
           onSessionSelect={handleSelectSession}
           onSessionDelete={handleDeleteSession}
+          onSessionUpdate={handleSessionUpdate}
         />
         
         {/* Main Content Area - 50/50 Layout */}

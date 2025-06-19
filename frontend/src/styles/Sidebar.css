@@ -343,3 +343,92 @@
   margin: 0 auto;
 }
 
+/* Session title editing styles */
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.edit-session-button {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  opacity: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-item:hover .edit-session-button {
+  opacity: 0.6;
+}
+
+.edit-session-button:hover {
+  opacity: 1 !important;
+  background-color: var(--background-alt);
+}
+
+.session-title-input {
+  background: var(--background);
+  border: 1px solid var(--primary-blue);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+}
+
+.session-title-input:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px rgba(91, 124, 255, 0.2);
+}
+
+.session-title-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Update existing conversation-preview to flex for proper alignment */
+.conversation-preview {
+  flex: 1;
+  font-size: 0.875rem;
+  min-width: 0; /* Allow flex shrinking */
+}
+
+/* Update conversation-details to handle new layout */
+.conversation-details {
+  flex: 1;
+  min-width: 0; /* Allow flex shrinking */
+  overflow: hidden;
+}
+
+/* Ensure conversation-content takes full width */
+.conversation-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0; /* Allow flex shrinking */
+}
+
+/* Update conversation-item to handle new action buttons layout */
+.conversation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Distribute space between content and actions */
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+}
