@@ -108,6 +108,20 @@ class VoiceService:
                     }
                 
                 agent_text = agent_response["response"]
+
+                #Auto-generate title if this is the first user message
+                try:
+                    # Check if this is the first user message (message_index = 1)
+                    if agent_response.get("user_message", {}).get("message_index") == 1:
+                        # Auto-generate title from first voice message
+                        await self.session_repository.auto_generate_title_from_message(
+                            session_id, 
+                            user_text
+                        )
+                        logger.info(f"Auto-generated title for voice session {session_id} from first message")
+                except Exception as title_error:
+                    # Don't fail the voice processing if title generation fails
+                    logger.warning(f"Failed to auto-generate title for voice session {session_id}: {title_error}")
                 
             except Exception as agent_error:
                 logger.error(f"Agent service failed: {agent_error}")

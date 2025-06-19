@@ -5,6 +5,7 @@ Vertex AI Agent client for communicating with deployed Oprina agent.
 import asyncio
 from typing import Optional, Dict, Any, AsyncGenerator
 from vertexai import agent_engines
+from google import genai
 import structlog
 
 from app.config import get_settings
@@ -20,6 +21,34 @@ class VertexAgentClient:
         self._initialized = False
         self.settings = get_settings()
         self._agent_id = self.settings.VERTEX_AI_AGENT_ID
+        self._gemini_model: Optional[Any] = None
+
+    def _setup_gemini(self):
+        """One-time Gemini setup using new Gen AI SDK with Vertex AI."""
+        try:
+            
+            
+            # Get project and location from settings or environment
+            project_id = getattr(self.settings, 'GOOGLE_CLOUD_PROJECT', None)
+            location = getattr(self.settings, 'GOOGLE_CLOUD_LOCATION', None)  
+            
+            if not project_id:
+                logger.error("GOOGLE_CLOUD_PROJECT must be set for Vertex AI")
+                self._gemini_client = None
+                return
+            
+            # Create Vertex AI client using new Gen AI SDK
+            self._gemini_client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location
+            )
+            
+            logger.info(f"Gemini client initialized for Vertex AI project: {project_id}, location: {location}")
+            
+        except Exception as e:
+            logger.error(f"Gemini setup failed: {e}")
+            self._gemini_client = None
     
     async def initialize(self) -> None:
         """Initialize the agent client."""
@@ -155,21 +184,156 @@ class VertexAgentClient:
     
     def _process_response_events(self, events: list) -> str:
         """Process response events into a single response string."""
+        
+        # ADD THIS DEBUG LINE
+        logger.info(f"🔍 DEBUG: Processing {len(events)} events")
+        
         response_parts = []
         
-        for event in events:
-            # Extract text content from event
-            if hasattr(event, 'content'):
-                response_parts.append(str(event.content))
-            elif isinstance(event, dict) and 'content' in event:
-                response_parts.append(str(event['content']))
-            elif isinstance(event, str):
-                response_parts.append(event)
-            else:
-                # Try to convert to string
-                response_parts.append(str(event))
+        for i, event in enumerate(events):
+            # ADD THIS DEBUG LINE  
+            logger.info(f"🔍 DEBUG: Event {i} type: {type(event)}, content: {str(event)[:200]}...")
+            
+            extracted_text = self._extract_text_from_event(event)
+            
+            # ADD THIS DEBUG LINE
+            logger.info(f"🔍 DEBUG: Extracted text: '{extracted_text}'")
+            
+            if extracted_text:
+                response_parts.append(extracted_text)
         
-        return " ".join(response_parts).strip()
+        final_response = " ".join(response_parts).strip()
+
+        logger.info(f"🔍 DEBUG: Final response: '{final_response}'")
+
+        optimized_response = self.optimize_for_voice(final_response)
+        
+        # ADD THIS DEBUG LINE
+        logger.info(f"🔍 DEBUG: Final response: '{optimized_response}'")
+        
+        return optimized_response
+    
+    def optimize_for_voice(self, text: str) -> str:
+        """Make text voice-friendly using new Gen AI SDK."""
+        logger.info(f"🔍 VOICE OPTIMIZATION: Method called with {len(text)} characters")
+        
+        if not hasattr(self, '_gemini_client'):
+            self._setup_gemini()
+        
+        if not self._gemini_client:
+            logger.error("🔍 VOICE OPTIMIZATION: No Gemini client available!")
+            return text
+        
+        try:
+            optimization_prompt = f"""
+    Convert this text into natural, conversational speech for text-to-speech output:
+
+    Original text: {text}
+
+    Rules:
+    1. Remove asterisks (*), formatting symbols, and technical punctuation
+    2. Convert "From: email@domain.com" to "from [name]" 
+    3. Convert timestamps to natural language (e.g., "today at 2 PM")
+    4. Make email lists conversational: "You have 3 emails: one from John about..."
+    5. Remove technical IDs and replace with natural references
+    6. Keep the same information but make it sound natural when spoken
+    7. Use casual, friendly tone
+    8. If it's a list, introduce it naturally: "Here are your emails:" or "Your schedule shows:"
+
+    Respond with ONLY the optimized text, no explanations.
+    """
+            
+            # Use new Gen AI SDK API
+            response = self._gemini_client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=optimization_prompt
+            )
+            
+            logger.info(f"🔍 VOICE OPTIMIZATION: Gemini response received")
+            
+            if response and response.text:
+                optimized_text = response.text.strip()
+                logger.info(f"🔍 VOICE OPTIMIZATION: Success - {len(text)} -> {len(optimized_text)} chars")
+                return optimized_text
+            else:
+                logger.warning("🔍 VOICE OPTIMIZATION: Empty response from Gemini")
+                return text
+            
+        except Exception as e:
+            logger.error(f"🔍 VOICE OPTIMIZATION: Failed - {e}")
+            return text
+        
+
+    def _extract_text_from_event(self, event) -> str:
+        """Extract clean text from various event formats."""
+        try:
+            # Handle string events
+            if isinstance(event, str):
+                return event
+            
+            # Handle dict events
+            if isinstance(event, dict):
+                # NEW: Handle nested content structure
+                if 'content' in event and isinstance(event['content'], dict):
+                    content = event['content']
+                    if 'parts' in content and isinstance(content['parts'], list):
+                        text_parts = []
+                        for part in content['parts']:
+                            if isinstance(part, dict) and 'text' in part:
+                                text_parts.append(str(part['text']))
+                        if text_parts:
+                            return " ".join(text_parts).strip()
+                
+                # Check for direct 'content' field
+                if 'content' in event:
+                    return str(event['content'])
+                
+                # Check for 'text' field  
+                if 'text' in event:
+                    return str(event['text'])
+                
+                # Check for direct 'parts' structure
+                if 'parts' in event:
+                    text_parts = []
+                    for part in event['parts']:
+                        if isinstance(part, dict) and 'text' in part:
+                            text_parts.append(str(part['text']))
+                    if text_parts:
+                        return " ".join(text_parts).strip()
+            
+            # Handle objects with attributes
+            if hasattr(event, 'content'):
+                content = event.content
+                # If content has parts
+                if hasattr(content, 'parts'):
+                    text_parts = []
+                    for part in content.parts:
+                        if hasattr(part, 'text'):
+                            text_parts.append(str(part.text))
+                    if text_parts:
+                        return " ".join(text_parts).strip()
+                else:
+                    return str(content)
+            
+            # Handle objects with text attribute
+            if hasattr(event, 'text'):
+                return str(event.text)
+            
+            # Handle objects with parts attribute
+            if hasattr(event, 'parts'):
+                text_parts = []
+                for part in event.parts:
+                    if hasattr(part, 'text'):
+                        text_parts.append(str(part.text))
+                if text_parts:
+                    return " ".join(text_parts).strip()
+            
+            return ""
+            
+        except Exception as e:
+            logger.warning(f"Failed to extract text from event: {e}")
+            return ""
+        
     
     async def health_check(self) -> bool:
         """Check if the agent is healthy and responding."""

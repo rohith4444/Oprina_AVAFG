@@ -554,11 +554,25 @@ body, html, .home-page {
 }
 
 /* Image optimization */
-.hero-avatar-container img, .logo img {
+.logo img {
   max-width: 100%;
   height: auto;
   border-radius: 50%;
 }
+
+.hero-avatar-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 1rem; /* Same as dashboard - shows full rectangle */
+}
+
+.hero-avatar-container .static-avatar .avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1rem !important;
+}
+
 
 /* Button base styles */
 button, .cta-button {

@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.tsx - Updated with Session API Integration & Audio Recording
+// src/pages/DashboardPage.tsx - Updated with Session Lifecycle Tracking
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +45,14 @@ const DashboardPage: React.FC = () => {
   const [avatarReady, setAvatarReady] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   
-  // NEW: Voice recording states
+  // NEW: HeyGen Session Tracking State
+  const [heygenSessionId, setHeygenSessionId] = useState<string | null>(null);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [quotaRefreshTrigger, setQuotaRefreshTrigger] = useState(0);
+  
+  // Voice recording states
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessingVoice, setIsProcessingVoice] = useState(false);
@@ -58,9 +65,17 @@ const DashboardPage: React.FC = () => {
   const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
   const staticAvatarRef = useRef<StaticAvatarRef>(null);
 
-  // Add this state at the top with other states
+  // Existing state
   const [lastSwitchTime, setLastSwitchTime] = useState(0);
-  const [isSwitching, setIsSwitching] = useState(false)
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [quotaMessage, setQuotaMessage] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [isCheckingQuota, setIsCheckingQuota] = useState(false);
+  const [isSwitchingAvatar, setIsSwitchingAvatar] = useState(false);
+  const [operationStatus, setOperationStatus] = useState<string | null>(null);
+  const [isEndingSession, setIsEndingSession] = useState(false);
   
   const navigate = useNavigate();
 
@@ -70,7 +85,248 @@ const DashboardPage: React.FC = () => {
     return session?.access_token;
   };
 
-  // NEW: Play audio response from base64 content
+  // NEW: Generate unique session ID
+  const generateSessionId = (): string => {
+    return `heygen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
+
+  // NEW: Trigger quota refresh
+  const triggerQuotaRefresh = () => {
+    setQuotaRefreshTrigger(prev => prev + 1);
+    console.log('🔄 Quota refresh triggered');
+  };
+
+  // NEW: Start Avatar Session Tracking
+  const startAvatarSession = async (sessionId: string): Promise<boolean> => {
+    try {
+      setSessionError(null);
+      
+      const token = await getUserToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      console.log('🚀 Starting avatar session tracking:', sessionId);
+
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/sessions/start`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          heygen_session_id: sessionId,
+          avatar_name: "Ann_Therapist_public"
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `Session start failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Session start failed');
+      }
+
+      // Update state
+      setHeygenSessionId(sessionId);
+      setIsSessionActive(true);
+      setSessionStartTime(new Date());
+      
+      // Trigger quota refresh to show updated remaining time
+      triggerQuotaRefresh();
+      
+      console.log('✅ Avatar session started successfully:', result);
+      return true;
+
+    } catch (error) {
+      console.error('❌ Failed to start avatar session:', error);
+      setSessionError(error instanceof Error ? error.message : 'Session start failed');
+      return false;
+    }
+  };
+
+  // UPDATED: End Avatar Session Tracking with guard
+  const endAvatarSession = async (sessionId: string): Promise<boolean> => {
+    // Prevent double calls
+    if (isEndingSession) {
+      console.log('🚫 Session end already in progress, skipping...');
+      return true;
+    }
+
+    // Check if session is still active
+    if (!isSessionActive || heygenSessionId !== sessionId) {
+      console.log('🚫 Session not active or ID mismatch, skipping end call');
+      return true;
+    }
+
+    try {
+      setIsEndingSession(true); // Set guard
+      setSessionError(null);
+      
+      const token = await getUserToken();
+      if (!token) {
+        console.warn('No auth token for ending session');
+        return false;
+      }
+
+      console.log('🛑 Ending avatar session tracking:', sessionId);
+
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/sessions/end`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          heygen_session_id: sessionId
+        })
+      });
+
+      if (!response.ok) {
+        // Handle 400 errors gracefully (session already ended)
+        if (response.status === 400) {
+          console.log('ℹ️ Session already ended (400 status) - this is OK');
+          // Clear session state even if API call failed
+          setHeygenSessionId(null);
+          setIsSessionActive(false);
+          setSessionStartTime(null);
+          return true;
+        }
+        
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `Session end failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Session end failed');
+      }
+
+      // Clear session state
+      setHeygenSessionId(null);
+      setIsSessionActive(false);
+      setSessionStartTime(null);
+      
+      // Trigger quota refresh to show updated remaining time
+      triggerQuotaRefresh();
+      
+      console.log('✅ Avatar session ended successfully:', result);
+      
+      // Show quota update message if quota exhausted
+      if (result.quota_exhausted) {
+        setQuotaMessage('Avatar quota exhausted - switching to static avatar');
+      }
+      
+      return true;
+
+    } catch (error) {
+      console.error('❌ Failed to end avatar session:', error);
+      setSessionError(error instanceof Error ? error.message : 'Session end failed');
+      
+      // Even if API call fails, clear local state to prevent stuck state
+      setHeygenSessionId(null);
+      setIsSessionActive(false);
+      setSessionStartTime(null);
+      
+      return false;
+    } finally {
+      setIsEndingSession(false); // Clear guard
+    }
+  };
+
+  // NEW: Handle session errors
+  const handleSessionError = (error: string) => {
+    console.error('🚨 Session error:', error);
+    setSessionError(error);
+    setOperationStatus(`Session error: ${error}`);
+    
+    // Clear error after 5 seconds
+    setTimeout(() => {
+      setSessionError(null);
+      if (operationStatus?.includes('Session error')) {
+        setOperationStatus(null);
+      }
+    }, 5000);
+  };
+
+  // UPDATED: Browser cleanup with guard
+  useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      if (isSessionActive && heygenSessionId && !isEndingSession) {
+        console.log('🧹 Page unload - ending active avatar session');
+        
+        // Use sendBeacon for reliable cleanup on page unload
+        const token = await getUserToken();
+        if (token) {
+          const data = JSON.stringify({
+            heygen_session_id: heygenSessionId
+          });
+          
+          const beaconSent = navigator.sendBeacon(
+            `${BACKEND_API_URL}/api/v1/avatar/sessions/end`,
+            new Blob([data], { type: 'application/json' })
+          );
+          
+          console.log('📡 Beacon sent:', beaconSent);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Component unmount cleanup with guard
+      if (isSessionActive && heygenSessionId && !isEndingSession) {
+        console.log('🧹 Component unmount - ending active avatar session');
+        endAvatarSession(heygenSessionId);
+      }
+    };
+  }, [isSessionActive, heygenSessionId, isEndingSession]);
+
+  // Phase 4: Retry logic for failed API calls
+  const retryOperation = async (
+    operation: () => Promise<any>, 
+    maxRetries: number = 3,
+    retryDelay: number = 1000
+  ): Promise<any> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setIsRetrying(attempt > 1);
+        setRetryCount(attempt - 1);
+        
+        const result = await operation();
+        
+        // Success - clear error states
+        setIsRetrying(false);
+        setRetryCount(0);
+        setLastError(null);
+        
+        return result;
+        
+      } catch (error) {
+        console.log(`Attempt ${attempt}/${maxRetries} failed:`, error);
+        
+        if (attempt === maxRetries) {
+          // Final attempt failed
+          setIsRetrying(false);
+          setLastError(`Operation failed after ${maxRetries} attempts`);
+          throw error;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+      }
+    }
+  };
+
+  // Play audio response from base64 content
   const playAudioResponse = async (base64Audio: string) => {
     try {
       // Stop any currently playing audio
@@ -127,22 +383,22 @@ const DashboardPage: React.FC = () => {
   };
 
   // API Methods
+  // MODIFY the existing createNewSession function:
   const createNewSession = async () => {
-    if (isCreatingSession) return null;
-    
+    if (isCreatingSession) return;
+
     try {
       setIsCreatingSession(true);
       const token = await getUserToken();
       
-      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions/create`, {
+      const response = await fetch(`${BACKEND_API_URL}/api/v1/sessions`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: "New Conversation",
-          avatar_settings: { type: "static" }
+          title: "New Chat" // Backend will auto-update this when first message is sent
         })
       });
 
@@ -153,18 +409,18 @@ const DashboardPage: React.FC = () => {
       const newSession = await response.json();
       // Map backend response to frontend format
       const sessionForFrontend = {
-        id: newSession.session_id,  // Map session_id to id
-        title: newSession.title,
+        id: newSession.session_id,
+        title: newSession.title, // Will be "New Chat" initially, then auto-updated
         created_at: newSession.created_at,
-        updated_at: newSession.created_at,  // Use created_at as initial updated_at
+        updated_at: newSession.created_at,
         message_count: 0
       };
 
-      setSessions(prev => [sessionForFrontend, ...(prev || [])]);  // Handle prev being null
-      setActiveSessionId(newSession.session_id);  // Use session_id
+      setSessions(prev => [sessionForFrontend, ...(prev || [])]);
+      setActiveSessionId(newSession.session_id);
       setMessages([]);
       
-      console.log('💬 New session created:', newSession.id);
+      console.log('💬 New session created:', newSession.session_id);
       return newSession;
     } catch (error) {
       console.error('Error creating session:', error);
@@ -255,6 +511,15 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const handleSessionUpdate = (sessionId: string, newTitle: string) => {
+    setSessions(prev => prev.map(s => 
+      s.id === sessionId 
+        ? { ...s, title: newTitle }
+        : s
+    ));
+    console.log(`📝 Updated session ${sessionId} title to: ${newTitle}`);
+  };
+
   // Load sessions on component mount
   useEffect(() => {
     loadSessions();
@@ -269,14 +534,14 @@ const DashboardPage: React.FC = () => {
     }
   }, [activeSessionId]);
 
-  // NEW: Process audio when chunks are available
+  // Process audio when chunks are available
   useEffect(() => {
     if (audioChunks.length > 0 && !isRecording) {
       processRecordedAudio(audioChunks);
     }
   }, [audioChunks, isRecording]);
 
-  // NEW: Cleanup audio resources on unmount
+  // Cleanup audio resources on unmount
   useEffect(() => {
     return () => {
       if (audioStream) {
@@ -288,7 +553,18 @@ const DashboardPage: React.FC = () => {
     };
   }, [audioStream, currentAudio]);
 
-  // NEW: Update audio volume when volume control changes
+  // Auto-clear quota message after 5 seconds
+  useEffect(() => {
+    if (quotaMessage) {
+      const timer = setTimeout(() => {
+        setQuotaMessage(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [quotaMessage]);
+
+  // Update audio volume when volume control changes
   useEffect(() => {
     if (currentAudio) {
       currentAudio.volume = isMuted ? 0 : volume / 100;
@@ -308,6 +584,7 @@ const DashboardPage: React.FC = () => {
     setAvatarReady(false);
   }, []);
 
+  // Updated avatar speaking handlers with voice activity tracking
   const handleAvatarStartTalking = useCallback(() => {
     console.log('🗣️ Avatar started talking');
     setIsSpeaking(true);
@@ -316,9 +593,10 @@ const DashboardPage: React.FC = () => {
   const handleAvatarStopTalking = useCallback(() => {
     console.log('🤐 Avatar stopped talking');
     setIsSpeaking(false);
+ 
   }, []);
 
-  // NEW: Audio Recording Functions
+  // Audio Recording Functions
   const startAudioRecording = async () => {
     try {
       setRecordingError(null);
@@ -397,7 +675,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // NEW: Send voice message to API
+  // Send voice message to API
   const sendVoiceMessage = async (audioBlob: Blob, sessionId: string) => {
     try {
       const token = await getUserToken();
@@ -442,7 +720,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // NEW: Process recorded audio and send to API
+  // Process recorded audio and send to API
   const processRecordedAudio = async (chunks: Blob[]) => {
     if (chunks.length === 0) {
       console.warn('No audio chunks to process');
@@ -496,9 +774,30 @@ const DashboardPage: React.FC = () => {
       setMessages(prev => [...prev, userMessage, assistantMessage]);
       
       // Handle audio response if provided
+      // Handle audio response based on avatar mode
       if (apiResponse.audio_response && !isMuted) {
-        console.log('🔊 Playing audio response...');
-        await playAudioResponse(apiResponse.audio_response.audio_content);
+        if (useStaticAvatar) {
+          // Static mode: Play background audio as before
+          console.log('🔊 Playing background audio (Static mode)...');
+          await playAudioResponse(apiResponse.audio_response.audio_content);
+        } else {
+          // Streaming mode: Make avatar speak the text instead
+          console.log('🗣️ Making avatar speak (Streaming mode)...');
+          if (streamingAvatarRef.current && avatarReady) {
+            try {
+              await streamingAvatarRef.current.speak(apiResponse.chat_response.text);
+              console.log('✅ Avatar speech initiated');
+            } catch (speakError) {
+              console.error('❌ Avatar speak failed, falling back to background audio:', speakError);
+              // Fallback to background audio if avatar speak fails
+              await playAudioResponse(apiResponse.audio_response.audio_content);
+            }
+          } else {
+            console.warn('⚠️ Avatar not ready, playing background audio as fallback');
+            // Fallback to background audio if avatar not ready
+            await playAudioResponse(apiResponse.audio_response.audio_content);
+          }
+        }
       }
       
       // Clear chunks
@@ -514,7 +813,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // UPDATED: Voice interaction handlers
+  // Updated voice interaction handlers with activity tracking
   const handleStartListening = useCallback(async () => {
     // Auto-create session when user starts talking if none exists
     if (!activeSessionId && !isCreatingSession) {
@@ -547,15 +846,122 @@ const DashboardPage: React.FC = () => {
     }
   }, []);
 
-  // Avatar mode toggle (for testing/development)
-  const toggleAvatarMode = () => {
-    setUseStaticAvatar(!useStaticAvatar);
-    setAvatarReady(false);
-    setAvatarError(null);
-    console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
+  // Updated quota check with retry logic
+  const checkQuotaBeforeSwitch = async (): Promise<boolean> => {
+    try {
+      const result = await retryOperation(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        
+        if (!token) {
+          throw new Error('No auth token available');
+        }
+
+        const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/check-quota`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Quota check failed: ${response.status}`);
+        }
+
+        return await response.json();
+      });
+
+      return result.success && result.can_create_session;
+      
+    } catch (error) {
+      console.error('Error checking quota after retries:', error);
+      setQuotaMessage('Unable to check quota - please check your connection and try again');
+      return false;
+    }
   };
 
-  // Add message to active session (for manual text interactions)
+  // UPDATED: Avatar mode toggle with complete session lifecycle
+  const toggleAvatarMode = async () => {
+    // Clear any previous messages
+    setQuotaMessage(null);
+    setLastError(null);
+    setOperationStatus(null);
+    setSessionError(null);
+    
+    try {
+      setIsSwitchingAvatar(true);
+      
+      // If switching FROM static TO streaming, check quota and start session
+      if (useStaticAvatar) {
+        setOperationStatus('Checking quota...');
+        setIsCheckingQuota(true);
+        
+        console.log('🔍 Checking quota before switching to streaming...');
+        
+        const canCreateSession = await checkQuotaBeforeSwitch();
+        
+        setIsCheckingQuota(false);
+        
+        if (!canCreateSession) {
+          // Quota exhausted - prevent switch and show message
+          setQuotaMessage('Cannot switch to streaming avatar - quota exhausted. Please wait for quota to reset.');
+          console.warn('🚫 Switch to streaming blocked - quota exhausted');
+          return; // Don't switch
+        }
+        
+        setOperationStatus('Quota check passed - starting session tracking...');
+        console.log('✅ Quota check passed - starting session tracking');
+        
+        // Generate new session ID and start tracking
+        const newSessionId = generateSessionId();
+        const sessionStarted = await startAvatarSession(newSessionId);
+        
+        if (!sessionStarted) {
+          setQuotaMessage('Failed to start session tracking - please try again');
+          console.error('❌ Session tracking failed');
+          return; // Don't switch if session tracking fails
+        }
+        
+        setOperationStatus('Session tracking started - switching to streaming...');
+        
+      } else {
+        // Switching FROM streaming TO static - end session first
+        setOperationStatus('Ending session tracking...');
+        
+        if (isSessionActive && heygenSessionId) {
+          console.log('🛑 Ending session before switching to static');
+          await endAvatarSession(heygenSessionId);
+        }
+        
+        setOperationStatus('Session ended - switching to static avatar...');
+      }
+      
+      // Proceed with the UI switch
+      setUseStaticAvatar(!useStaticAvatar);
+      setAvatarReady(false);
+      setAvatarError(null);
+      
+      setOperationStatus('Avatar switch completed');
+      console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
+      
+      // Clear status after 2 seconds
+      setTimeout(() => {
+        setOperationStatus(null);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error during avatar switch:', error);
+      setQuotaMessage('Error switching avatar - please try again');
+      setLastError('Avatar switch failed');
+      handleSessionError('Avatar switch failed');
+    } finally {
+      setIsSwitchingAvatar(false);
+      setIsCheckingQuota(false);
+    }
+  };
+
+  // Add message with voice activity tracking
   const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
     if (!activeSessionId) return;
     
@@ -567,7 +973,7 @@ const DashboardPage: React.FC = () => {
     };
     
     setMessages(prev => [...prev, newMessage]);
-    
+
     console.log('💬 Message added:', sender, text);
   }, [activeSessionId]);
 
@@ -581,6 +987,7 @@ const DashboardPage: React.FC = () => {
           onNewChat={handleNewChat}
           onSessionSelect={handleSelectSession}
           onSessionDelete={handleDeleteSession}
+          onSessionUpdate={handleSessionUpdate}
         />
         
         {/* Main Content Area - 50/50 Layout */}
@@ -589,28 +996,96 @@ const DashboardPage: React.FC = () => {
             
             {/* Left Side: Avatar + Controls (50%) */}
             <div className="avatar-section">
-              {/* Avatar Mode Toggle (Development Only) */}
-              {/* Avatar Mode Toggle with Quota Display */}
+              {/* Enhanced Avatar Mode Toggle with Session Status */}
               {process.env.NODE_ENV === 'development' && (
                 <div className="avatar-mode-toggle">
                   <div className="left-section">
                     <button 
-                        className="mode-status-box"
-                        onClick={toggleAvatarMode}
-                        style={{
-                          backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF'
-                        }}
-                      >
-                        {useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'}
-                      </button>
-                      <span className="mode-label">
-                        {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
-                      </span>
+                      className="mode-status-box"
+                      onClick={toggleAvatarMode}
+                      disabled={isSwitchingAvatar || isCheckingQuota}
+                      style={{
+                        backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
+                        opacity: (isSwitchingAvatar || isCheckingQuota) ? 0.6 : 1
+                      }}
+                    >
+                      {isSwitchingAvatar ? (
+                        '🔄 Switching...'
+                      ) : isCheckingQuota ? (
+                        '🔍 Checking Quota...'
+                      ) : (
+                        useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'
+                      )}
+                    </button>
+                    <span className="mode-label">
+                      {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
+                      {isSessionActive && (
+                        <span style={{ color: '#10b981', fontSize: '10px', marginLeft: '5px' }}>
+                          (Session Active)
+                        </span>
+                      )}
+                    </span>
                   </div>
                   
                   <div className="right-section">
-                    <QuotaDisplay isVisible={!useStaticAvatar} />
+                    <QuotaDisplay 
+                      isVisible={!useStaticAvatar} 
+                      refreshTrigger={quotaRefreshTrigger}
+                      isSessionActive={isSessionActive}
+                      sessionStartTime={sessionStartTime}
+                    />
+                    {isRetrying && (
+                      <span style={{ color: '#f59e0b', fontSize: '10px' }}>
+                        Retrying... (Attempt {retryCount + 1})
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* Enhanced feedback messages */}
+                  {quotaMessage && (
+                    <div className="quota-message" style={{ 
+                      color: '#ef4444', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                      {quotaMessage}
+                    </div>
+                  )}
+                  
+                  {operationStatus && (
+                    <div className="operation-status" style={{ 
+                      color: '#10b981', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                      {operationStatus}
+                    </div>
+                  )}
+                  
+                  {lastError && (
+                    <div className="error-message" style={{ 
+                      color: '#ef4444', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                      {lastError}
+                    </div>
+                  )}
+                  
+                  {sessionError && (
+                    <div className="session-error" style={{ 
+                      color: '#dc2626', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center',
+                      fontWeight: 'bold'
+                    }}>
+                      Session Error: {sessionError}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -665,7 +1140,7 @@ const DashboardPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* NEW: Recording Feedback */}
+              {/* Recording Feedback */}
               {(isRecording || isProcessingVoice || recordingError) && (
                 <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' }}>
                   {isRecording && (

@@ -102,6 +102,19 @@ class AgentService:
                 "content": message,
                 "message_type": "text"
             })
+
+            try:
+                # Check if this is the first user message (message_index = 1)
+                if user_message.get("message_index") == 1:
+                    # Auto-generate title from first message
+                    await self.session_repo.auto_generate_title_from_message(
+                        session_id, 
+                        message
+                    )
+                    logger.info(f"Auto-generated title for session {session_id} from first message")
+            except Exception as title_error:
+                # Don't fail the message sending if title generation fails
+                logger.warning(f"Failed to auto-generate title for session {session_id}: {title_error}")
             
             # Send to agent directly
             agent_response = await self.agent_client.send_message(

@@ -3,7 +3,7 @@ Session request models for Oprina API.
 Simplified models for voice-first chat sessions.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
@@ -63,5 +63,46 @@ class SessionMessagesRequest(BaseModel):
             "example": {
                 "limit": 50,
                 "message_type": "voice"
+            }
+        }
+
+class UpdateSessionRequest(BaseModel):
+    """Request model for updating session title."""
+    title: str = Field(
+        ..., 
+        description="New session title",
+        min_length=1,
+        max_length=20
+    )
+
+    @field_validator('title')
+    def validate_title(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Title cannot be empty')
+        if len(v.strip()) > 20:
+            raise ValueError('Title cannot exceed 20 characters')
+        return v.strip()
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "title": "Gmail Integration"
+            }
+        }
+
+class RegenerateTitleRequest(BaseModel):
+    """Request model for regenerating session title (optional - can be empty for auto-generation)."""
+    
+    # Optional: Allow custom content for title generation
+    custom_content: Optional[str] = Field(
+        None, 
+        description="Custom content to generate title from (uses first message if not provided)",
+        max_length=200
+    )
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "custom_content": "Help me organize my Gmail inbox"
             }
         }
