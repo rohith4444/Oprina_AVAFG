@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.tsx - Updated with Session API Integration & Audio Recording
+// src/pages/DashboardPage.tsx - Updated with Phase 4 Voice-Only Activity Tracking
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -60,7 +60,25 @@ const DashboardPage: React.FC = () => {
 
   // Add this state at the top with other states
   const [lastSwitchTime, setLastSwitchTime] = useState(0);
-  const [isSwitching, setIsSwitching] = useState(false)
+  const [isSwitching, setIsSwitching] = useState(false);
+
+  // Phase 3: Quota feedback
+  const [quotaMessage, setQuotaMessage] = useState<string | null>(null);
+
+  // Phase 4: Idle timeout management (VOICE-ONLY)
+  const [idleTimer, setIdleTimer] = useState<NodeJS.Timeout | null>(null);
+  const [lastActivity, setLastActivity] = useState<Date>(new Date());
+  const [isIdleTimeoutActive, setIsIdleTimeoutActive] = useState(false);
+
+  // Phase 4: Enhanced error handling
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [lastError, setLastError] = useState<string | null>(null);
+
+  // Phase 4: Loading states
+  const [isCheckingQuota, setIsCheckingQuota] = useState(false);
+  const [isSwitchingAvatar, setIsSwitchingAvatar] = useState(false);
+  const [operationStatus, setOperationStatus] = useState<string | null>(null);
   
   const navigate = useNavigate();
 
@@ -69,6 +87,84 @@ const DashboardPage: React.FC = () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token;
   };
+
+  // Phase 4: Retry logic for failed API calls
+  const retryOperation = async (
+    operation: () => Promise<any>, 
+    maxRetries: number = 3,
+    retryDelay: number = 1000
+  ): Promise<any> => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setIsRetrying(attempt > 1);
+        setRetryCount(attempt - 1);
+        
+        const result = await operation();
+        
+        // Success - clear error states
+        setIsRetrying(false);
+        setRetryCount(0);
+        setLastError(null);
+        
+        return result;
+        
+      } catch (error) {
+        console.log(`Attempt ${attempt}/${maxRetries} failed:`, error);
+        
+        if (attempt === maxRetries) {
+          // Final attempt failed
+          setIsRetrying(false);
+          setLastError(`Operation failed after ${maxRetries} attempts`);
+          throw error;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+      }
+    }
+  };
+
+  // Phase 4: Reset idle timer on VOICE activity only
+  const resetIdleTimer = useCallback(() => {
+    setLastActivity(new Date());
+    
+    // Only track idle time when using streaming avatar
+    if (!useStaticAvatar) {
+      // Clear existing timer
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+      }
+      
+      // Set new 25-second timer
+      const newTimer = setTimeout(() => {
+        console.log('🕒 25-second voice idle timeout - switching to static avatar');
+        handleIdleTimeout();
+      }, 25000); // 25 seconds
+      
+      setIdleTimer(newTimer);
+      setIsIdleTimeoutActive(true);
+      console.log('🔄 Voice activity detected - idle timer reset');
+    }
+  }, [useStaticAvatar, idleTimer]);
+
+  // Phase 4: Handle idle timeout
+  const handleIdleTimeout = useCallback(async () => {
+    if (!useStaticAvatar) {
+      console.log('🔄 Auto-switching to static avatar due to inactivity');
+      
+      // Switch to static avatar
+      setUseStaticAvatar(true);
+      setAvatarReady(false);
+      setAvatarError(null);
+      
+      // Show user feedback
+      setQuotaMessage('Switched to static avatar due to 25 seconds of voice inactivity');
+      
+      // Clear timer
+      setIdleTimer(null);
+      setIsIdleTimeoutActive(false);
+    }
+  }, [useStaticAvatar]);
 
   // NEW: Play audio response from base64 content
   const playAudioResponse = async (base64Audio: string) => {
@@ -288,6 +384,40 @@ const DashboardPage: React.FC = () => {
     };
   }, [audioStream, currentAudio]);
 
+  // Phase 3: Auto-clear quota message after 5 seconds
+  useEffect(() => {
+    if (quotaMessage) {
+      const timer = setTimeout(() => {
+        setQuotaMessage(null);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [quotaMessage]);
+
+  // Phase 4: Voice-only activity tracking (no mouse/keyboard)
+  useEffect(() => {
+    if (!useStaticAvatar && avatarReady) {
+      // Start idle timer when streaming avatar becomes ready
+      resetIdleTimer();
+      
+      return () => {
+        // Cleanup timer when switching away from streaming
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          console.log('🧹 Idle timer cleared - no longer using streaming avatar');
+        }
+      };
+    } else {
+      // Clear timer when not using streaming avatar
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        setIdleTimer(null);
+        setIsIdleTimeoutActive(false);
+      }
+    }
+  }, [useStaticAvatar, avatarReady, resetIdleTimer, idleTimer]);
+
   // NEW: Update audio volume when volume control changes
   useEffect(() => {
     if (currentAudio) {
@@ -308,15 +438,24 @@ const DashboardPage: React.FC = () => {
     setAvatarReady(false);
   }, []);
 
+  // Phase 4: Updated avatar speaking handlers with voice activity tracking
   const handleAvatarStartTalking = useCallback(() => {
     console.log('🗣️ Avatar started talking');
     setIsSpeaking(true);
-  }, []);
+    
+    // Reset idle timer when avatar starts speaking
+    resetIdleTimer();
+    console.log('🗣️ Avatar started speaking - idle timer reset');
+  }, [resetIdleTimer]);
 
   const handleAvatarStopTalking = useCallback(() => {
     console.log('🤐 Avatar stopped talking');
     setIsSpeaking(false);
-  }, []);
+    
+    // Reset idle timer when avatar stops speaking
+    resetIdleTimer();
+    console.log('🗣️ Avatar stopped speaking - idle timer reset');
+  }, [resetIdleTimer]);
 
   // NEW: Audio Recording Functions
   const startAudioRecording = async () => {
@@ -514,7 +653,7 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  // UPDATED: Voice interaction handlers
+  // Phase 4: Updated voice interaction handlers with activity tracking
   const handleStartListening = useCallback(async () => {
     // Auto-create session when user starts talking if none exists
     if (!activeSessionId && !isCreatingSession) {
@@ -524,12 +663,20 @@ const DashboardPage: React.FC = () => {
     
     setIsListening(true);
     await startAudioRecording();
-  }, [activeSessionId, isCreatingSession]);
+    
+    // Reset idle timer on voice input START
+    resetIdleTimer();
+    console.log('🎙️ Voice input started - idle timer reset');
+  }, [activeSessionId, isCreatingSession, resetIdleTimer]);
 
   const handleStopListening = useCallback(async () => {
     setIsListening(false);
     await stopAudioRecording();
-  }, [mediaRecorder]);
+    
+    // Reset idle timer on voice input END
+    resetIdleTimer();
+    console.log('🎙️ Voice input ended - idle timer reset');
+  }, [mediaRecorder, resetIdleTimer]);
 
   // Session management handlers
   const handleNewChat = useCallback(async () => {
@@ -547,15 +694,99 @@ const DashboardPage: React.FC = () => {
     }
   }, []);
 
-  // Avatar mode toggle (for testing/development)
-  const toggleAvatarMode = () => {
-    setUseStaticAvatar(!useStaticAvatar);
-    setAvatarReady(false);
-    setAvatarError(null);
-    console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
+  // Phase 4: Updated quota check with retry logic
+  const checkQuotaBeforeSwitch = async (): Promise<boolean> => {
+    try {
+      const result = await retryOperation(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        
+        if (!token) {
+          throw new Error('No auth token available');
+        }
+
+        const response = await fetch(`${BACKEND_API_URL}/api/v1/avatar/check-quota`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Quota check failed: ${response.status}`);
+        }
+
+        return await response.json();
+      });
+
+      return result.success && result.can_create_session;
+      
+    } catch (error) {
+      console.error('Error checking quota after retries:', error);
+      setQuotaMessage('Unable to check quota - please check your connection and try again');
+      return false;
+    }
   };
 
-  // Add message to active session (for manual text interactions)
+  // Phase 4: Updated avatar mode toggle with enhanced UX
+  const toggleAvatarMode = async () => {
+    // Clear any previous messages
+    setQuotaMessage(null);
+    setLastError(null);
+    setOperationStatus(null);
+    
+    try {
+      setIsSwitchingAvatar(true);
+      
+      // If switching FROM static TO streaming, check quota first
+      if (useStaticAvatar) {
+        setOperationStatus('Checking quota...');
+        setIsCheckingQuota(true);
+        
+        console.log('🔍 Checking quota before switching to streaming...');
+        
+        const canCreateSession = await checkQuotaBeforeSwitch();
+        
+        setIsCheckingQuota(false);
+        
+        if (!canCreateSession) {
+          // Quota exhausted - prevent switch and show message
+          setQuotaMessage('Cannot switch to streaming avatar - quota exhausted. Please wait for quota to reset.');
+          console.warn('🚫 Switch to streaming blocked - quota exhausted');
+          return; // Don't switch
+        }
+        
+        setOperationStatus('Quota check passed - initializing streaming avatar...');
+        console.log('✅ Quota check passed - switching to streaming');
+      } else {
+        setOperationStatus('Switching to static avatar...');
+      }
+      
+      // Proceed with the switch
+      setUseStaticAvatar(!useStaticAvatar);
+      setAvatarReady(false);
+      setAvatarError(null);
+      
+      setOperationStatus('Avatar switch completed');
+      console.log('🔄 Switched to', !useStaticAvatar ? 'static' : 'streaming', 'avatar');
+      
+      // Clear status after 2 seconds
+      setTimeout(() => {
+        setOperationStatus(null);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Error during avatar switch:', error);
+      setQuotaMessage('Error switching avatar - please try again');
+      setLastError('Avatar switch failed');
+    } finally {
+      setIsSwitchingAvatar(false);
+      setIsCheckingQuota(false);
+    }
+  };
+
+  // Phase 4: Add message with voice activity tracking
   const addMessage = useCallback((sender: 'user' | 'assistant', text: string) => {
     if (!activeSessionId) return;
     
@@ -568,8 +799,14 @@ const DashboardPage: React.FC = () => {
     
     setMessages(prev => [...prev, newMessage]);
     
+    // Reset idle timer on text message activity
+    if (sender === 'user') {
+      resetIdleTimer();
+      console.log('💬 User text message sent - idle timer reset');
+    }
+    
     console.log('💬 Message added:', sender, text);
-  }, [activeSessionId]);
+  }, [activeSessionId, resetIdleTimer]);
 
   return (
     <div className="dashboard-page min-h-screen flex flex-col">
@@ -589,28 +826,79 @@ const DashboardPage: React.FC = () => {
             
             {/* Left Side: Avatar + Controls (50%) */}
             <div className="avatar-section">
-              {/* Avatar Mode Toggle (Development Only) */}
-              {/* Avatar Mode Toggle with Quota Display */}
+              {/* Phase 4: Enhanced Avatar Mode Toggle with Loading States */}
               {process.env.NODE_ENV === 'development' && (
                 <div className="avatar-mode-toggle">
                   <div className="left-section">
                     <button 
-                        className="mode-status-box"
-                        onClick={toggleAvatarMode}
-                        style={{
-                          backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF'
-                        }}
-                      >
-                        {useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'}
-                      </button>
-                      <span className="mode-label">
-                        {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
-                      </span>
+                      className="mode-status-box"
+                      onClick={toggleAvatarMode}
+                      disabled={isSwitchingAvatar || isCheckingQuota}
+                      style={{
+                        backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
+                        opacity: (isSwitchingAvatar || isCheckingQuota) ? 0.6 : 1
+                      }}
+                    >
+                      {isSwitchingAvatar ? (
+                        '🔄 Switching...'
+                      ) : isCheckingQuota ? (
+                        '🔍 Checking Quota...'
+                      ) : (
+                        useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'
+                      )}
+                    </button>
+                    <span className="mode-label">
+                      {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
+                      {isIdleTimeoutActive && !useStaticAvatar && (
+                        <span style={{ color: '#f59e0b', fontSize: '10px', marginLeft: '5px' }}>
+                          (Auto-switch after 25s without voice activity)
+                        </span>
+                      )}
+                    </span>
                   </div>
                   
                   <div className="right-section">
                     <QuotaDisplay isVisible={!useStaticAvatar} />
+                    {isRetrying && (
+                      <span style={{ color: '#f59e0b', fontSize: '10px' }}>
+                        Retrying... (Attempt {retryCount + 1})
+                      </span>
+                    )}
                   </div>
+                  
+                  {/* Enhanced feedback messages */}
+                  {quotaMessage && (
+                    <div className="quota-message" style={{ 
+                      color: '#ef4444', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                      {quotaMessage}
+                    </div>
+                  )}
+                  
+                  {operationStatus && (
+                    <div className="operation-status" style={{ 
+                      color: '#10b981', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                      {operationStatus}
+                    </div>
+                  )}
+                  
+                  {lastError && (
+                    <div className="error-message" style={{ 
+                      color: '#ef4444', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                      {lastError}
+                    </div>
+                  )}
                 </div>
               )}
 
