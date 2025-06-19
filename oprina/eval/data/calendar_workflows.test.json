@@ -1,0 +1,314 @@
+{
+  "eval_set_id": "calendar-workflows-001",
+  "name": "Calendar Agent Workflows Test",
+  "description": "Tests calendar event management including creation, listing, updating, and deletion",
+  "eval_cases": [
+    {
+      "eval_id": "calendar-create-event",
+      "conversation": [
+        {
+          "invocation_id": "calendar-create-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Create a meeting event called 'Team Standup' tomorrow at 9:00 AM for 30 minutes"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Calendar Event Created Successfully!**\n\n📅 **Event Details:**\n🎯 Title: Team Standup\n📅 Date: Tomorrow (2024-01-16)\n⏰ Time: 9:00 AM - 9:30 AM\n⏱️ Duration: 30 minutes\n📍 Location: Not specified\n\n🆔 **Event ID:** cal_event_001\n\nThe event has been added to your Google Calendar. You'll receive a notification 15 minutes before the meeting starts.\n\nWould you like me to:\n- Add attendees to this meeting?\n- Set a custom reminder time?\n- Add a description or location?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "summary": "Team Standup",
+                  "start_time": "2024-01-16 09:00",
+                  "end_time": "2024-01-16 09:30",
+                  "description": "Daily team standup meeting"
+                },
+                "name": "calendar_create_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "calendar-list-events",
+      "conversation": [
+        {
+          "invocation_id": "calendar-list-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Show me my calendar events for the next 3 days"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "📅 **Your Calendar - Next 3 Days**\n\n**Today (January 15, 2024)**\n🕒 3:00 PM - 4:00 PM: Client Presentation\n🕕 6:00 PM - 7:30 PM: Dinner with Sarah\n\n**Tomorrow (January 16, 2024)**\n🕘 9:00 AM - 9:30 AM: Team Standup\n🕚 11:00 AM - 12:00 PM: Project Review\n🕐 2:00 PM - 3:30 PM: Budget Planning Meeting\n\n**January 17, 2024 (Wednesday)**\n🕘 9:30 AM - 10:30 AM: One-on-One with Manager\n🕐 1:00 PM - 2:00 PM: Lunch Meeting - Marketing Discussion\n🕓 4:00 PM - 5:00 PM: Weekly Team Check-in\n\n**Summary:** 8 events scheduled over the next 3 days\n\n📊 **Schedule Density:**\n- Today: 2 events (3 hours)\n- Tomorrow: 3 events (3 hours)\n- Wednesday: 3 events (3 hours)\n\nWould you like me to:\n- Show details for any specific event?\n- Check for scheduling conflicts?\n- Find available time slots for new meetings?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "start_date": "2024-01-15",
+                  "days": 3
+                },
+                "name": "calendar_list_events"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "calendar-update-event",
+      "conversation": [
+        {
+          "invocation_id": "calendar-update-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Update the Team Standup meeting to start at 9:30 AM instead of 9:00 AM"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Event Updated Successfully!**\n\n📅 **Updated Event Details:**\n🎯 Title: Team Standup\n📅 Date: Tomorrow (2024-01-16)\n⏰ New Time: 9:30 AM - 10:00 AM\n⏰ Previous Time: 9:00 AM - 9:30 AM\n\n🔄 **Changes Made:**\n- Start time moved from 9:00 AM to 9:30 AM\n- End time adjusted to 10:00 AM (30-minute duration maintained)\n\nThe event has been updated in your Google Calendar. If there are any attendees, they will be notified of the time change.\n\n⚠️ **Schedule Check:** No conflicts detected with the new time.\n\nIs there anything else you'd like to update for this meeting?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "event_id": "cal_event_001",
+                  "start_time": "2024-01-16 09:30",
+                  "end_time": "2024-01-16 10:00"
+                },
+                "name": "calendar_update_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {
+          "calendar:last_created_event_id": "cal_event_001"
+        }
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "calendar-complex-scheduling",
+      "conversation": [
+        {
+          "invocation_id": "calendar-complex-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Schedule a recurring weekly meeting called 'Product Planning' every Wednesday at 2 PM for 90 minutes"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Recurring Event Created Successfully!**\n\n📅 **Event Details:**\n🎯 Title: Product Planning\n📅 Schedule: Every Wednesday\n⏰ Time: 2:00 PM - 3:30 PM\n⏱️ Duration: 90 minutes\n🔄 Recurrence: Weekly\n\n📋 **Next Occurrences:**\n• Wednesday, Jan 17, 2024 at 2:00 PM\n• Wednesday, Jan 24, 2024 at 2:00 PM\n• Wednesday, Jan 31, 2024 at 2:00 PM\n• Wednesday, Feb 7, 2024 at 2:00 PM\n\n🆔 **Event Series ID:** cal_series_002\n\n⚠️ **Schedule Conflicts Detected:**\n- Jan 17: Overlaps with 'Weekly Team Check-in' (4:00 PM - 5:00 PM)\n  💡 Suggestion: Move team check-in to 3:45 PM to allow transition time\n\nThe recurring event has been added to your Google Calendar. Would you like me to:\n- Resolve the scheduling conflict?\n- Add attendees to all occurrences?\n- Set up a meeting room or video link?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "summary": "Product Planning",
+                  "start_time": "2024-01-17 14:00",
+                  "end_time": "2024-01-17 15:30",
+                  "description": "Weekly product planning meeting",
+                  "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=WE"
+                },
+                "name": "calendar_create_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "calendar-delete-event",
+      "conversation": [
+        {
+          "invocation_id": "calendar-delete-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Cancel the Team Standup meeting for tomorrow"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Event Deleted Successfully!**\n\n🗑️ **Cancelled Event:**\n🎯 Title: Team Standup\n📅 Date: Tomorrow (2024-01-16)\n⏰ Time: 9:30 AM - 10:00 AM\n\n📧 **Notifications:** If there were any attendees, they have been notified of the cancellation.\n\n📅 **Your Updated Schedule for Tomorrow:**\n🕚 11:00 AM - 12:00 PM: Project Review\n🕐 2:00 PM - 3:30 PM: Budget Planning Meeting\n\nYou now have a free 30-minute slot from 9:30 AM - 10:00 AM tomorrow.\n\nWould you like me to:\n- Schedule something else in that time slot?\n- Move any other meetings to fill the gap?\n- Keep the time free for focused work?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "event_id": "cal_event_001"
+                },
+                "name": "calendar_delete_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {
+          "calendar:last_created_event_id": "cal_event_001"
+        }
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "calendar-delete-confirmation",
+      "conversation": [
+        {
+          "invocation_id": "calendar-delete-confirm-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Delete the Budget Planning Meeting"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "⚠️ **Deletion Confirmation Required**\n\nI found the 'Budget Planning Meeting' scheduled for tomorrow (2024-01-16) from 2:00 PM - 3:30 PM.\n\nBefore I can delete this event, I need your confirmation. This action cannot be undone.\n\nWould you like me to:\n- Confirm and delete this event?\n- Show you more details about the event first?\n- Cancel the deletion request?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "event_id": "Budget Planning Meeting",
+                  "confirm": false
+                },
+                "name": "calendar_delete_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        },
+        {
+          "invocation_id": "calendar-delete-confirm-2",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Yes, please confirm and delete it"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Event Deleted Successfully!**\n\n🗑️ **Cancelled Event:**\n🎯 Title: Budget Planning Meeting\n📅 Date: Tomorrow (2024-01-16)\n⏰ Time: 2:00 PM - 3:30 PM\n\n📧 **Notifications:** If there were any attendees, they have been notified of the cancellation.\n\n📅 **Your Updated Schedule for Tomorrow:**\n🕚 11:00 AM - 12:00 PM: Project Review\n\nYou now have a free 90-minute slot from 2:00 PM - 3:30 PM tomorrow.\n\nWould you like me to:\n- Schedule something else in that time slot?\n- Move any other meetings to fill the gap?\n- Keep the time free for focused work?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "event_id": "Budget Planning Meeting",
+                  "confirm": true
+                },
+                "name": "calendar_delete_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.6145446
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    }
+  ],
+  "creation_timestamp": 1747946425.614588
+} 

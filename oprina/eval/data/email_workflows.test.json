@@ -1,0 +1,182 @@
+{
+  "eval_set_id": "email-workflows-001",
+  "name": "Email Agent Workflows Test",
+  "description": "Tests basic email operations including sending, reading, organizing, and AI-powered features",
+  "eval_cases": [
+    {
+      "eval_id": "email-send-basic",
+      "conversation": [
+        {
+          "invocation_id": "email-send-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Send an email to oprina123789@gmail.com with subject 'Test Message' and body 'This is a test email from the evaluation system.'"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ Email sent successfully!\n\n**Email Details:**\n📧 To: oprina123789@gmail.com\n📋 Subject: Test Message\n📄 Body: This is a test email from the evaluation system.\n\nThe email has been delivered to the recipient's inbox."
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "to": "oprina123789@gmail.com",
+                  "subject": "Test Message",
+                  "body": "This is a test email from the evaluation system."
+                },
+                "name": "gmail_send_message"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "email-list-recent",
+      "conversation": [
+        {
+          "invocation_id": "email-list-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Show me my 3 most recent emails"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "📧 **Your Recent Emails (Last 3)**\n\nI've retrieved your most recent emails from your Gmail account. Here are the details:\n\n1. **Most Recent Email**\n   📋 Preview: [Email details will vary based on current inbox content]\n\n2. **Second Email**\n   📋 Preview: [Email details will vary based on current inbox content]\n\n3. **Third Email**\n   📋 Preview: [Email details will vary based on current inbox content]\n\nWould you like me to open any of these emails or perform any actions?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "query": "",
+                  "max_results": 3
+                },
+                "name": "gmail_list_messages"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user", 
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "email-search-recent",
+      "conversation": [
+        {
+          "invocation_id": "email-search-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Search for emails from the last week"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "🔍 **Search Results: Emails from last week**\n\nI've searched your Gmail for emails from the past week. The results will vary based on your current email activity.\n\nWould you like me to:\n- Show more details about any specific emails?\n- Apply labels for better organization?\n- Create action items from these emails?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "search_query": "newer_than:7d",
+                  "max_results": 10
+                },
+                "name": "gmail_search_messages"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "email-profile-check",
+      "conversation": [
+        {
+          "invocation_id": "email-profile-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Show me my Gmail profile information"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "👤 **Gmail Profile Information**\n\nI've retrieved your Gmail profile details. Your account information shows the current status of your Gmail account including total message counts and storage information.\n\nYour profile is successfully connected and accessible through the Gmail API."
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {},
+                "name": "gmail_get_profile"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    }
+  ],
+  "creation_timestamp": 1747946425.614588
+} 

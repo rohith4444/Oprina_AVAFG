@@ -1,0 +1,202 @@
+{
+  "eval_set_id": "cross-agent-workflows-001",
+  "name": "Cross-Agent Workflows Test",
+  "description": "Tests complex workflows that coordinate between email and calendar agents",
+  "eval_cases": [
+    {
+      "eval_id": "email-to-calendar-scheduling",
+      "conversation": [
+        {
+          "invocation_id": "cross-agent-1",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Check my emails for any meeting requests and schedule them on my calendar"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "🔍 **Email Analysis Complete!**\n\nFound 2 meeting requests in your recent emails:\n\n📧 **Email 1**: From sarah@company.com\n- Subject: \"Quarterly Review Meeting Request\"\n- Proposed time: Next Tuesday at 2:00 PM\n- Duration: 90 minutes\n\n📧 **Email 2**: From client@external.com\n- Subject: \"Project Kick-off Meeting\"\n- Proposed time: This Friday at 10:00 AM\n- Duration: 60 minutes\n\n📅 **Calendar Integration Results:**\n\n✅ **Successfully Scheduled:**\n1. **Quarterly Review Meeting**\n   - Date: Tuesday, Jan 23, 2024\n   - Time: 2:00 PM - 3:30 PM\n   - Attendee: sarah@company.com\n   - Calendar event created\n\n⚠️ **Conflict Detected:**\n2. **Project Kick-off Meeting**\n   - Requested: Friday, Jan 19, 2024 at 10:00 AM\n   - Conflict: Overlaps with existing \"Team Planning\" meeting (9:30 AM - 11:00 AM)\n   - Suggested alternative: Friday at 11:30 AM - 12:30 PM\n\n📤 **Email Responses Sent:**\n- Confirmation sent to Sarah accepting Tuesday meeting\n- Counter-proposal sent to client suggesting alternative time\n\nWould you like me to resolve the scheduling conflict or make any adjustments?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "search_query": "meeting request",
+                  "max_results": 10
+                },
+                "name": "gmail_search_messages"
+              },
+              {
+                "id": null,
+                "args": {
+                  "start_date": "2024-01-19",
+                  "days": 7
+                },
+                "name": "calendar_list_events"
+              },
+              {
+                "id": null,
+                "args": {
+                  "summary": "Quarterly Review Meeting",
+                  "start_time": "2024-01-23 14:00",
+                  "end_time": "2024-01-23 15:30"
+                },
+                "name": "calendar_create_event"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "meeting-invitation-workflow",
+      "conversation": [
+        {
+          "invocation_id": "cross-agent-2",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Schedule a meeting with john@company.com for next week and send him an invitation email"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Meeting Scheduled & Invitation Sent!**\n\n📅 **Calendar Event Created:**\n🎯 Title: Meeting with John\n📅 Date: Tuesday, January 23, 2024\n⏰ Time: 3:00 PM - 4:00 PM\n👤 Attendee: john@company.com\n🆔 Event ID: cal_event_003\n\n📧 **Invitation Email Sent:**\n📧 To: john@company.com\n📋 Subject: Meeting Invitation - Tuesday, January 23rd\n\n**Email Content:**\n\"Hi John,\n\nI'd like to schedule a meeting with you for next week.\n\nMeeting Details:\n- Date: Tuesday, January 23, 2024\n- Time: 3:00 PM - 4:00 PM\n- Duration: 60 minutes\n\nPlease let me know if this time works for you, or if you'd prefer to reschedule.\n\nBest regards\"\n\n🔄 **Workflow Status:**\n1. ✅ Found available time slot\n2. ✅ Created calendar event\n3. ✅ Sent professional invitation email\n4. ⏳ Awaiting response from John\n\nYou'll receive a notification if John responds to the meeting invitation."
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "attendee_email": "john@company.com",
+                  "meeting_subject": "Meeting with John",
+                  "meeting_duration_minutes": 60
+                },
+                "name": "schedule_meeting_with_invitation"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "deadline-management-workflow",
+      "conversation": [
+        {
+          "invocation_id": "cross-agent-3",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Scan my emails for any deadlines and block time on my calendar to work on them"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "📧 **Email Deadline Analysis Complete!**\n\nFound 3 action items with deadlines:\n\n1. **Review quarterly report**\n   ⏰ Deadline: End of this week\n   🔥 Priority: High\n   ⏱️ Estimated time: 2 hours\n\n2. **Respond to client proposal**\n   ⏰ Deadline: Tomorrow\n   🔥 Priority: Medium\n   ⏱️ Estimated time: 1 hour\n\n3. **Prepare presentation slides**\n   ⏰ Deadline: Next Monday\n   🔥 Priority: Medium\n   ⏱️ Estimated time: 90 minutes\n\n📅 **Calendar Time Blocks Created:**\n\n✅ **Scheduled Work Sessions:**\n\n1. **Client Proposal Response**\n   📅 Tomorrow, 10:00 AM - 11:00 AM\n   📝 Task: Respond to client proposal\n   🎯 Goal: Complete response before deadline\n\n2. **Quarterly Report Review**\n   📅 Thursday, 2:00 PM - 4:00 PM\n   📝 Task: Review quarterly report\n   🎯 Goal: Thorough analysis and feedback\n\n3. **Presentation Preparation**\n   📅 Friday, 9:00 AM - 10:30 AM\n   📝 Task: Prepare presentation slides\n   🎯 Goal: Draft slides for Monday presentation\n\n🔔 **Reminders Set:**\n- 30-minute reminder before each work session\n- Email notifications for upcoming deadlines\n\n📊 **Schedule Summary:**\n- Total work time blocked: 4.5 hours\n- All deadlines can be met with current schedule\n- No conflicts with existing calendar events\n\nYour deadlines are now properly scheduled with dedicated time blocks!"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "days_to_check": 7
+                },
+                "name": "process_emails_for_deadlines_and_schedule"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    },
+    {
+      "eval_id": "follow-up-coordination",
+      "conversation": [
+        {
+          "invocation_id": "cross-agent-4",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Reply to the latest email from alice@company.com saying I'll review the document, and schedule a follow-up meeting for next week"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "✅ **Email Reply & Follow-up Meeting Coordinated!**\n\n📧 **Email Reply Sent:**\n📧 To: alice@company.com\n📋 Subject: Re: Document Review Request\n\n**Reply Content:**\n\"Hi Alice,\n\nThank you for sending the document. I'll review it and provide feedback.\n\nI've also scheduled a follow-up meeting for us next week to discuss the details in person.\n\nBest regards\"\n\n📅 **Follow-up Meeting Scheduled:**\n🎯 Title: Follow-up Meeting with Alice\n📅 Date: Tuesday, January 30, 2024\n⏰ Time: 3:00 PM - 4:00 PM\n👤 Attendee: alice@company.com\n📍 Meeting Type: In-person discussion\n\n🔄 **Coordination Complete:**\n1. ✅ Email reply sent confirming document review\n2. ✅ Follow-up meeting created in calendar\n3. ✅ Alice will receive calendar invitation\n4. ⏳ Document review pending (add to your task list?)\n\n📝 **Next Steps:**\n- Review the document before the meeting\n- Prepare feedback and discussion points\n- Meeting reminder set for 15 minutes before\n\nWould you like me to:\n- Add a reminder to review the document?\n- Create a preparation checklist for the meeting?\n- Block time earlier in the week for document review?"
+              }
+            ],
+            "role": "model"
+          },
+          "intermediate_data": {
+            "tool_uses": [
+              {
+                "id": null,
+                "args": {
+                  "email_reference": "alice@company.com",
+                  "reply_message": "Thank you for sending the document. I'll review it and provide feedback. I've also scheduled a follow-up meeting for us next week to discuss the details in person.",
+                  "schedule_follow_up": true
+                },
+                "name": "coordinate_email_reply_and_meeting"
+              }
+            ],
+            "intermediate_responses": []
+          },
+          "creation_timestamp": 1747946425.614513
+        }
+      ],
+      "session_input": {
+        "app_name": "oprina",
+        "user_id": "test_user",
+        "state": {}
+      },
+      "creation_timestamp": 1747946425.61458
+    }
+  ],
+  "creation_timestamp": 1747946425.614588
+} 

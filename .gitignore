@@ -343,7 +343,7 @@ Dockerfile.prod
 checkpoints/
 
 # Data files
-data/
+
 datasets/
 *.csv
 # *.json
