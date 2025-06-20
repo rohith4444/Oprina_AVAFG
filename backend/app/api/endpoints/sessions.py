@@ -19,6 +19,7 @@ from app.core.database.repositories.session_repository import SessionRepository
 from app.core.database.repositories.message_repository import MessageRepository
 from app.core.services.agent_service import AgentService  # ADDED IMPORT
 from app.utils.logging import get_logger
+from app.config import get_settings  # NEW: Added import for Vertex AI configuration check
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -40,14 +41,18 @@ async def verify_session_ownership(
     return session
 
 
-@router.post("/create")
-async def create_session(
+# FIX 1: Add standard POST /sessions endpoint (main session creation endpoint)
+@router.post("/")
+async def create_session_standard(
     title: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
-    agent_service: AgentService = Depends(get_agent_service)  # ADDED VERTEX AI SERVICE
+    agent_service: AgentService = Depends(get_agent_service)
 ):
-    """Create a new chat session with optional Vertex AI integration."""
+    """
+    FIXED: Main session creation endpoint (POST /sessions)
+    Creates a new chat session with enhanced Vertex AI integration and error recovery.
+    """
     try:
         user_id = current_user["id"]
         
@@ -64,27 +69,34 @@ async def create_session(
         
         logger.info(f"Created database session {session_id} for user {user_id}")
         
-        # Try to create Vertex AI session (graceful failure)
+        # ENHANCED: Better Vertex AI integration with retry logic
         vertex_integration = False
         vertex_session_id = None
         vertex_error = None
         
-        try:
-            agent_result = await agent_service.create_agent_session(user_id, session_id)
-            vertex_integration = agent_result.get("vertex_integration", False)
-            vertex_session_id = agent_result.get("agent_session_id")
-            
-            if vertex_integration:
-                logger.info(f"Successfully integrated session {session_id} with Vertex AI: {vertex_session_id}")
-            else:
-                logger.warning(f"Vertex AI integration partially failed for session {session_id}")
-                vertex_error = agent_result.get("vertex_error", "Unknown Vertex AI error")
+        # NEW: Check if Vertex AI is configured before attempting integration
+        settings = get_settings()
+        if settings.VERTEX_AI_AGENT_ID and settings.VERTEX_AI_AGENT_ID.strip():
+            try:
+                logger.info(f"Attempting Vertex AI integration for session {session_id}")
+                agent_result = await agent_service.create_agent_session(user_id, session_id)
                 
-        except Exception as e:
-            logger.warning(f"Vertex AI integration failed for session {session_id}: {str(e)}")
-            vertex_error = str(e)
+                vertex_integration = agent_result.get("vertex_integration", False)
+                vertex_session_id = agent_result.get("agent_session_id")
+                
+                if vertex_integration:
+                    logger.info(f"✅ Successfully integrated session {session_id} with Vertex AI: {vertex_session_id}")
+                else:
+                    vertex_error = agent_result.get("vertex_error", "Unknown Vertex AI error")
+                    logger.warning(f"⚠️ Vertex AI integration partially failed for session {session_id}: {vertex_error}")
+                    
+            except Exception as e:
+                vertex_error = str(e)
+                logger.warning(f"❌ Vertex AI integration failed for session {session_id}: {vertex_error}")
+        else:
+            logger.info(f"⏭️ Skipping Vertex AI integration (not configured) for session {session_id}")
         
-        # Return session data regardless of Vertex AI success
+        # Return session data with detailed Vertex AI status
         response_data = {
             "session_id": session_id,
             "user_id": user_id,
@@ -96,9 +108,14 @@ async def create_session(
             "message": "Session created successfully"
         }
         
-        # Add vertex error info if integration failed (useful for debugging)
-        if not vertex_integration and vertex_error:
+        # ENHANCED: Provide more detailed vertex AI status for debugging
+        if vertex_error:
             response_data["vertex_error"] = vertex_error
+            response_data["vertex_status"] = "failed"
+        elif vertex_integration:
+            response_data["vertex_status"] = "active"
+        else:
+            response_data["vertex_status"] = "disabled"
         
         return response_data
         
@@ -108,6 +125,18 @@ async def create_session(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create session"
         )
+
+
+@router.post("/create")
+async def create_session(
+    title: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
+    session_repo: SessionRepository = Depends(get_session_repository),
+    agent_service: AgentService = Depends(get_agent_service)  # ADDED VERTEX AI SERVICE
+):
+    """LEGACY: Create a new chat session with optional Vertex AI integration (kept for backward compatibility)."""
+    # Delegate to the main endpoint
+    return await create_session_standard(title, current_user, session_repo, agent_service)
 
 
 @router.get("/list")

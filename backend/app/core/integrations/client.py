@@ -76,8 +76,18 @@ class VertexAgentClient:
             await self.initialize()
         
         try:
+            # ENHANCED: Better error handling and logging for Vertex AI session creation
+            logger.info(f"🚀 Creating Vertex AI session for user {user_id} with agent {self._agent_id}")
+            
             # Create the Vertex AI session
             session_response = self._agent_app.create_session(user_id=user_id)
+            
+            # ENHANCED: Validate session response
+            if not session_response or "id" not in session_response:
+                raise ValueError(f"Invalid session response from Vertex AI: {session_response}")
+            
+            session_id = session_response["id"]
+            logger.info(f"✅ Vertex AI session created successfully: {session_id}")
             
             # Set initial session state with user context
             initial_state = {
@@ -93,26 +103,31 @@ class VertexAgentClient:
             # If update_session_state doesn't exist, the session may already have the user_id accessible
             try:
                 await self._agent_app.update_session_state(
-                    session_id=session_response["id"],
+                    session_id=session_id,
                     state_updates=initial_state
                 )
+                logger.info(f"✅ Session state updated for {session_id}")
             except AttributeError:
                 # If update_session_state method doesn't exist, log and continue
                 # The user_id should still be accessible via session.user_id
-                logger.info("Session state update method not available, relying on session.user_id")
+                logger.info("⏭️ Session state update method not available, relying on session.user_id")
+            except Exception as state_error:
+                # Log state update error but don't fail session creation
+                logger.warning(f"⚠️ Failed to update session state for {session_id}: {state_error}")
             
             session_data = {
-                "vertex_session_id": session_response["id"],
+                "vertex_session_id": session_id,
                 "user_id": user_id,
                 "status": "active"
             }
             
-            logger.info(f"Created agent session {session_response['id']} for user {user_id}")
+            logger.info(f"✅ Created agent session {session_id} for user {user_id}")
             return session_data
             
         except Exception as e:
-            logger.error(f"Failed to create agent session for user {user_id}: {e}")
-
+            logger.error(f"❌ Failed to create agent session for user {user_id}: {e}")
+            # FIXED: Added missing raise statement
+            raise
     
     async def send_message(
         self, 
