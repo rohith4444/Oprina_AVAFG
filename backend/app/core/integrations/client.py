@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, AsyncGenerator
 from vertexai import agent_engines
 from google import genai
 import structlog
+from datetime import datetime, timezone
 
 from app.config import get_settings
 
@@ -89,13 +90,27 @@ class VertexAgentClient:
             session_id = session_response["id"]
             logger.info(f"✅ Vertex AI session created successfully: {session_id}")
             
-            # Set initial session state with user context
+            # NEW: Get current date/time information to fix incorrect date responses
+            now = datetime.now(timezone.utc)
+            local_now = datetime.now()
+            
+            # Set initial session state with user context AND CURRENT DATE/TIME
             initial_state = {
                 "user:id": user_id,
                 "user:backend_url": self.settings.BACKEND_API_URL or "http://localhost:8000",
                 "user:session_type": "multi_user",
                 "gmail:connected": False,
                 "calendar:connected": False,
+                # FIXED: Add current date/time context to prevent incorrect dates
+                "current:utc_datetime": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "current:local_datetime": local_now.strftime("%Y-%m-%d %H:%M:%S"),
+                "current:date": local_now.strftime("%Y-%m-%d"),
+                "current:time": local_now.strftime("%H:%M:%S"),
+                "current:day_of_week": local_now.strftime("%A"),
+                "current:month": local_now.strftime("%B"),
+                "current:year": str(local_now.year),
+                "current:timezone": str(local_now.astimezone().tzinfo),
+                "system:date_context": f"Today is {local_now.strftime('%A, %B %d, %Y')} at {local_now.strftime('%I:%M %p')}. Always use this current date/time information when responding to date/time questions."
             }
             
             # Update the session with initial state
@@ -106,11 +121,12 @@ class VertexAgentClient:
                     session_id=session_id,
                     state_updates=initial_state
                 )
-                logger.info(f"✅ Session state updated for {session_id}")
+                logger.info(f"✅ Session state updated for {session_id} with current date/time: {local_now.strftime('%A, %B %d, %Y')}")
             except AttributeError:
                 # If update_session_state method doesn't exist, log and continue
                 # The user_id should still be accessible via session.user_id
                 logger.info("⏭️ Session state update method not available, relying on session.user_id")
+                logger.warning("⚠️ Cannot inject current date/time context - agent may give incorrect dates")
             except Exception as state_error:
                 # Log state update error but don't fail session creation
                 logger.warning(f"⚠️ Failed to update session state for {session_id}: {state_error}")
@@ -140,13 +156,26 @@ class VertexAgentClient:
             await self.initialize()
         
         try:
+            # NEW: Inject current date/time context with each message to ensure accuracy
+            now = datetime.now(timezone.utc)
+            local_now = datetime.now()
+            
+            # Prefix message with current date/time context
+            contextualized_message = f"""[SYSTEM CONTEXT - Current Date/Time: {local_now.strftime('%A, %B %d, %Y at %I:%M %p')}]
+
+{message}
+
+[Use the current date/time provided above when answering any date or time-related questions.]"""
+            
+            logger.info(f"📨 Sending message to Vertex AI with current date context: {local_now.strftime('%A, %B %d, %Y')}")
+            
             # Send message and get response
             response_events = []
             
             for event in self._agent_app.stream_query(
                 user_id=user_id,
                 session_id=session_id,
-                message=message
+                message=contextualized_message  # Use contextualized message with current date/time
             ):
                 response_events.append(event)
             
@@ -177,10 +206,23 @@ class VertexAgentClient:
             await self.initialize()
         
         try:
+            # NEW: Inject current date/time context with each streaming message
+            now = datetime.now(timezone.utc)
+            local_now = datetime.now()
+            
+            # Prefix message with current date/time context
+            contextualized_message = f"""[SYSTEM CONTEXT - Current Date/Time: {local_now.strftime('%A, %B %d, %Y at %I:%M %p')}]
+
+{message}
+
+[Use the current date/time provided above when answering any date or time-related questions.]"""
+            
+            logger.info(f"🌊 Streaming message to Vertex AI with current date context: {local_now.strftime('%A, %B %d, %Y')}")
+            
             for event in self._agent_app.stream_query(
                 user_id=user_id,
                 session_id=session_id,
-                message=message
+                message=contextualized_message  # Use contextualized message with current date/time
             ):
                 yield {
                     "event": event,

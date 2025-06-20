@@ -176,14 +176,41 @@ def calendar_list_events(
         if not service:
             return "Calendar not set up. Please run: python setup_calendar.py"
         
-        # Set time range (your logic)
+        # Set time range (FIXED: Proper timezone handling)
         if not start_date or start_date.strip() == "":
-            start_time = datetime.utcnow()
-            start_date_display = "today"
+            # FIXED: Use timezone-aware current time instead of UTC
+            import pytz
+            try:
+                # Try to get local timezone, fallback to PST
+                import time
+                local_tz_name = time.tzname[0] if time.tzname else "America/Los_Angeles"
+                tz_mappings = {
+                    "PST": "America/Los_Angeles", "PDT": "America/Los_Angeles", 
+                    "EST": "America/New_York", "EDT": "America/New_York",
+                    "CST": "America/Chicago", "CDT": "America/Chicago",
+                    "MST": "America/Denver", "MDT": "America/Denver",
+                }
+                timezone_name = tz_mappings.get(local_tz_name, "America/Los_Angeles")
+                local_tz = pytz.timezone(timezone_name)
+                
+                # Get current time in user's local timezone
+                start_time = datetime.now(local_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+                start_date_display = "today"
+            except Exception:
+                # Fallback to UTC if timezone detection fails
+                start_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                start_date_display = "today"
         else:
             try:
-                start_time = datetime.strptime(start_date, "%Y-%m-%d")
-                start_date_display = start_time.strftime('%B %d, %Y')
+                # FIXED: Parse date and make it timezone-aware
+                naive_start = datetime.strptime(start_date, "%Y-%m-%d")
+                start_date_display = naive_start.strftime('%B %d, %Y')
+                
+                # Convert to timezone-aware datetime at start of day
+                import pytz
+                local_tz = pytz.timezone("America/Los_Angeles")  # Default to PST
+                start_time = local_tz.localize(naive_start.replace(hour=0, minute=0, second=0, microsecond=0))
+                
             except ValueError:
                 return f"Invalid date format: {start_date}. Please use YYYY-MM-DD format."
         
@@ -445,7 +472,7 @@ def calendar_delete_event(
 # =============================================================================
 
 def _parse_datetime(datetime_str: str) -> Optional[datetime]:
-    """Parse a datetime string into a datetime object (your logic)."""
+    """Parse a datetime string into a datetime object with proper timezone handling."""
     formats = [
         "%Y-%m-%dT%H:%M:%S",
         "%Y-%m-%d %H:%M",
@@ -459,9 +486,48 @@ def _parse_datetime(datetime_str: str) -> Optional[datetime]:
         "%B %d, %Y",
     ]
     
+    # FIXED: Try to parse with timezone awareness
     for fmt in formats:
         try:
-            return datetime.strptime(datetime_str, fmt)
+            parsed_dt = datetime.strptime(datetime_str, fmt)
+            
+            # NEW: If the parsed datetime is naive (no timezone), assume local timezone
+            if parsed_dt.tzinfo is None:
+                # Import timezone handling
+                from zoneinfo import ZoneInfo
+                import pytz
+                
+                # Try to get the user's timezone from system, default to PST
+                try:
+                    # Try to detect local timezone
+                    import time
+                    local_tz_name = time.tzname[0] if time.tzname else "America/Los_Angeles"
+                    
+                    # Common timezone mappings
+                    tz_mappings = {
+                        "PST": "America/Los_Angeles",
+                        "PDT": "America/Los_Angeles", 
+                        "EST": "America/New_York",
+                        "EDT": "America/New_York",
+                        "CST": "America/Chicago",
+                        "CDT": "America/Chicago",
+                        "MST": "America/Denver",
+                        "MDT": "America/Denver",
+                    }
+                    
+                    timezone_name = tz_mappings.get(local_tz_name, "America/Los_Angeles")
+                    local_tz = pytz.timezone(timezone_name)
+                    
+                    # FIXED: Localize the naive datetime to the local timezone
+                    parsed_dt = local_tz.localize(parsed_dt)
+                    
+                except Exception as tz_error:
+                    # Fallback to PST if timezone detection fails
+                    pst = pytz.timezone('America/Los_Angeles')
+                    parsed_dt = pst.localize(parsed_dt)
+            
+            return parsed_dt
+            
         except ValueError:
             continue
     
