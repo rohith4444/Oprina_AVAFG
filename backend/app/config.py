@@ -14,13 +14,18 @@ def get_env_file():
     if os.getenv("ENVIRONMENT") == "production":
         return None  # Use environment variables directly
     
-    # For local development, prefer .env-local
+    # For local development, look for .env-local
+    # Check parent directory first (when running from backend/)
+    parent_env_local = os.path.join("..", ".env-local")
+    if os.path.exists(parent_env_local):
+        return parent_env_local
+    
+    # Check current directory (when running from root)
     if os.path.exists(".env-local"):
         return ".env-local"
     
-    # Fallback to standard .env
-    return ".env"
-
+    # No valid environment file found
+    return None
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -43,7 +48,7 @@ class Settings(BaseSettings):
     # Supabase Configuration
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
-    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
     
     # Vertex AI Agent settings
@@ -150,6 +155,8 @@ def get_settings() -> Settings:
         _settings = Settings()
         # Optional: Print which config is being used
         env_file = get_env_file()
-        env_source = env_file if env_file else "Cloud Run environment variables"
-        print(f"🔧 Loading config from: {env_source}")
+        if env_file:
+            print(f"🔧 Loading config from: {env_file}")
+        else:
+            print(f"🔧 Loading config from: environment variables (production)")
     return _settings
