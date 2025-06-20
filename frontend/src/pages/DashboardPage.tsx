@@ -60,6 +60,10 @@ const DashboardPage: React.FC = () => {
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
+  const hasControllableAudio = currentAudio !== null;
+  const showAudioControls = useStaticAvatar || hasControllableAudio; // Always show in static mode
+  
   
   // Refs for both avatar types
   const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
@@ -357,11 +361,13 @@ const DashboardPage: React.FC = () => {
       audio.onplay = () => {
         console.log('🔊 Audio response started playing');
         setIsSpeaking(true);
+        setIsAudioPaused(false); // NEW LINE
       };
-      
+
       audio.onended = () => {
         console.log('🔇 Audio response finished playing');
         setIsSpeaking(false);
+        setIsAudioPaused(false); // NEW LINE
         setCurrentAudio(null);
         URL.revokeObjectURL(audioUrl); // Clean up
       };
@@ -369,16 +375,79 @@ const DashboardPage: React.FC = () => {
       audio.onerror = (error) => {
         console.error('Audio playback error:', error);
         setIsSpeaking(false);
+        setIsAudioPaused(false); // NEW LINE
         setCurrentAudio(null);
         URL.revokeObjectURL(audioUrl); // Clean up
       };
-      
+
+      audio.onpause = () => {
+        if (currentAudio && currentAudio.currentTime > 0 && !currentAudio.ended) {
+          setIsAudioPaused(true);
+          console.log('⏸️ Audio paused');
+        }
+      };
+            
       await audio.play();
       
     } catch (error) {
       console.error('Failed to play audio response:', error);
       setIsSpeaking(false);
       setCurrentAudio(null);
+    }
+  };
+
+  // REPLACE the basic functions with these enhanced versions:
+
+  const pauseAudioResponse = () => {
+    try {
+      if (currentAudio && !currentAudio.paused) {
+        currentAudio.pause();
+        setIsAudioPaused(true);
+        console.log('⏸️ Audio paused');
+      }
+    } catch (error) {
+      console.error('Error pausing audio:', error);
+      setIsAudioPaused(false);
+    }
+  };
+
+  const resumeAudioResponse = () => {
+    try {
+      if (currentAudio && currentAudio.paused) {
+        currentAudio.play();
+        setIsAudioPaused(false);
+        console.log('▶️ Audio resumed');
+      }
+    } catch (error) {
+      console.error('Error resuming audio:', error);
+      setIsAudioPaused(false);
+    }
+  };
+
+  const stopAudioResponse = () => {
+    try {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        setIsSpeaking(false);
+        setIsAudioPaused(false);
+        setCurrentAudio(null);
+        console.log('⏹️ Audio stopped');
+      }
+    } catch (error) {
+      console.error('Error stopping audio:', error);
+      // Still reset states even if error occurs
+      setIsSpeaking(false);
+      setIsAudioPaused(false);
+      setCurrentAudio(null);
+    }
+  };
+
+  const toggleAudioPause = () => {
+    if (isAudioPaused) {
+      resumeAudioResponse();
+    } else {
+      pauseAudioResponse();
     }
   };
 
@@ -540,7 +609,7 @@ const DashboardPage: React.FC = () => {
       processRecordedAudio(audioChunks);
     }
   }, [audioChunks, isRecording]);
-
+ 
   // Cleanup audio resources on unmount
   useEffect(() => {
     return () => {
@@ -549,6 +618,7 @@ const DashboardPage: React.FC = () => {
       }
       if (currentAudio) {
         currentAudio.pause();
+        setIsAudioPaused(false); // NEW LINE
       }
     };
   }, [audioStream, currentAudio]);
@@ -836,6 +906,14 @@ const DashboardPage: React.FC = () => {
   }, []);
 
   const handleSelectSession = useCallback((sessionId: string) => {
+
+    if (currentAudio) {
+      currentAudio.pause();
+      setCurrentAudio(null);
+    }
+    setIsAudioPaused(false);
+    setIsSpeaking(false);
+
     setActiveSessionId(sessionId);
     console.log('💬 Session selected:', sessionId);
   }, []);
@@ -883,6 +961,13 @@ const DashboardPage: React.FC = () => {
 
   // UPDATED: Avatar mode toggle with complete session lifecycle
   const toggleAvatarMode = async () => {
+
+    if (currentAudio) {
+      currentAudio.pause();
+      setCurrentAudio(null);
+    }
+    setIsAudioPaused(false);
+    setIsSpeaking(false);
     // Clear any previous messages
     setQuotaMessage(null);
     setLastError(null);
@@ -1138,7 +1223,31 @@ const DashboardPage: React.FC = () => {
                 >
                   {isMuted ? '🔇' : '🔊'}
                 </button>
+
+                {/* NEW: Conditional Audio Control Buttons */}
+                {showAudioControls && (
+                  <>
+                    <button
+                      className="audio-control-button pause-button"
+                      onClick={toggleAudioPause}
+                      disabled={!currentAudio || !isSpeaking}
+                      aria-label={isAudioPaused ? 'Resume audio' : 'Pause audio'}
+                    >
+                      {isAudioPaused ? '▶️' : '⏸️'}
+                    </button>
+                    
+                    <button
+                      className="audio-control-button stop-button"
+                      onClick={stopAudioResponse}
+                      disabled={!currentAudio || !isSpeaking}
+                      aria-label="Stop audio"
+                    >
+                      ⏹️
+                    </button>
+                  </>
+                )}
               </div>
+               
 
               {/* Recording Feedback */}
               {(isRecording || isProcessingVoice || recordingError) && (
