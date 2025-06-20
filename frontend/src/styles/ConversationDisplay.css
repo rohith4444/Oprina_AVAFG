@@ -1,4 +1,4 @@
-/* ConversationDisplay.css - Optimized for 50% layout using existing design system */
+/* Updated ConversationDisplay.css - Input section removed */
 
 .conversation-display {
   background-color: var(--background);
@@ -97,6 +97,35 @@
   font-size: 0.875rem;
   color: var(--text);
   opacity: 0.8;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+/* Instruction hint for voice interaction */
+.instruction-hint {
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+  border: 1px solid #bfdbfe;
+}
+
+/* Loading state */
+.loading-messages {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.loading-content p {
+  font-size: 1rem;
+  color: var(--text);
+  opacity: 0.7;
+  margin: 0;
 }
 
 /* Messages */
@@ -172,134 +201,22 @@
   color: var(--text);
 }
 
-/* Input Area */
-.conversation-input {
-  display: flex;
-  padding: 1.5rem;
+/* Voice interaction hint */
+.voice-hint {
+  padding: 1rem;
+  text-align: center;
   border-top: 1px solid var(--border);
-  gap: 0.75rem;
   background-color: var(--background-alt);
-  align-items: center;
 }
 
-.text-input {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 1.5rem;
-  outline: none;
+.voice-hint p {
   font-size: 0.875rem;
-  background-color: var(--background);
   color: var(--text);
-  transition: all 0.2s ease;
+  opacity: 0.7;
+  margin: 0;
 }
 
-.text-input:focus {
-  border-color: var(--primary-blue);
-  box-shadow: 0 0 0 3px rgba(91, 124, 255, 0.1);
-}
-
-.text-input::placeholder {
-  color: var(--text);
-  opacity: 0.5;
-}
-
-.send-button {
-  background: linear-gradient(135deg, var(--primary-blue), var(--primary-teal));
-  color: white;
-  border: none;
-  border-radius: 1.5rem;
-  padding: 0.75rem 1.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.send-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(91, 124, 255, 0.3);
-}
-
-.send-button:active {
-  transform: translateY(0);
-}
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .conversation-header {
-    padding: 1rem;
-  }
-  
-  .messages-container {
-    padding: 1rem;
-  }
-  
-  .conversation-input {
-    padding: 1rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .message {
-    max-width: 90%;
-    padding: 0.75rem;
-  }
-  
-  .message-text {
-    font-size: 0.8125rem;
-  }
-  
-  .conversation-header {
-    flex-direction: column;
-    gap: 0.5rem;
-    text-align: center;
-  }
-  
-  .conversation-input {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  
-  .text-input {
-    width: 100%;
-  }
-  
-  .send-button {
-    width: 100%;
-    justify-self: stretch;
-  }
-}
-
-@media (max-width: 480px) {
-  .conversation-header {
-    padding: 0.75rem;
-  }
-  
-  .messages-container {
-    padding: 0.75rem;
-    gap: 0.75rem;
-  }
-  
-  .conversation-input {
-    padding: 0.75rem;
-  }
-  
-  .message {
-    padding: 0.625rem;
-  }
-  
-  .message-text {
-    font-size: 0.75rem;
-  }
-  
-  .conversation-title {
-    font-size: 1rem;
-  }
-}
-
-/* Animation */
+/* Animation for new messages */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -310,3 +227,10 @@
     transform: translateY(0);
   }
 }
+
+/* Remove input section styles completely */
+/* These styles have been removed:
+- .conversation-input
+- .text-input  
+- .send-button
+*/

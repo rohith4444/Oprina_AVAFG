@@ -215,11 +215,6 @@ const StaticAvatar = forwardRef<StaticAvatarRef, StaticAvatarProps>(({
             : '⏳ Loading'
           }
         </div>
-        {avatarData && (
-          <div className="avatar-info">
-            <small>{avatarData.avatar_name}</small>
-          </div>
-        )}
       </div>
     </div>
   );

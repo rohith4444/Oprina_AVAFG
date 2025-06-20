@@ -23,6 +23,7 @@ from app.api.endpoints import sessions
 from app.api.endpoints import oauth
 from app.api.endpoints import voice
 from app.api.endpoints import avatar  # Added avatar endpoints
+from app.api.endpoints import test_supabase
 
 # Import background service
 from app.core.services.background_tasks import (
@@ -90,6 +91,7 @@ app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"]
 app.include_router(oauth.router, prefix="/api/v1/oauth", tags=["oauth"])
 app.include_router(voice.router, prefix="/api/v1/voice", tags=["voice"])
 app.include_router(avatar.router, prefix="/api/v1/avatar", tags=["avatar"])  # Added avatar router
+app.include_router(test_supabase.router, prefix="/api/v1/test", tags=["testing"])
 
 # Root endpoint
 @app.get("/")
@@ -163,6 +165,7 @@ async def root():
                 "POST /api/v1/avatar/sessions/status",
                 "GET /api/v1/avatar/sessions",
                 "POST /api/v1/avatar/admin/cleanup",
+                "POST /api/v1/avatar/token",
                 "GET /api/v1/avatar/health"
             ]
         }
@@ -196,11 +199,14 @@ async def startup_event():
     logger.info("  👤 Users: GET /api/v1/user/me")
     logger.info("  👤 Users: PUT /api/v1/user/me")
     logger.info("  👤 Users: POST /api/v1/user/change-password")
-    logger.info("  💬 Sessions: POST /api/v1/sessions")
-    logger.info("  💬 Sessions: GET /api/v1/sessions")
+    logger.info("  💬 Sessions: POST /api/v1/sessions/create")
+    logger.info("  💬 Sessions: GET /api/v1/sessions/list")
     logger.info("  💬 Sessions: GET /api/v1/sessions/{id}")
     logger.info("  💬 Sessions: DELETE /api/v1/sessions/{id}")
     logger.info("  💬 Sessions: GET /api/v1/sessions/{id}/messages")
+    logger.info("  💬 Sessions: PATCH /api/v1/sessions/{id}")
+    logger.info("  💬 Sessions: POST /api/v1/sessions/{id}/end")
+    logger.info("  💬 Sessions: POST /api/v1/sessions/{id}/regenerate-title ")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/connect/{service}")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/google/login")
     logger.info("  🔗 OAuth: GET /api/v1/oauth/google/signup")
@@ -216,6 +222,7 @@ async def startup_event():
     logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/end")
     logger.info("  🤖 Avatar: POST /api/v1/avatar/sessions/status")
     logger.info("  🤖 Avatar: GET /api/v1/avatar/sessions")
+    logger.info("  🤖 Avatar: POST /api/v1/avatar/token")
     logger.info("  🤖 Avatar: GET /api/v1/avatar/health")
     
     # Log OAuth configuration status

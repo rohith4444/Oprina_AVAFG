@@ -69,7 +69,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .new-chat-button:hover {
@@ -86,6 +86,7 @@
   text-transform: uppercase;
   color: var(--text);
   opacity: 0.7;
+  margin-top: 1.5rem;        /* Add top margin for spacing */
   margin-bottom: 0.75rem;
   padding: 0 0.5rem;
 }
@@ -237,8 +238,65 @@
   justify-content: center;
 }
 
-.sidebar.collapsed .connect-apps-button span {
+/* Fix New Chat Button */
+.sidebar.collapsed .new-chat-button {
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+}
+
+.sidebar.collapsed .new-chat-button svg {
+  width: 20px !important;
+  height: 20px !important;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .new-chat-button span {
   display: none;
+}
+
+/* Fix Connect Apps Button */
+.sidebar.collapsed .connect-apps-button {
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0.75rem;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex !important;
+}
+
+.sidebar.collapsed .connect-apps-button svg {
+  width: 18px !important;
+  height: 18px !important;
+  flex-shrink: 0;
+}
+
+/* General icon sizing for collapsed sidebar */
+.sidebar.collapsed button svg {
+  flex-shrink: 0;
+}
+
+
+/* Ensure the Button component itself centers content when collapsed */
+.sidebar.collapsed .connect-apps-button .button-content {
+  justify-content: center;
+  align-items: center;
+}
+
+/* If your Button component has internal wrapper, target it */
+.sidebar.collapsed .connect-apps-button > * {
+  justify-content: center;
+  align-items: center;
+}
+
+
+/* Make sure conversation icons stay visible too */
+.sidebar.collapsed .conversation-icon {
+  width: 16px !important;
+  height: 16px !important;
 }
 
 @media (max-width: 768px) {
@@ -273,4 +331,104 @@
 
 .sidebar.collapsed .collapse-button {
   right: -14px;
+}
+
+.sidebar.collapsed button {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+.sidebar.collapsed button * {
+  margin: 0 auto;
+}
+
+/* Session title editing styles */
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.edit-session-button {
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  opacity: 0;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-item:hover .edit-session-button {
+  opacity: 0.6;
+}
+
+.edit-session-button:hover {
+  opacity: 1 !important;
+  background-color: var(--background-alt);
+}
+
+.session-title-input {
+  background: var(--background);
+  border: 1px solid var(--primary-blue);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+}
+
+.session-title-input:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 2px rgba(91, 124, 255, 0.2);
+}
+
+.session-title-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Update existing conversation-preview to flex for proper alignment */
+.conversation-preview {
+  flex: 1;
+  font-size: 0.875rem;
+  min-width: 0; /* Allow flex shrinking */
+}
+
+/* Update conversation-details to handle new layout */
+.conversation-details {
+  flex: 1;
+  min-width: 0; /* Allow flex shrinking */
+  overflow: hidden;
+}
+
+/* Ensure conversation-content takes full width */
+.conversation-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0; /* Allow flex shrinking */
+}
+
+/* Update conversation-item to handle new action buttons layout */
+.conversation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Distribute space between content and actions */
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-bottom: 0.25rem;
+  color: var(--text);
 }

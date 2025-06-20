@@ -207,3 +207,42 @@ class EndSessionResponse(BaseModel):
                 "ended_at": "2024-01-15T11:00:00Z"
             }
         }
+
+class UpdateSessionResponse(BaseModel):
+    """Response model for session title update."""
+    message: str = Field(..., description="Success message")
+    session_id: str = Field(..., description="Updated session ID")
+    title: str = Field(..., description="New session title")
+    updated_at: str = Field(..., description="Update timestamp")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "message": "Session title updated successfully",
+                "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "title": "Gmail Integration",
+                "updated_at": "2024-01-15T11:30:00Z"
+            }
+        }
+
+class RegenerateTitleResponse(BaseModel):
+    """Response model for session title regeneration."""
+    
+    message: str = Field(..., description="Success message")
+    session_id: str = Field(..., description="Session ID")
+    title: str = Field(..., description="Newly generated title")
+    previous_title: str = Field(..., description="Previous session title")
+    updated_at: str = Field(..., description="Update timestamp")
+    generation_source: str = Field(..., description="Source used for title generation")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "message": "Session title regenerated successfully",
+                "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "title": "organize Gmail inbox",
+                "previous_title": "New Chat",
+                "updated_at": "2024-01-15T11:30:00Z",
+                "generation_source": "first_user_message"
+            }
+        }

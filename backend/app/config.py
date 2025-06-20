@@ -1,36 +1,62 @@
 """
 Configuration settings for Oprina API.
+Simple approach with multiple env files.
 """
 
+import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings
 
 
+def get_env_file():
+    """Determine which environment file to use."""
+    # Check if we're in production (set by Cloud Run or manually)
+    if os.getenv("ENVIRONMENT") == "production":
+        return None  # Use environment variables directly
+    
+    # For local development, look for .env-local
+    # Check parent directory first (when running from backend/)
+    parent_env_local = os.path.join("..", ".env-local")
+    if os.path.exists(parent_env_local):
+        return parent_env_local
+    
+    # Check current directory (when running from root)
+    if os.path.exists(".env-local"):
+        return ".env-local"
+    
+    # No valid environment file found
+    return None
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # Application settings
+    # Application settings (configurable for production)
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    SECRET_KEY: str = "your-secret-key-change-in-production"
     
-    # Server settings
+    # ... (rest of your settings remain the same) ...
+    
+    # All your existing settings here
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    
-    # API settings
     API_TITLE: str = "Oprina API"
     API_VERSION: str = "1.0.0"
     API_DESCRIPTION: str = "AI Agent API with HeyGen Avatar Integration"
     ALLOWED_HOSTS: List[str] = ["*"]
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost:3001"
     
-    # Database settings (Supabase)
-    SUPABASE_URL: Optional[str] = None
-    SUPABASE_SERVICE_KEY: Optional[str] = None
+    # Supabase Configuration
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
+    SUPABASE_JWT_SECRET: str = ""
     
     # Vertex AI Agent settings
     VERTEX_AI_AGENT_ID: str = ""
+    
+    # Google Cloud settings
+    GOOGLE_CLOUD_PROJECT: str = ""
+    GOOGLE_CLOUD_LOCATION: str = "us-central1"
     
     # HeyGen settings
     HEYGEN_API_KEY: str = ""
@@ -43,29 +69,27 @@ class Settings(BaseSettings):
     
     # OAuth Scopes
     GOOGLE_GMAIL_SCOPES: str = " ".join([
-        "openid",
-        "email", 
-        "profile",
+        "openid", "email", "profile",
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.send",
         "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/gmail.compose",
         "https://www.googleapis.com/auth/gmail.labels",
-        "https://www.googleapis.com/auth/gmail.metadata"
+        "https://www.googleapis.com/auth/gmail.metadata",
     ])
 
     GOOGLE_CALENDAR_SCOPES: str = " ".join([
-        "openid",
-        "email",
-        "profile", 
+        "openid", "email", "profile", 
         "https://www.googleapis.com/auth/calendar",
-        "https://www.googleapis.com/auth/calendar.settings.readonly"
+        "https://www.googleapis.com/auth/calendar.settings.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
     ])
 
     GOOGLE_AUTH_SCOPES: str = "openid email profile"
-        
-    # Frontend URLs (for redirects after OAuth)
-    FRONTEND_URL: str = "http://localhost:3000"
+    
+    # URLs
+    FRONTEND_URL: str = "http://localhost:5173"
+    BACKEND_API_URL: str = "http://localhost:8000"
     
     # Voice Services Configuration
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
@@ -78,13 +102,11 @@ class Settings(BaseSettings):
     VOICE_DEFAULT_SPEAKING_RATE: float = 1.0
     VOICE_DEFAULT_AUDIO_FORMAT: str = "mp3"
     
-    # JWT settings
-    JWT_SECRET_KEY: str = "jwt-secret-key-change-in-production"
+    # Security settings
+    JWT_SECRET_KEY: str = "dev-jwt-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
-    
-    # Admin settings
-    ADMIN_TOKEN: str = "admin-token-change-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ADMIN_TOKEN: str = "dev-admin-token-change-in-production"
     
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -93,19 +115,20 @@ class Settings(BaseSettings):
     ENABLE_BACKGROUND_TASKS: bool = True
     TOKEN_REFRESH_INTERVAL_MINUTES: int = 30
     CLEANUP_INTERVAL_HOURS: int = 6
-
-    BACKEND_API_URL: str = "http://localhost:8000"  # Your backend URL
-    INTERNAL_API_KEY: str = "your-internal-api-key"  # Your internal API key
     
     # Logging
     LOG_LEVEL: str = "INFO"
     
-    # Properties that depend on other settings
+    # Computed properties
     @property
-    def FRONTEND_SETTINGS_URL(self) -> str:
-        return f"{self.FRONTEND_URL}/settings"
+    def CORS_ORIGINS_LIST(self) -> List[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
     @property
+    def FRONTEND_SETTINGS_URL(self) -> str:
+        return f"{self.FRONTEND_URL}/settings/connected-apps"
+
+    @property  
     def FRONTEND_DASHBOARD_URL(self) -> str:
         return f"{self.FRONTEND_URL}/dashboard"
     
@@ -115,21 +138,25 @@ class Settings(BaseSettings):
     
     @property
     def oauth_configured(self) -> bool:
-        """Check if OAuth is properly configured."""
         return bool(self.GOOGLE_CLIENT_ID and self.GOOGLE_CLIENT_SECRET)
     
     class Config:
-        env_file = ".env"
+        env_file = get_env_file()
         case_sensitive = True
         extra = "allow"
 
 
-# Simple singleton pattern
+# Singleton pattern
 _settings: Optional[Settings] = None
 
 def get_settings() -> Settings:
-    """Get settings - simple implementation."""
     global _settings
     if _settings is None:
         _settings = Settings()
+        # Optional: Print which config is being used
+        env_file = get_env_file()
+        if env_file:
+            print(f"🔧 Loading config from: {env_file}")
+        else:
+            print(f"🔧 Loading config from: environment variables (production)")
     return _settings

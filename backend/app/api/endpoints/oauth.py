@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import RedirectResponse
 from typing import Dict, Any, Optional
 
-from app.api.dependencies import get_current_user, get_user_repository
+from app.api.dependencies import get_current_user, get_user_repository, get_current_user_supabase, get_current_user_supabase_optional
 from app.core.database.repositories.user_repository import UserRepository
 from app.core.services.google_oauth_service import GoogleOAuthService
 from app.core.services.background_tasks import get_background_token_service
@@ -27,9 +27,11 @@ from app.api.models.responses.oauth import (
 from app.utils.logging import get_logger
 from app.utils.errors import OAuthError, ValidationError
 from app.utils.auth import AuthManager
+from app.config import get_settings
 
 logger = get_logger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 
 def get_oauth_service(
@@ -46,12 +48,12 @@ def get_oauth_service(
 @router.get("/connect/{service}")
 async def connect_service(
     service: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     oauth_service: GoogleOAuthService = Depends(get_oauth_service)
 ):
     """
     Get OAuth URL to connect a service (Gmail or Calendar).
-    Used by Settings page Connect buttons.
+    Returns the URL instead of redirecting directly.
     """
     try:
         if service not in ["gmail", "calendar"]:
@@ -70,8 +72,13 @@ async def connect_service(
         
         logger.info(f"Generated {service} connect URL for user {user_id}")
         
-        # Redirect user to Google OAuth
-        return RedirectResponse(url=auth_url, status_code=302)
+        # Return the URL instead of redirecting
+        return {
+            "auth_url": auth_url,
+            "service": service,
+            "user_id": user_id,
+            "state": state
+        }
         
     except Exception as e:
         logger.error(f"Failed to connect {service} for user {current_user.get('id')}: {str(e)}")
@@ -84,7 +91,7 @@ async def connect_service(
 @router.post("/disconnect", response_model=DisconnectResponse)
 async def disconnect_service(
     request: OAuthDisconnectRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     oauth_service: GoogleOAuthService = Depends(get_oauth_service)
 ):
     """Disconnect a service (remove stored tokens)."""
@@ -109,7 +116,7 @@ async def disconnect_service(
 
 @router.get("/status", response_model=ConnectionStatusResponse)
 async def get_connection_status(
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     oauth_service: GoogleOAuthService = Depends(get_oauth_service)
 ):
     """Get connection status for all services."""
@@ -189,54 +196,51 @@ async def oauth_callback(
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
     error_description: Optional[str] = Query(None),
-    oauth_service: GoogleOAuthService = Depends(get_oauth_service),
-    user_repository: UserRepository = Depends(get_user_repository)
+    oauth_service: GoogleOAuthService = Depends(get_oauth_service)
 ):
-    """
-    Handle OAuth callback from Google.
-    This endpoint receives the authorization code and processes it.
-    """
+    """Handle OAuth callback from Google."""
     try:
-        # Check for OAuth errors
         if error:
             logger.warning(f"OAuth error: {error} - {error_description}")
-            # Redirect to frontend with error
-            frontend_url = f"{oauth_service.settings.FRONTEND_LOGIN_URL}?error={error}"
-            return RedirectResponse(url=frontend_url, status_code=302)
+            # For now, default to settings page for errors
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_SETTINGS_URL}?error={error}",
+                status_code=302
+            )
         
         if not code or not state:
             logger.warning("OAuth callback missing code or state")
-            frontend_url = f"{oauth_service.settings.FRONTEND_LOGIN_URL}?error=missing_parameters"
-            return RedirectResponse(url=frontend_url, status_code=302)
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_SETTINGS_URL}?error=missing_parameters",
+                status_code=302
+            )
         
         # Process the OAuth callback
         result = await oauth_service.handle_callback(code, state)
         
-        # Handle different types of results
-        if result["action"] in ["login", "signup"]:
-            # Authentication flow - generate JWT token
-            auth_manager = AuthManager()
-            user = result["user"]
-            jwt_token = auth_manager.create_jwt_token(user["id"])
+        # 🎯 KEY CHANGE: Use the redirect_url from the service result
+        if result["action"] in ["gmail_connect", "calendar_connect"]:
+            # Service connections - use the redirect_url from service
+            frontend_url = f"{result['redirect_url']}?service={result['service']}&status=connected"
             
-            # Redirect to frontend with token
-            frontend_url = f"{result['redirect_url']}?token={jwt_token}&action={result['action']}"
+        elif result["action"] in ["google_login", "google_signup"]:
+            # Authentication flows (unused for now, but keep the code)
+            frontend_url = f"{result['redirect_url']}?action={result['action']}&status=success"
             
         else:
-            # Service connection flow - redirect to settings
-            frontend_url = f"{result['redirect_url']}?service={result.get('service')}&status=connected"
+            # Fallback - shouldn't happen but be safe
+            logger.warning(f"Unknown OAuth action: {result['action']}")
+            frontend_url = f"{settings.FRONTEND_SETTINGS_URL}?status=unknown"
         
         logger.info(f"OAuth callback successful: {result['action']}")
         return RedirectResponse(url=frontend_url, status_code=302)
         
-    except OAuthError as e:
-        logger.error(f"OAuth callback error: {str(e)}")
-        frontend_url = f"{oauth_service.settings.FRONTEND_LOGIN_URL}?error=oauth_failed"
-        return RedirectResponse(url=frontend_url, status_code=302)
     except Exception as e:
         logger.error(f"OAuth callback failed: {str(e)}")
-        frontend_url = f"{oauth_service.settings.FRONTEND_LOGIN_URL}?error=internal_error"
-        return RedirectResponse(url=frontend_url, status_code=302)
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_SETTINGS_URL}?error=callback_failed",
+            status_code=302
+        )
 
 
 # =============================================================================

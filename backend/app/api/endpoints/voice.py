@@ -9,7 +9,7 @@ import json
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 
-from app.api.dependencies import get_current_user, get_voice_service
+from app.api.dependencies import get_current_user, get_voice_service, get_current_user_supabase, get_current_user_supabase_optional
 from app.core.services.voice_service import VoiceService
 from app.api.models.requests.voice import SynthesisRequest
 from app.api.models.responses.voice import (
@@ -30,7 +30,7 @@ async def process_voice_message(
     audio_format: str = Form(default="webm"),
     include_audio_response: bool = Form(default=True),
     audio_file: UploadFile = File(...),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     voice_service: VoiceService = Depends(get_voice_service)
 ):
     """
@@ -96,7 +96,7 @@ async def process_voice_message(
 async def transcribe_audio(
     audio_format: str = Form(default="webm"),
     audio_file: UploadFile = File(...),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     voice_service: VoiceService = Depends(get_voice_service)
 ):
     """
@@ -154,7 +154,7 @@ async def transcribe_audio(
 @router.post("/synthesize", response_model=SynthesisResponse)
 async def synthesize_speech(
     request: SynthesisRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     voice_service: VoiceService = Depends(get_voice_service)
 ):
     """

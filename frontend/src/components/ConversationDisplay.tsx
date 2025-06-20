@@ -10,10 +10,14 @@ interface Message {
 
 interface ConversationDisplayProps {
   messages: Message[];
+  activeSessionId: string | null;
+  isLoading?: boolean;
 }
 
 const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
   messages,
+  activeSessionId,
+  isLoading = false,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -24,8 +28,36 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
   }, [messages]);
 
   const formatTimestamp = (timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  // No active session state
+  if (!activeSessionId) {
+    return (
+      <div className="conversation-display">
+        {/* Header */}
+        <div className="conversation-header">
+          <h3 className="conversation-title">Conversation</h3>
+          <div className="conversation-status">
+            <span className="message-count">0 messages</span>
+          </div>
+        </div>
+        
+        {/* Empty state - no session */}
+        <div className="messages-container">
+          <div className="no-messages">
+            <div className="no-messages-content">
+              <p>Start speaking to Oprina</p>
+              <small>Use the microphone button to begin a conversation</small>
+              <div className="instruction-hint">
+                💡 Your session will be created automatically when you start talking
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="conversation-display">
@@ -33,17 +65,28 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
       <div className="conversation-header">
         <h3 className="conversation-title">Conversation</h3>
         <div className="conversation-status">
-          <span className="message-count">{messages.length} messages</span>
+          <span className="message-count">
+            {isLoading ? 'Loading...' : `${messages.length} messages`}
+          </span>
         </div>
       </div>
       
       {/* Messages Container */}
       <div className="messages-container">
-        {messages.length === 0 ? (
+        {isLoading ? (
+          <div className="loading-messages">
+            <div className="loading-content">
+              <p>Loading conversation...</p>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="no-messages">
             <div className="no-messages-content">
-              <p>Start speaking to Oprina</p>
-              <small>Use the microphone button to begin a conversation</small>
+              <p>Ready to chat!</p>
+              <small>Start speaking to begin this conversation</small>
+              <div className="instruction-hint">
+                🎙️ Click the microphone button to start talking
+              </div>
             </div>
           </div>
         ) : (
@@ -68,30 +111,13 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
           </>
         )}
       </div>
-
-      {/* Input Area */}
-      <div className="conversation-input">
-        <input
-          type="text"
-          className="text-input"
-          placeholder="Type a message or use voice..."
-          onKeyPress={(e) => {
-            if (e.key === 'Enter') {
-              // Could add text input functionality here in the future
-              console.log('Text input pressed:', (e.target as HTMLInputElement).value);
-            }
-          }}
-        />
-        <button 
-          className="send-button"
-          onClick={() => {
-            // Could add send functionality here in the future
-            console.log('Send button clicked');
-          }}
-        >
-          Send
-        </button>
-      </div>
+      
+      {/* Voice interaction hint */}
+      {activeSessionId && messages.length === 0 && !isLoading && (
+        <div className="voice-hint">
+          <p>🎤 This conversation is ready for voice interaction</p>
+        </div>
+      )}
     </div>
   );
 };

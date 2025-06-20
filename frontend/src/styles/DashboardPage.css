@@ -134,6 +134,54 @@
   cursor: not-allowed;
 }
 
+/* NEW: Audio Control Buttons */
+.audio-control-button {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.pause-button {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.pause-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.stop-button {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
+.stop-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* NEW: Fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .volume-slider-container {
   display: flex;
   flex-direction: column;
@@ -259,6 +307,12 @@
     gap: 0.5rem;
     padding: 1rem;
   }
+
+  .audio-control-button {
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -285,4 +339,91 @@
   .avatar-section {
     padding: 1rem;
   }
+
+  .audio-control-button {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
+
+.avatar-mode-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.left-section {
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+}
+
+.right-section {
+  display: flex;
+  align-items: center;
+}
+
+.quota-display {
+  font-size: 0.875rem;
+  color: #FB923C; /* Light orange color */
+  font-weight: 500;
+}
+
+.mode-status-box {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 70px;
+}
+
+.mode-status-box:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.mode-label {
+  font-size: 0.875rem;
+  color: var(--heading);
+  font-weight: 500;
+}
+
+.mute-button {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-teal), var(--primary-green));
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.mute-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(79, 209, 197, 0.3);
+}
+
+/* Disabled state for audio control buttons */
+.audio-control-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.audio-control-button:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }

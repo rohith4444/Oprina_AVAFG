@@ -5,12 +5,15 @@ Simplified for voice-first chat sessions with proper repository integration and 
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional, Dict, Any
+from app.api.models.requests.sessions import UpdateSessionRequest, RegenerateTitleRequest
+from app.api.models.responses.sessions import UpdateSessionResponse, RegenerateTitleResponse
 
 from app.api.dependencies import (
     get_current_user,
     get_session_repository,
     get_message_repository,
-    get_agent_service  # ADDED FOR VERTEX AI INTEGRATION
+    get_agent_service,  # ADDED FOR VERTEX AI INTEGRATION
+    get_current_user_supabase, get_current_user_supabase_optional
 )
 from app.core.database.repositories.session_repository import SessionRepository
 from app.core.database.repositories.message_repository import MessageRepository
@@ -40,7 +43,7 @@ async def verify_session_ownership(
 @router.post("/create")
 async def create_session(
     title: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     agent_service: AgentService = Depends(get_agent_service)  # ADDED VERTEX AI SERVICE
 ):
@@ -111,7 +114,7 @@ async def create_session(
 async def get_user_sessions(
     active_only: bool = True,
     limit: int = 50,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     message_repo: MessageRepository = Depends(get_message_repository)
 ):
@@ -165,7 +168,7 @@ async def get_user_sessions(
 @router.get("/{session_id}")
 async def get_session_details(
     session_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     message_repo: MessageRepository = Depends(get_message_repository)
 ):
@@ -209,10 +212,61 @@ async def get_session_details(
         )
 
 
+@router.patch("/{session_id}")
+async def update_session(
+    session_id: str,
+    update_data: UpdateSessionRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
+    session_repo: SessionRepository = Depends(get_session_repository)
+):
+    """Update session title (PATCH endpoint for partial updates)."""
+    try:
+        user_id = current_user["id"]
+        
+        # Verify ownership
+        session = await verify_session_ownership(session_id, user_id, session_repo)
+        
+        # Only allow updates on active sessions
+        if session["status"] != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot update session with status: {session['status']}"
+            )
+        
+        # Update the session title
+        updated_session = await session_repo.update_session_title(
+            session_id, 
+            update_data.title
+        )
+        
+        logger.info(f"Updated session {session_id} title to '{update_data.title}' for user {user_id}")
+        
+        return UpdateSessionResponse(
+            message="Session title updated successfully",
+            session_id=session_id,
+            title=updated_session["title"],
+            updated_at=updated_session["updated_at"]
+        )
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Failed to update session {session_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update session"
+        )
+    
+
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository)
 ):
     """Delete a session (soft delete - sets status to 'deleted')."""
@@ -253,7 +307,7 @@ async def get_session_messages(
     session_id: str,
     limit: int = 50,
     message_type: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository),
     message_repo: MessageRepository = Depends(get_message_repository)
 ):
@@ -301,7 +355,7 @@ async def get_session_messages(
 @router.post("/{session_id}/end")
 async def end_session(
     session_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
     session_repo: SessionRepository = Depends(get_session_repository)
 ):
     """End a session gracefully (sets status to 'ended')."""
@@ -338,4 +392,67 @@ async def end_session(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to end session"
+        )
+    
+@router.post("/{session_id}/regenerate-title", response_model=RegenerateTitleResponse)
+async def regenerate_session_title(
+    session_id: str,
+    request_data: RegenerateTitleRequest = RegenerateTitleRequest(),  # Empty body allowed
+    current_user: Dict[str, Any] = Depends(get_current_user_supabase),
+    session_repo: SessionRepository = Depends(get_session_repository),
+    message_repo: MessageRepository = Depends(get_message_repository)
+):
+    """Regenerate session title from first user message or custom content."""
+    try:
+        user_id = current_user["id"]
+        
+        # Verify ownership and get current session
+        session = await verify_session_ownership(session_id, user_id, session_repo)
+        previous_title = session.get("title", "New Chat")
+        
+        # Determine content source for title generation
+        content_for_title = None
+        generation_source = None
+        
+        if request_data.custom_content:
+            # Use provided custom content
+            content_for_title = request_data.custom_content
+            generation_source = "custom_content"
+        else:
+            # Use first user message
+            first_message = await message_repo.get_first_user_message(session_id)
+            
+            if not first_message:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No user messages found in session and no custom content provided"
+                )
+            
+            content_for_title = first_message["content"]
+            generation_source = "first_user_message"
+        
+        # Regenerate title
+        updated_session = await session_repo.auto_generate_title_from_message(
+            session_id, 
+            content_for_title
+        )
+        
+        logger.info(f"Regenerated title for session {session_id} from {generation_source}")
+        
+        return RegenerateTitleResponse(
+            message="Session title regenerated successfully",
+            session_id=session_id,
+            title=updated_session["title"],
+            previous_title=previous_title,
+            updated_at=updated_session["updated_at"],
+            generation_source=generation_source
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to regenerate title for session {session_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to regenerate session title"
         )
