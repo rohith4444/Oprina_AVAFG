@@ -101,20 +101,20 @@ Both guides include:
         <br />
         <sub>Project Creator & Lead Developer</sub>
     </td>
-    <td align="center">
-        <a href="https://github.com/calvinhoang203">
-            <img src="https://github.com/calvinhoang203.png" width="100px;" alt="Hieu Hoang (Calvin)"/>
+  <td align="center">
+        <a href="https://github.com/abharathkumarr">
+            <img src="https://github.com/abharathkumarr.png" width="100px;" alt="Bharath Kumar"/>
             <br />
-            <sub><b>Hieu Hoang (Calvin)</b></sub>
+            <sub><b>Bharath Kumar</b></sub>
         </a>
         <br />
         <sub>Developer</sub>
     </td>
     <td align="center">
-        <a href="https://github.com/abharathkumarr">
-            <img src="https://github.com/abharathkumarr.png" width="100px;" alt="Bharath Kumar"/>
+        <a href="https://github.com/calvinhoang203">
+            <img src="https://github.com/calvinhoang203.png" width="100px;" alt="Hieu Hoang (Calvin)"/>
             <br />
-            <sub><b>Bharath Kumar</b></sub>
+            <sub><b>Hieu Hoang (Calvin)</b></sub>
         </a>
         <br />
         <sub>Developer</sub>
