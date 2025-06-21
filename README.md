@@ -73,10 +73,39 @@ Both guides include:
 
 ## Acknowledgements
 
-### Main Contributors
-- [Your Name](https://x.com/yourhandle) - Project Creator
-- [Contributor Name](https://x.com/handle) - Frontend Development
-- [Contributor Name](https://x.com/handle) - Backend Architecture
+### Contributors
+
+<table>
+<tr>
+    <td align="center">
+        <a href="https://github.com/rohith4444">
+            <img src="https://github.com/rohith4444.png" width="100px;" alt="Rohith Reddy Mandala"/>
+            <br />
+            <sub><b>Rohith Reddy Mandala</b></sub>
+        </a>
+        <br />
+        <sub>Project Creator & Lead Developer</sub>
+    </td>
+    <td align="center">
+        <a href="https://github.com/calvinhoang203">
+            <img src="https://github.com/calvinhoang203.png" width="100px;" alt="Hieu Hoang (Calvin)"/>
+            <br />
+            <sub><b>Hieu Hoang (Calvin)</b></sub>
+        </a>
+        <br />
+        <sub>Developer</sub>
+    </td>
+    <td align="center">
+        <a href="https://github.com/abharathkumarr">
+            <img src="https://github.com/abharathkumarr.png" width="100px;" alt="Bharath Kumar"/>
+            <br />
+            <sub><b>Bharath Kumar</b></sub>
+        </a>
+        <br />
+        <sub>Developer</sub>
+    </td>
+</tr>
+</table>
 
 ### Technologies
 - [Google Cloud AI Platform](https://cloud.google.com/ai-platform) - AI model hosting and Vertex AI
