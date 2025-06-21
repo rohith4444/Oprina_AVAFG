@@ -6,7 +6,7 @@
 
 </div>
 
-![Oprina Screenshot](docs/Homescreen.png)
+![Oprina Screenshot](docs/images/Homescreen.png)
 
 
 ## Overview
@@ -20,7 +20,7 @@ Oprina's comprehensive platform features HeyGen streaming avatars for lifelike i
 <table border="0">
 <tr>
 <td>
-<img src="docs/adk_logo.png" alt="Google Agent Development Kit" width="300"/>
+<img src="docs/images/adk_logo.png" alt="Google Agent Development Kit" width="300"/>
 </td>
 <td style="vertical-align: middle; padding-left: 20px;">
 <h2><strong>Built for the Agent Development Kit Hackathon with Google Cloud</strong></h2>
