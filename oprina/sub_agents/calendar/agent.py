@@ -3,7 +3,18 @@
 from google.adk.agents import Agent
 
 from oprina.sub_agents.calendar import prompt
-from oprina.tools.calendar import CALENDAR_TOOLS
+import os
+
+# Smart tool selection
+TOOLS_MODE = os.getenv("OPRINA_TOOLS_MODE")
+print(f"🔧 CALENDAR AGENT USING TOOLS_MODE: {TOOLS_MODE}")
+
+if TOOLS_MODE == "prod":
+    from oprina.tools_prod import CALENDAR_TOOLS
+    print("📁 Using tools_prod")
+else:
+    from oprina.tools import CALENDAR_TOOLS
+    print("📁 Using tools_local")
 
 calendar_agent = Agent(
     model="gemini-2.0-flash",
@@ -13,5 +24,5 @@ calendar_agent = Agent(
     tools=CALENDAR_TOOLS,
 )
 
-# ADK evaluation framework expects 'root_agent' variable
-root_agent = calendar_agent
+# # ADK evaluation framework expects 'root_agent' variable
+# root_agent = calendar_agent
