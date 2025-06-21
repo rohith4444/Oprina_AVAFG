@@ -15,6 +15,21 @@ Oprina is a revolutionary voice-powered AI assistant that combines conversationa
 
 Oprina's comprehensive platform features HeyGen streaming avatars for lifelike interactions, seamless Gmail and Google Calendar integration, intelligent voice processing with speech-to-text and text-to-speech capabilities, Google ADK-powered multi-agent architecture with specialized email and calendar agents, and enterprise-grade user authentication and session management. These technologies work together to create an immersive, voice-first experience that makes AI assistance feel natural and intuitive!
 
+
+<div align="center">
+<table border="0">
+<tr>
+<td>
+<img src="docs/adk_logo.png" alt="Google Agent Development Kit" width="300"/>
+</td>
+<td style="vertical-align: middle; padding-left: 20px;">
+<h2><strong>Built for the Agent Development Kit Hackathon with Google Cloud</strong></h2>
+</td>
+</tr>
+</table>
+</div>
+</div>
+
 ***
 
 ## See it in action
