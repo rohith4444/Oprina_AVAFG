@@ -9,23 +9,24 @@ from pydantic_settings import BaseSettings
 
 
 def get_env_file():
-    """Determine which environment file to use."""
-    # Check if we're in production (set by Cloud Run or manually)
-    if os.getenv("ENVIRONMENT") == "production":
-        return None  # Use environment variables directly
+    """
+    Determine which environment file to use.
+    NOTE: This expects to be run from the backend/ directory.
+    """
     
-    # For local development, look for .env-local
-    # Check parent directory first (when running from backend/)
-    parent_env_local = os.path.join("..", ".env-local")
-    if os.path.exists(parent_env_local):
-        return parent_env_local
+    is_production = any([
+        os.getenv("GOOGLE_CLOUD_PROJECT"),
+        os.getenv("K_SERVICE"), 
+        os.getenv("GAE_ENV"),
+        os.getenv("ENVIRONMENT") == "production"
+    ])
     
-    # Check current directory (when running from root)
-    if os.path.exists(".env-local"):
-        return ".env-local"
-    
-    # No valid environment file found
-    return None
+    if is_production:
+        return None
+    else:
+        # This will look for .env in current working directory
+        # Make sure to run: cd backend && python -m app.main
+        return ".env" if os.path.exists(".env") else None
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""

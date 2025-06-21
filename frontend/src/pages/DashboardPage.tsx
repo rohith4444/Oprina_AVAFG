@@ -510,7 +510,7 @@ const DashboardPage: React.FC = () => {
       if (response.ok) {
           const data = await response.json();
           // Map backend format to frontend format
-          const mappedSessions = data.sessions.map(session => ({
+          const mappedSessions = data.sessions.map((session: any) =>({
             id: session.session_id,                    // Map session_id to id
             title: session.title,
             created_at: session.created_at,
@@ -538,7 +538,7 @@ const DashboardPage: React.FC = () => {
         const data = await response.json();
         
         // Transform backend format to frontend format
-        const transformedMessages = data.messages.map(msg => ({
+        const transformedMessages = data.messages.map((msg: any) => ({
           id: msg.id,
           sender: msg.role === 'user' ? 'user' : 'assistant',  // role → sender
           text: msg.content,                                   // content → text
@@ -581,7 +581,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const handleSessionUpdate = (sessionId: string, newTitle: string) => {
-    setSessions(prev => prev.map(s => 
+    setSessions(prev => prev.map((s: Session) => 
       s.id === sessionId 
         ? { ...s, title: newTitle }
         : s
