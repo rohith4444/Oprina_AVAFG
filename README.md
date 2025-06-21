@@ -1,24 +1,27 @@
-<div align="left">
+<div align="Center">
 
 # Oprina: Conversational AI Avatar Assistant
 
 (It's the first one of its kind)
 
-![Oprina Screenshot](frontend/public/banner.png)
+</div>
+
+![Oprina Screenshot](docs/Homescreen.png)
+
+
+## Overview
 
 Oprina is a revolutionary voice-powered AI assistant that combines conversational intelligence with interactive avatar technology. Through natural voice commands and real-time avatar interactions, Oprina transforms how you manage your digital life—making email management, calendar scheduling, and productivity tasks as simple as having a conversation with a trusted assistant.
 
-Oprina's comprehensive platform features HeyGen streaming avatars for lifelike interactions, seamless Gmail and Google Calendar integration, intelligent voice processing with speech-to-text and text-to-speech capabilities, multi-user authentication and session management, and professional contact form systems with automated case tracking. These technologies work together to create an immersive, voice-first experience that makes AI assistance feel natural and intuitive!
+Oprina's comprehensive platform features HeyGen streaming avatars for lifelike interactions, seamless Gmail and Google Calendar integration, intelligent voice processing with speech-to-text and text-to-speech capabilities, Google ADK-powered multi-agent architecture with specialized email and calendar agents, and enterprise-grade user authentication and session management. These technologies work together to create an immersive, voice-first experience that makes AI assistance feel natural and intuitive!
 
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue)](./LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-available-brightgreen)](./docs)
-[![Issues](https://img.shields.io/github/issues/your-username/oprina)](https://github.com/your-username/oprina/issues)
+***
 
-</div>
+## See it in action
 
-## Enterprise
+![demo_chat](https://github.com/khoj-ai/khoj/blob/master/documentation/assets/img/quadratic_equation_khoj_web.gif?raw=true)
 
-Oprina is available as a cloud service for teams and enterprises. Experience the power of conversational AI avatars at [https://oprina.ai](https://oprina.ai). For enterprise deployments, custom integrations, and white-label solutions, contact our team to learn more about Oprina Enterprise.
+Go to https://www.oprinaai.com to see Oprina live.
 
 ## Table of Contents
 
@@ -77,11 +80,11 @@ Both guides include:
 
 ### Technologies
 - [Google Cloud AI Platform](https://cloud.google.com/ai-platform) - AI model hosting and Vertex AI
+- [Google ADK](https://cloud.google.com/agent-development-kit) - Agent development framework
 - [HeyGen](https://heygen.com/) - AI avatar generation and streaming
 - [Supabase](https://supabase.com/) - Database, authentication, and real-time features
 - [React](https://reactjs.org/) - Frontend framework
 - [FastAPI](https://fastapi.tiangolo.com/) - Backend API framework
-- [Google ADK](https://cloud.google.com/agent-development-kit) - Agent development framework
 - [Tailwind CSS](https://tailwindcss.com/) - UI styling
 - [TypeScript](https://www.typescriptlang.org/) - Type-safe development
 
