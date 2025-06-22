@@ -1,289 +1,219 @@
-# Oprina API Architecture
+# Oprina Platform - Architecture Documentation
 
-## Overview
+## System Overview
 
-The Oprina API is a sophisticated FastAPI-based backend system designed to provide multi-user voice assistant capabilities with avatar integration. The system follows a clean architecture pattern with clear separation of concerns across multiple layers.
+Oprina is a multi-agent conversational AI avatar assistant platform built on a modern microservices architecture that leverages Google Cloud's Agent Development Kit (ADK) for intelligent agent orchestration. The system combines frontend user interfaces, backend APIs, AI agent systems, and external service integrations to deliver a seamless voice-first productivity experience.
 
-## High-Level Architecture
+## Architecture Layers
 
+### 1. **Frontend Layer (User Interface)**
+- **Technology**: React 18 + TypeScript, Vite, Tailwind CSS
+- **Components**: 
+  - Avatar interaction interface (HeyGen streaming + Static fallback)
+  - Voice controls and speech recognition
+  - Session management and conversation display
+  - Authentication and user profile management
+  - Settings and OAuth connection management
+- **Deployment**: Static hosting (Vercel/Netlify) with CDN distribution
+
+### 2. **Backend API Layer (Business Logic)**
+- **Technology**: FastAPI + Python
+- **Services**:
+  - User management and profile operations
+  - Session and message persistence
+  - Voice processing coordination
+  - Avatar session management and quota tracking
+  - OAuth token management and refresh
+- **Deployment**: Google Cloud Run (containerized)
+
+### 3. **Agent Intelligence Layer (Core AI)**
+- **Technology**: Google Agent Development Kit (ADK)
+- **Agent Architecture**:
+  - **Root Agent**: Central orchestrator and conversation manager
+  - **Email Agent**: Gmail operations specialist (read, send, organize, analyze)
+  - **Calendar Agent**: Google Calendar management specialist
+- **Deployment**: Google Vertex AI (agent_engines)
+
+### 4. **Database & Authentication Layer**
+- **Technology**: Supabase (PostgreSQL + Auth)
+- **Components**:
+  - User authentication and session management
+  - Application data storage (users, sessions, messages)
+  - Contact system with edge functions
+  - Row Level Security (RLS) for data isolation
+
+### 5. **External Service Integration Layer**
+- **Google Cloud Services**:
+  - Speech-to-Text API
+  - Text-to-Speech API
+  - Gmail API (via OAuth)
+  - Google Calendar API (via OAuth)
+- **Third-Party Services**:
+  - HeyGen API (streaming avatars)
+  - Resend API (email notifications)
+
+## Component Interaction Flow
+
+### **User Interaction Flow**
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER                             │
-├─────────────────────────────────────────────────────────────────┤
-│  React Frontend  │  Mobile Apps  │  Third-party Integrations    │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         API LAYER                               │
-├─────────────────────────────────────────────────────────────────┤
-│  FastAPI │ CORS │ Authentication │ Rate Limiting │ Validation   │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      BUSINESS LOGIC LAYER                       │
-├─────────────────────────────────────────────────────────────────┤
-│  User Service │ Agent Service │ Voice Service │ Avatar Service  │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     DATA ACCESS LAYER                           │
-├─────────────────────────────────────────────────────────────────┤
-│  User Repo │ Session Repo │ Message Repo │ Token Repo │ Avatar  │
-└─────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   EXTERNAL SERVICES                             │
-├─────────────────────────────────────────────────────────────────┤
-│  Supabase │ Google Cloud │ HeyGen │ Vertex AI │ OAuth Providers │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Core Components
-
-### 1. API Layer (`app/api/`)
-
-**Purpose**: Handles HTTP requests, routing, and response formatting.
-
-- **Endpoints**: RESTful API endpoints organized by domain
-- **Models**: Request/response schemas using Pydantic
-- **Dependencies**: Dependency injection for services and authentication
-- **Middleware**: CORS, authentication, error handling
-
-### 2. Core Services (`app/core/services/`)
-
-**Purpose**: Business logic and orchestration layer.
-
-- **UserService**: User management and profile operations
-- **AgentService**: AI agent interaction and conversation management
-- **VoiceService**: Speech-to-text and text-to-speech processing
-- **AvatarService**: HeyGen avatar integration and quota management
-- **GoogleOAuthService**: OAuth flow management and token handling
-- **BackgroundTasks**: Automated maintenance and token refresh
-
-### 3. Data Access Layer (`app/core/database/`)
-
-**Purpose**: Data persistence and retrieval operations.
-
-- **Repositories**: Domain-specific data access objects
-- **Connection**: Database client management
-- **Models**: Database entity definitions
-- **Schema Validator**: Database schema validation utilities
-
-### 4. External Integrations (`app/core/integrations/`)
-
-**Purpose**: Third-party service integrations.
-
-- **Speech Services**: Google Cloud Speech-to-Text/Text-to-Speech
-- **Client**: HTTP client configurations for external APIs
-
-### 5. Utilities (`app/utils/`)
-
-**Purpose**: Cross-cutting concerns and helper functions.
-
-- **Authentication**: JWT token management and password hashing
-- **Encryption**: Data encryption utilities
-- **Validation**: Input validation helpers
-- **Logging**: Structured logging configuration
-- **Error Handling**: Custom exceptions and error responses
-
-## Data Flow
-
-### Authentication Flow
-```
-Client → API Endpoint → JWT Validation → User Repository → Database
+1. User speaks to avatar → Frontend captures audio
+2. Frontend sends audio → Backend API
+3. Backend processes voice → Google Speech-to-Text API
+4. Text sent to → Deployed ADK Agents (Vertex AI)
+5. Agents process request → Use appropriate tools (Gmail/Calendar APIs)
+6. Response generated → Backend API
+7. Text-to-speech conversion → Google TTS API
+8. Avatar response → Frontend (HeyGen streaming or static)
+9. User sees/hears response → Conversation continues
 ```
 
-### Voice Processing Flow
+### **Authentication Flow**
 ```
-Client → Voice Endpoint → Speech Service → Agent Service → Response
-```
-
-### OAuth Flow
-```
-Client → OAuth Endpoint → Google OAuth → Token Storage → User Profile
-```
-
-### Avatar Session Flow
-```
-Client → Avatar Endpoint → Quota Check → HeyGen API → Session Tracking
+1. User authenticates → Supabase Auth (email/password or Google OAuth)
+2. Supabase returns → JWT token to frontend
+3. Frontend includes token → All backend API requests
+4. Backend validates token → Supabase token verification
+5. User context extracted → For personalized agent interactions
 ```
 
-## Database Schema
-
-### Core Tables
-
-1. **users** - User accounts and profiles
-2. **sessions** - Conversation sessions
-3. **messages** - Chat messages and AI responses
-4. **oauth_tokens** - OAuth token storage
-5. **avatar_quotas** - Avatar usage tracking
-6. **avatar_sessions** - Avatar session management
-
-### Relationships
-
+### **Multi-Agent Orchestration**
 ```
-users (1) ←→ (many) sessions
-sessions (1) ←→ (many) messages
-users (1) ←→ (many) oauth_tokens
-users (1) ←→ (1) avatar_quotas
-avatar_quotas (1) ←→ (many) avatar_sessions
+1. User request received → Root Agent (ADK)
+2. Root Agent analyzes intent → Routes to specialized agent
+3. Email Agent OR Calendar Agent → Executes specific operations
+4. Cross-agent workflows → Data passing between agents
+5. Response coordination → Root Agent consolidates results
+6. Final response → Back to user through backend/frontend
+```
+
+### **OAuth Integration Flow**
+```
+1. User initiates connection → Frontend OAuth flow
+2. Google OAuth consent → User grants permissions
+3. OAuth callback → Backend receives authorization code
+4. Token exchange → Google OAuth tokens stored (encrypted)
+5. Background refresh → Automated token renewal
+6. Agent tool usage → Authenticated API calls to Gmail/Calendar
+```
+
+## Data Architecture
+
+### **Frontend State Management**
+- **React Context**: Authentication state and user profile
+- **Local State**: Component-specific data (avatar status, voice controls)
+- **Session Storage**: Temporary conversation data
+- **Environment Variables**: API endpoints and configuration
+
+### **Backend Data Flow**
+- **Request Processing**: FastAPI endpoints with dependency injection
+- **Session Management**: Conversation persistence and retrieval
+- **Authentication**: JWT token validation and user context
+- **External API Coordination**: Google Cloud services and third-party APIs
+
+### **Database Schema**
+- **Users**: Profile data, preferences, OAuth tokens
+- **Sessions**: Conversation threads and metadata
+- **Messages**: Individual conversation messages
+- **Avatar Sessions**: Usage tracking and quota management
+- **Contact System**: Support case management (Supabase functions)
+
+### **Agent Data Context**
+- **Tool Context**: Session state management across agent interactions
+- **Cross-Agent Communication**: Data passing between Email and Calendar agents
+- **Persistent Memory**: Conversation history and user preferences
+- **Real-Time Processing**: Streaming responses and voice synthesis
+
+## Deployment Architecture
+
+### **Development Environment**
+```
+Local Development:
+- Frontend: Vite dev server (localhost:5173)
+- Backend: uvicorn dev server (localhost:8000)
+- Agents: ADK web interface (localhost:8080)
+- Database: Supabase cloud instance
+- Authentication: Local gcloud SDK or service account JSON
+```
+
+### **Production Environment**
+```
+Production Deployment:
+- Frontend: Vercel/Netlify (static hosting + CDN)
+- Backend: Google Cloud Run (containerized, auto-scaling)
+- Agents: Google Vertex AI (agent_engines, managed hosting)
+- Database: Supabase cloud (production instance)
+- Authentication: Service account keys and environment variables
 ```
 
 ## Security Architecture
 
-### Authentication & Authorization
+### **Authentication & Authorization**
+- **Frontend**: Supabase Auth integration with JWT tokens
+- **Backend**: JWT token validation for all protected endpoints
+- **Database**: Row Level Security (RLS) for user data isolation
+- **External APIs**: OAuth 2.0 with encrypted token storage
 
-- **JWT Tokens**: Stateless authentication with configurable expiration
-- **Password Hashing**: bcrypt for secure password storage
-- **OAuth Integration**: Google OAuth for third-party authentication
-- **Token Refresh**: Automatic background token refresh
-- **Rate Limiting**: Configurable request rate limiting
+### **Data Protection**
+- **Encryption**: OAuth tokens encrypted at rest
+- **HTTPS/TLS**: All communications encrypted in transit
+- **CORS**: Properly configured cross-origin policies
+- **Rate Limiting**: API rate limiting and quota management
 
-### Data Protection
+### **Privacy Considerations**
+- **Minimal Data Storage**: Email content processed in memory only
+- **User Consent**: Clear OAuth permission requests
+- **Data Isolation**: Session-based user data separation
+- **Audit Logging**: Tool execution logging for debugging
 
-- **Encryption**: AES encryption for sensitive data
-- **Secure Headers**: CORS and security headers
-- **Input Validation**: Comprehensive request validation
-- **SQL Injection Prevention**: Parameterized queries via ORM
+## Technology Integration Points
+
+### **Google Cloud Ecosystem**
+- **Vertex AI**: Agent hosting and management
+- **Speech APIs**: Voice processing pipeline
+- **Cloud Run**: Backend service deployment
+- **OAuth APIs**: Gmail and Calendar integration
+- **IAM**: Identity and access management
+
+### **Supabase Integration**
+- **Authentication**: User management and session handling
+- **Database**: PostgreSQL with real-time features
+- **Edge Functions**: Serverless functions for contact system
+- **Storage**: File and media storage (if needed)
+
+### **External Service APIs**
+- **HeyGen**: Avatar generation and streaming
+- **Resend**: Email notification service
+- **Gmail API**: Email operations and management
+- **Calendar API**: Calendar events and scheduling
 
 ## Scalability Considerations
 
-### Horizontal Scaling
+### **Horizontal Scaling**
+- **Frontend**: CDN distribution and static hosting
+- **Backend**: Cloud Run auto-scaling based on traffic
+- **Agents**: Vertex AI managed scaling for agent workloads
+- **Database**: Supabase connection pooling and read replicas
 
-- **Stateless Design**: No server-side session state
-- **Database Connection Pooling**: Efficient database connections
-- **Caching Strategy**: Redis integration ready
-- **Load Balancing**: Multiple instance support
-
-### Performance Optimization
-
-- **Async Operations**: FastAPI async support
-- **Connection Pooling**: Database connection optimization
-- **Background Tasks**: Async background processing
-- **Lazy Loading**: Efficient data fetching patterns
+### **Performance Optimization**
+- **Caching**: Avatar session caching and voice processing optimization
+- **Async Processing**: Non-blocking voice and agent operations
+- **Batch Operations**: Efficient multi-agent workflows
+- **Resource Management**: Avatar quota tracking and optimization
 
 ## Monitoring & Observability
 
-### Health Checks
+### **Application Monitoring**
+- **Frontend**: Error tracking and user analytics
+- **Backend**: API performance and error monitoring
+- **Agents**: Vertex AI agent execution logging
+- **Database**: Supabase query performance monitoring
 
-- **Basic Health**: Simple liveness probe
-- **Detailed Health**: Database connectivity and service status
-- **Service Dependencies**: External service health monitoring
+### **Infrastructure Monitoring**
+- **Cloud Run**: Service health and resource utilization
+- **Vertex AI**: Agent deployment status and performance
+- **External APIs**: Rate limit tracking and error monitoring
+- **Network**: Latency and connectivity monitoring
 
-### Logging
+---
 
-- **Structured Logging**: JSON formatted logs
-- **Log Levels**: Configurable logging levels
-- **Request Tracking**: Request ID correlation
-- **Error Tracking**: Comprehensive error logging
-
-### Metrics
-
-- **Background Service Stats**: Token refresh and cleanup metrics
-- **API Usage**: Endpoint usage tracking
-- **Performance Metrics**: Response time monitoring
-
-## Configuration Management
-
-### Environment-Based Configuration
-
-- **Development**: Local development settings
-- **Staging**: Pre-production environment
-- **Production**: Production-ready configuration
-
-### Security Configuration
-
-- **Secrets Management**: Environment variable based secrets
-- **API Keys**: Secure API key management
-- **Database Credentials**: Encrypted credential storage
-
-## Development Patterns
-
-### Repository Pattern
-
-```python
-class UserRepository:
-    def __init__(self, db_client):
-        self.db = db_client
-    
-    async def get_user_by_id(self, user_id: str) -> dict:
-        # Data access implementation
-```
-
-### Service Pattern
-
-```python
-class UserService:
-    def __init__(self, user_repository):
-        self.user_repo = user_repository
-    
-    async def create_user(self, user_data: dict) -> dict:
-        # Business logic implementation
-```
-
-### Dependency Injection
-
-```python
-def get_user_service(
-    user_repository: UserRepository = Depends(get_user_repository)
-) -> UserService:
-    return UserService(user_repository)
-```
-
-## Technology Stack
-
-### Core Technologies
-
-- **FastAPI**: Modern Python web framework
-- **Pydantic**: Data validation and serialization
-- **Supabase**: PostgreSQL database with real-time features
-- **Python 3.9+**: Runtime environment
-
-### External Services
-
-- **Google Cloud**: Speech services and OAuth
-- **HeyGen**: Avatar generation and management
-- **Vertex AI**: AI agent capabilities
-
-### Development Tools
-
-- **Poetry/pip**: Dependency management
-- **pytest**: Testing framework
-- **Black**: Code formatting
-- **mypy**: Type checking
-
-## Deployment Architecture
-
-### Container Strategy
-
-- **Docker**: Containerized application
-- **Multi-stage builds**: Optimized container images
-- **Health checks**: Container health monitoring
-
-### Infrastructure Requirements
-
-- **Compute**: CPU and memory requirements
-- **Storage**: Database and file storage
-- **Network**: Load balancing and CDN
-- **Monitoring**: Observability stack
-
-## Future Enhancements
-
-### Planned Features
-
-- **Caching Layer**: Redis integration for performance
-- **Message Queue**: Async task processing
-- **Microservices**: Service decomposition
-- **Multi-tenancy**: Organization-level isolation
-- **API Versioning**: Backward compatibility support
-
-### Scalability Improvements
-
-- **Database Sharding**: Horizontal database scaling
-- **CDN Integration**: Static asset optimization
-- **Event Sourcing**: Audit trail and replay capabilities
-- **CQRS Pattern**: Command-query separation
+This architecture documentation provides the foundation for creating comprehensive visual diagrams showing the technology interactions, data flows, and deployment strategies used in the Oprina platform.
