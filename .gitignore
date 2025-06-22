@@ -465,6 +465,9 @@ hackathon_docs/
 # Development notes (keep local)
 dev_notes.md
 todo.md
+COMPLETE_CHANGES_LOG.md
+OPRINA_CHANGES_LOG.md
+complete_changes_log.md
 ideas.txt
 
 # Add to your existing .gitignore

@@ -4,6 +4,9 @@ interface ImportMetaEnv {
   // Backend Connection
   readonly VITE_BACKEND_URL: string
 
+  // NEW: Add this line
+  readonly VITE_SITE_URL: string
+
   // Supabase Configuration
   readonly VITE_SUPABASE_URL: string
   readonly VITE_SUPABASE_ANON_KEY: string
