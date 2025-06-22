@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
 import '../styles/Footer.css';
 
 const Footer: React.FC = () => {
+  const { user } = useAuth();
   return (
     <footer className="footer">
       <div className="footer-container">
@@ -36,7 +38,7 @@ const Footer: React.FC = () => {
             <h4 className="footer-heading">Resources</h4>
             <ul>
               <li><Link to="/help">Help Center</Link></li>
-              <li><Link to="/contact">Contact</Link></li>
+              <li><Link to={user ? "/support" : "/contact"}>{user ? "Support" : "Contact"}</Link></li>
               <li><Link to="/faq">FAQ</Link></li>
             </ul>
           </div>

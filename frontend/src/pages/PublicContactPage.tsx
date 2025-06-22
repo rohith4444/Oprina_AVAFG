@@ -20,7 +20,7 @@ interface FormErrors {
   message?: string;
 }
 
-const ContactPage: React.FC = () => {
+const PublicContactPage: React.FC = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -30,7 +30,7 @@ const ContactPage: React.FC = () => {
     fullName: '',
     email: '',
     phone: '',
-    subject: 'Account Issue',
+    subject: 'General Inquiry',
     message: '',
   });
   
@@ -96,7 +96,7 @@ const ContactPage: React.FC = () => {
           fullName: '',
           email: '',
           phone: '',
-          subject: 'Account Issue',
+          subject: 'General Inquiry',
           message: '',
         });
         
@@ -127,17 +127,17 @@ const ContactPage: React.FC = () => {
       <div className="flex-1 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl mx-auto">
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/')}
             className="flex items-center text-gray-600 hover:text-gray-900 mb-8"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Back to Dashboard
+            Back to Home
           </button>
           
           <div className="bg-white shadow rounded-lg p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Contact Support</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Contact Us</h1>
           <p className="text-gray-600 mb-8">
-            Need help with your account or have a specific question? Fill out the form below and our team will get back to you shortly.
+            Have a question or want to learn more about Oprina? We'd love to hear from you! Fill out the form below and our team will get back to you shortly.
           </p>
           
           {showSuccess && (
@@ -212,11 +212,11 @@ const ContactPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200"
               >
-                <option value="Account Issue">Account Issue</option>
-                <option value="Bug Report">Bug Report</option>
-                <option value="Feature Request">Feature Request</option>
-                <option value="Technical Support">Technical Support</option>
-                <option value="Billing Question">Billing Question</option>
+                <option value="General Inquiry">General Inquiry</option>
+                <option value="Product Demo">Product Demo Request</option>
+                <option value="Partnership">Partnership Opportunities</option>
+                <option value="Press Inquiry">Press Inquiry</option>
+                <option value="Other">Other</option>
               </select>
             </div>
             
@@ -229,6 +229,7 @@ const ContactPage: React.FC = () => {
                 rows={5}
                 value={formData.message}
                 onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                placeholder="Tell us more about your inquiry..."
                 className={`mt-1 block w-full rounded-md shadow-sm ${
                   errors.message ? 'border-red-300' : 'border-gray-300'
                 } focus:border-blue-500 focus:ring focus:ring-blue-200`}
@@ -249,6 +250,20 @@ const ContactPage: React.FC = () => {
               </Button>
             </div>
           </form>
+          
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-4">
+                Already have an account? 
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="ml-1 text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Sign in for personalized support
+                </button>
+              </p>
+            </div>
+          </div>
         </div>
         </div>
       </div>
@@ -257,4 +272,4 @@ const ContactPage: React.FC = () => {
   );
 };
 
-export default ContactPage;
+export default PublicContactPage; 

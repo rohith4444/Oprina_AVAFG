@@ -4,8 +4,12 @@ import { AuthProvider } from './context/AuthContext';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import ContactPage from './pages/ContactPage';
+import PublicContactPage from './pages/PublicContactPage';
+import GetStartedPage from './pages/GetStartedPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import ProfileSettings from './pages/settings/ProfileSettings';
 import ConnectedAppsSettings from './pages/settings/ConnectedAppsSettings';
@@ -25,10 +29,14 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/email-confirmation" element={<EmailConfirmationPending />} />
           <Route path="/thank-you" element={<ThankYou />} />
+          <Route path="/contact" element={<PublicContactPage />} />
+          <Route path="/get-started" element={<GetStartedPage />} />
           <Route 
             path="/dashboard" 
             element={
@@ -38,7 +46,7 @@ function App() {
             } 
           />
           <Route 
-            path="/contact" 
+            path="/support" 
             element={
               <ProtectedRoute>
                 <ContactPage />

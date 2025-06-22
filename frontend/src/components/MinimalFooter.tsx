@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
 
 const MinimalFooter: React.FC = () => {
+  const { user } = useAuth();
   return (
     <footer style={{ backgroundColor: '#F8F9FA' }} className="w-full mt-auto border-t border-gray-200">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -33,10 +35,10 @@ const MinimalFooter: React.FC = () => {
                 Terms
               </Link>
               <Link 
-                to="/contact" 
+                to={user ? "/support" : "/contact"} 
                 className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200"
               >
-                Contact
+                {user ? "Support" : "Contact"}
               </Link>
             </div>
           </div>
