@@ -13,6 +13,18 @@ const PrivacyPage: React.FC = () => {
           <h1 className="auth-title">Privacy Policy</h1>
           <p className="auth-subtitle">Last updated: {new Date().toLocaleDateString()}</p>
           
+          {/* Hackathon Notice */}
+          <div style={{ 
+            background: '#fef3c7', 
+            border: '1px solid #f59e0b', 
+            padding: '1rem', 
+            borderRadius: '8px', 
+            marginBottom: '2rem',
+            fontSize: '0.9rem'
+          }}>
+            <strong>🚀 Hackathon Project Notice:</strong> Oprina is a demonstration project created for the Google Agent Development Kit Hackathon. This is an educational/research project and not a commercial service. Use at your own discretion.
+          </div>
+          
           <div style={{ textAlign: 'left', lineHeight: '1.6', color: '#374151' }}>
             <section style={{ marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
@@ -55,7 +67,7 @@ const PrivacyPage: React.FC = () => {
                 We use the information we collect to:
               </p>
               <ul style={{ paddingLeft: '1.5rem', marginBottom: '1rem' }}>
-                <li>Provide, maintain, and improve our services</li>
+                <li>Provide, maintain, and improve our demonstration services</li>
                 <li>Process voice commands and generate responses</li>
                 <li>Authenticate and authorize access to your accounts</li>
                 <li>Send you technical notices and support messages</li>
@@ -83,7 +95,7 @@ const PrivacyPage: React.FC = () => {
                 5. Data Sharing and Disclosure
               </h2>
               <p style={{ marginBottom: '1rem' }}>
-                We do not sell, trade, or otherwise transfer your personal information to third parties except:
+                As a hackathon demonstration project, we do not sell, trade, or otherwise transfer your personal information to third parties except:
               </p>
               <ul style={{ paddingLeft: '1.5rem', marginBottom: '1rem' }}>
                 <li>With your explicit consent</li>
@@ -143,10 +155,10 @@ const PrivacyPage: React.FC = () => {
 
             <section style={{ marginBottom: '2rem' }}>
               <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
-                9. Data Retention
+                9. Data Retention - Hackathon Project
               </h2>
               <p style={{ marginBottom: '1rem' }}>
-                We retain your information only as long as necessary to provide our services and comply with legal obligations. Account data is deleted within 30 days of account deletion.
+                As a demonstration project created for educational purposes, data retention is provided on a best-effort basis only. Account data will be deleted within 30 days of account deletion, but users should not rely on this service for critical data storage.
               </p>
             </section>
 
@@ -164,11 +176,12 @@ const PrivacyPage: React.FC = () => {
                 11. Contact Us
               </h2>
               <p style={{ marginBottom: '1rem' }}>
-                If you have any questions about this Privacy Policy, please contact us at:
+                If you have any questions about this Privacy Policy, please contact us through:
               </p>
               <ul style={{ paddingLeft: '1.5rem', marginBottom: '1rem' }}>
-                <li>Email: privacy@oprina.com</li>
-                <li>Support: support@oprina.com</li>
+                <li>Contact Form: Use our contact form at /contact</li>
+                <li>GitHub: <a href="https://github.com/rohith4444/oprina" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'underline' }}>https://github.com/rohith4444/oprina</a></li>
+                <li>Project by: Rohith Reddy Mandala and contributors</li>
               </ul>
             </section>
           </div>
@@ -180,4 +193,4 @@ const PrivacyPage: React.FC = () => {
   );
 };
 
-export default PrivacyPage; 
+export default PrivacyPage;

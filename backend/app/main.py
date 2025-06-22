@@ -8,7 +8,7 @@ voice services, avatar session tracking, and automatic background token refresh.
 """
 
 import time
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -56,6 +56,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions properly."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
 # Enhanced error handlers
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
@@ -64,7 +72,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={
-            "error": "Internal Server Error",
+            "error": "Internal Server Error", 
             "message": str(exc),
             "path": str(request.url.path)
         }

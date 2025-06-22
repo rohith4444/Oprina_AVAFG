@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS user_avatar_quotas (
     -- Constraints
     UNIQUE(user_id), -- One quota record per user
     CHECK (total_seconds_used >= 0),
-    CHECK (total_seconds_used <= 1200) -- 20 minutes max
+    CHECK (total_seconds_used <= 900) -- 15 minutes max
 );
 
 -- Create indexes for performance
@@ -78,7 +78,7 @@ BEGIN
     UPDATE user_avatar_quotas 
     SET 
         total_seconds_used = new_total,
-        quota_exhausted = (new_total >= 1200), -- 20 minutes
+        quota_exhausted = (new_total >= 900), -- 15 minutes
         updated_at = NOW()
     WHERE user_id = p_user_id
     RETURNING * INTO quota_record;
