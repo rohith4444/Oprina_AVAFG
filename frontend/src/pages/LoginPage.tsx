@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
@@ -13,9 +13,24 @@ const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [searchParams] = useSearchParams();
 
   const { login, loginWithGoogle, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get return path from URL params (e.g., ?return=dashboard)
+  const returnPath = searchParams.get('return') || 'dashboard';
+
+  // Check for success message from password reset
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clear the message from location state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   // Removed auto-redirect logic - user must manually login
   // Users coming from Thank You page should enter credentials manually
@@ -30,8 +45,8 @@ const LoginPage: React.FC = () => {
       setError('');
       setLoading(true);
       await login(email, password);
-      // Only redirect after successful manual login
-      navigate('/dashboard');
+      // Redirect to return path after successful login
+      navigate(`/${returnPath}`);
     } catch (err) {
       setError('Failed to sign in. Please check your credentials.');
       console.error(err);
@@ -61,6 +76,38 @@ const LoginPage: React.FC = () => {
           <div className="auth-card">
             <h1 className="auth-title">Log in to Oprina</h1>
             <p className="auth-subtitle">Enter your details below</p>
+            {successMessage && (
+              <div style={{
+                backgroundColor: '#dbeafe',
+                border: '1px solid #3b82f6',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                color: '#1d4ed8',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>✅</span>
+                <span>{successMessage}</span>
+                <button
+                  onClick={() => setSuccessMessage('')}
+                  style={{
+                    marginLeft: 'auto',
+                    background: 'none',
+                    border: 'none',
+                    color: '#1d4ed8',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    padding: '0 4px'
+                  }}
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+            )}
             {error && <div className="auth-error">{error}</div>}
 
             <form className="auth-form" onSubmit={handleSubmit}>

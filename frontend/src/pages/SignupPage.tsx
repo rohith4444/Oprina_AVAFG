@@ -14,7 +14,7 @@ const SignupPage: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signup, loginWithGoogle } = useAuth();
+  const { signup, signupWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,8 +52,8 @@ const SignupPage: React.FC = () => {
     try {
       setError('');
       setLoading(true);
-      await loginWithGoogle();
-      // Supabase will redirect to dashboard
+      await signupWithGoogle();
+      // Supabase will redirect to dashboard with signup=true parameter
     } catch (err) {
       setError('Failed to sign up with Google.');
       console.error(err);

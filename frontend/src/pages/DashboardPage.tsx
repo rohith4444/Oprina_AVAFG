@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import HeyGenAvatar, { HeyGenAvatarRef } from '../components/HeyGenAvatar';
 import StaticAvatar, { StaticAvatarRef } from '../components/StaticAvatar';
@@ -28,10 +29,16 @@ interface Session {
 const BACKEND_API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 const DashboardPage: React.FC = () => {
+  const { user } = useAuth();
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [volume, setVolume] = useState(75);
   const [isMuted, setIsMuted] = useState(false);
+  
+  // Check if this was a signup attempt with existing account
+  const [showExistingAccountMessage, setShowExistingAccountMessage] = useState(false);
+  // Check if this was a login attempt that created a new account
+  const [showNewAccountMessage, setShowNewAccountMessage] = useState(false);
   
   // Session management - Updated for API integration
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -82,6 +89,44 @@ const DashboardPage: React.FC = () => {
   const [isEndingSession, setIsEndingSession] = useState(false);
   
   const navigate = useNavigate();
+
+  // Check for signup attempt with existing account OR login attempt with new account
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isSignupAttempt = urlParams.get('signup') === 'true';
+    const isLoginAttempt = urlParams.get('login') === 'true';
+    
+    if (user) {
+      const accountCreated = new Date(user.created_at).getTime();
+      const now = Date.now();
+      const timeDiff = now - accountCreated;
+      
+      if (isSignupAttempt) {
+        // Check if this account already existed (account creation date vs current time)
+        // If account was created more than 5 minutes ago, it's an existing account
+        if (timeDiff > 5 * 60 * 1000) {
+          setShowExistingAccountMessage(true);
+          
+          // Auto-hide message after 8 seconds
+          setTimeout(() => setShowExistingAccountMessage(false), 8000);
+        }
+      } else if (isLoginAttempt) {
+        // Check if this was a new account creation (account created within last 5 minutes)
+        if (timeDiff <= 5 * 60 * 1000) {
+          setShowNewAccountMessage(true);
+          
+          // Auto-hide message after 8 seconds
+          setTimeout(() => setShowNewAccountMessage(false), 8000);
+        }
+      }
+      
+      // Clear the parameters from URL
+      if (isSignupAttempt || isLoginAttempt) {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    }
+  }, [user]);
 
   // Get user token for API calls
   const getUserToken = async () => {
@@ -1077,6 +1122,74 @@ const DashboardPage: React.FC = () => {
         
         {/* Main Content Area - 50/50 Layout */}
         <div className="main-content flex-1">
+          {/* Existing Account Message */}
+          {showExistingAccountMessage && (
+            <div style={{
+              backgroundColor: '#fef3c7',
+              border: '1px solid #f59e0b',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              margin: '16px',
+              color: '#92400e',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>⚠️</span>
+              <span>Account with {user?.email} already exists. You have been logged in instead.</span>
+              <button
+                onClick={() => setShowExistingAccountMessage(false)}
+                style={{
+                  marginLeft: 'auto',
+                  background: 'none',
+                  border: 'none',
+                  color: '#92400e',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  padding: '0 4px'
+                }}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* New Account Created During Login Message */}
+          {showNewAccountMessage && (
+            <div style={{
+              backgroundColor: '#dbeafe',
+              border: '1px solid #3b82f6',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              margin: '16px',
+              color: '#1d4ed8',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>ℹ️</span>
+              <span>No account found for {user?.email}. A new account has been created for you.</span>
+              <button
+                onClick={() => setShowNewAccountMessage(false)}
+                style={{
+                  marginLeft: 'auto',
+                  background: 'none',
+                  border: 'none',
+                  color: '#1d4ed8',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  padding: '0 4px'
+                }}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+          
           <div className="dashboard-unified">
             
             {/* Left Side: Avatar + Controls (50%) */}

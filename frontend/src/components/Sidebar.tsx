@@ -299,9 +299,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <Settings size={16} />
                 <span>Settings</span>
               </button>
-              <button className="menu-item" onClick={() => navigate('/contact')}>
+              <button className="menu-item" onClick={() => navigate('/support')}>
                 {/*<Send size={16} >*/}
-                <span>Contact Us</span>
+                <span>Contact Support</span>
               </button>
               <button className="menu-item" onClick={handleLogout}>
                 <LogOut size={16} />
