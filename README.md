@@ -57,19 +57,19 @@ Go to https://www.oprinaai.com to see Oprina live.
 Oprina consists of five main components working together to deliver a seamless conversational AI experience:
 
 ### Backend API
-FastAPI-based service that handles REST endpoints, user authentication, avatar session management, and integration with external services like Google Cloud AI and HeyGen APIs.
+FastAPI-based service that handles REST endpoints, user authentication, avatar session management, and integration with external services like Google Cloud AI and HeyGen APIs. 📖 [See Backend README](./backend/README.md)
 
 ### Frontend
-React/TypeScript application providing a responsive web interface with real-time avatar streaming, voice controls, chat interface, user settings, and dashboard functionality.
+React/TypeScript application providing a responsive web interface with real-time avatar streaming, voice controls, chat interface, user settings, and dashboard functionality. 📖 [See Frontend README](./frontend/README.md)
 
 ### Oprina Agent
-AI-powered agent system built on Google's Agent Development Kit (ADK) featuring multimodal Gemini 2.0 Flash model, specialized email and calendar sub-agents, voice-optimized conversation flows, and comprehensive tool integration for Gmail and Google Calendar operations.
+AI-powered agent system built on Google's Agent Development Kit (ADK) featuring multimodal Gemini 2.0 Flash model, specialized email and calendar sub-agents, voice-optimized conversation flows, and comprehensive tool integration for Gmail and Google Calendar operations.📖 [See Oprina README](./oprina/README.md)
 
 ### Vertex Deployment
-Google Cloud Vertex AI deployment infrastructure for scalable agent hosting, session management, and production-ready AI model serving with enterprise-grade security and performance.
+Google Cloud Vertex AI deployment infrastructure for scalable agent hosting, session management, and production-ready AI model serving with enterprise-grade security and performance. 📖 [See Veterx Deployment README](./vertex-deployment/README.md)
 
 ### Supabase Database
-PostgreSQL database with real-time capabilities handling user management, conversation history, session state, avatar usage tracking, contact form submissions, and authentication workflows.
+PostgreSQL database with real-time capabilities handling user management, conversation history, session state, avatar usage tracking, contact form submissions, and authentication workflows. 📖 [See Supabase README](./supabase/README.md)
 
 ## Run Locally / Self-Hosting
 
@@ -101,20 +101,20 @@ Both guides include:
         <br />
         <sub>Project Creator & Lead Developer</sub>
     </td>
-    <td align="center">
-        <a href="https://github.com/calvinhoang203">
-            <img src="https://github.com/calvinhoang203.png" width="100px;" alt="Hieu Hoang (Calvin)"/>
+  <td align="center">
+        <a href="https://github.com/abharathkumarr">
+            <img src="https://github.com/abharathkumarr.png" width="100px;" alt="Bharath Kumar"/>
             <br />
-            <sub><b>Hieu Hoang (Calvin)</b></sub>
+            <sub><b>Bharath Kumar</b></sub>
         </a>
         <br />
         <sub>Developer</sub>
     </td>
     <td align="center">
-        <a href="https://github.com/abharathkumarr">
-            <img src="https://github.com/abharathkumarr.png" width="100px;" alt="Bharath Kumar"/>
+        <a href="https://github.com/calvinhoang203">
+            <img src="https://github.com/calvinhoang203.png" width="100px;" alt="Hieu Hoang (Calvin)"/>
             <br />
-            <sub><b>Bharath Kumar</b></sub>
+            <sub><b>Hieu Hoang (Calvin)</b></sub>
         </a>
         <br />
         <sub>Developer</sub>
@@ -129,8 +129,6 @@ Both guides include:
 - [Supabase](https://supabase.com/) - Database, authentication, and real-time features
 - [React](https://reactjs.org/) - Frontend framework
 - [FastAPI](https://fastapi.tiangolo.com/) - Backend API framework
-- [Tailwind CSS](https://tailwindcss.com/) - UI styling
-- [TypeScript](https://www.typescriptlang.org/) - Type-safe development
 
 ## License
 

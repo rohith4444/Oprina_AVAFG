@@ -175,11 +175,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${className}`}>
       <div className="sidebar-header">
-        <div className="logo-section">
+        <div className="logo-section" onClick={() => navigate('/')} role="button" tabIndex={0}>
           <Logo size={30} />
           {!isCollapsed && <h2 className="sidebar-title">Oprina</h2>}
         </div>
-        <button className="collapse-button" onClick={toggleSidebar}>
+                <button className="collapse-button" onClick={toggleSidebar}>
           <ChevronLeft
             size={16}
             style={{

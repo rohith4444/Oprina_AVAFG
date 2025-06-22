@@ -87,6 +87,9 @@ const DashboardPage: React.FC = () => {
   const [isSwitchingAvatar, setIsSwitchingAvatar] = useState(false);
   const [operationStatus, setOperationStatus] = useState<string | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  const [isLockPeriodActive, setIsLockPeriodActive] = useState(false);
+  const [lockCountdown, setLockCountdown] = useState(0);
+  const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const navigate = useNavigate();
 
@@ -679,6 +682,14 @@ const DashboardPage: React.FC = () => {
     }
   }, [quotaMessage]);
 
+  useEffect(() => {
+    return () => {
+      if (lockTimerRef.current) {
+        clearInterval(lockTimerRef.current);
+      }
+    };
+  }, []);
+
   // Update audio volume when volume control changes
   useEffect(() => {
     if (currentAudio) {
@@ -817,6 +828,13 @@ const DashboardPage: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.text();
+        
+        // Handle specific "No speech detected" case
+        if (response.status === 422 && errorData.includes('NO_SPEECH_DETECTED')) {
+          throw new Error("I had a hard time hearing you, can you try again?");
+        }
+        
+        // Handle other API errors
         throw new Error(`API Error: ${response.status} - ${errorData}`);
       }
 
@@ -1004,6 +1022,25 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const startLockPeriod = () => {
+    setIsLockPeriodActive(true);
+    setLockCountdown(10);
+    
+    const countdownInterval = setInterval(() => {
+      setLockCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          setIsLockPeriodActive(false);
+          setLockCountdown(0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    lockTimerRef.current = countdownInterval;
+  };
+
   // UPDATED: Avatar mode toggle with complete session lifecycle
   const toggleAvatarMode = async () => {
 
@@ -1088,6 +1125,9 @@ const DashboardPage: React.FC = () => {
     } finally {
       setIsSwitchingAvatar(false);
       setIsCheckingQuota(false);
+      
+      // Start 10-second lock period
+      startLockPeriod();
     }
   };
 
@@ -1192,198 +1232,223 @@ const DashboardPage: React.FC = () => {
           
           <div className="dashboard-unified">
             
-            {/* Left Side: Avatar + Controls (50%) */}
-            <div className="avatar-section">
-              {/* Enhanced Avatar Mode Toggle with Session Status */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="avatar-mode-toggle">
-                  <div className="left-section">
-                    <button 
-                      className="mode-status-box"
-                      onClick={toggleAvatarMode}
-                      disabled={isSwitchingAvatar || isCheckingQuota}
-                      style={{
-                        backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
-                        opacity: (isSwitchingAvatar || isCheckingQuota) ? 0.6 : 1
-                      }}
-                    >
-                      {isSwitchingAvatar ? (
-                        '🔄 Switching...'
-                      ) : isCheckingQuota ? (
-                        '🔍 Checking Quota...'
-                      ) : (
-                        useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'
-                      )}
-                    </button>
-                    <span className="mode-label">
-                      {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
-                      {isSessionActive && (
-                        <span style={{ color: '#10b981', fontSize: '10px', marginLeft: '5px' }}>
-                          (Session Active)
-                        </span>
-                      )}
+            {/* NEW: Horizontal Status Box - Above everything, full width */}
+            {(quotaMessage || operationStatus || lastError || sessionError || (!useStaticAvatar) || isRetrying || isLockPeriodActive) && (
+              <div className="avatar-status-box">
+                <div className="status-content">
+                  {/* Streaming Avatar indicator */}
+                  {!useStaticAvatar && (
+                    <span className="status-item streaming">
+                      📡 <strong>Streaming Avatar</strong>
                     </span>
-                  </div>
+                  )}
                   
-                  <div className="right-section">
-                    <QuotaDisplay 
-                      isVisible={!useStaticAvatar} 
-                      refreshTrigger={quotaRefreshTrigger}
-                      isSessionActive={isSessionActive}
-                      sessionStartTime={sessionStartTime}
-                    />
-                    {isRetrying && (
-                      <span style={{ color: '#f59e0b', fontSize: '10px' }}>
-                        Retrying... (Attempt {retryCount + 1})
+                  {/* Quota information (moved from right-section) */}
+                  {!useStaticAvatar && (
+                    <span className="status-item quota">
+                      <QuotaDisplay 
+                        isVisible={true} 
+                        refreshTrigger={quotaRefreshTrigger}
+                        isSessionActive={isSessionActive}
+                        sessionStartTime={sessionStartTime}
+                      />
+                    </span>
+                  )}
+                  
+                  {/* Connection status - only show when actually connecting */}
+                    {!useStaticAvatar && !avatarReady && (
+                      <span className="status-item connection">
+                        🔄 Connecting...
                       </span>
                     )}
+                  
+                  {/* Operation Status (green messages) */}
+                  {operationStatus && (
+                    <span className="status-item success">
+                      ✅ {operationStatus}
+                    </span>
+                  )}
+                  
+                  {/* Lock messages and warnings (yellow messages) */}
+                  {quotaMessage && (
+                    <span className="status-item warning">
+                      ⚠️ {quotaMessage}
+                    </span>
+                  )}
+                  
+                  {/* Lock period countdown */}
+                  {isLockPeriodActive && (
+                    <span className="status-item warning">
+                      🔒 Switch locked for {lockCountdown} seconds to prevent API errors
+                    </span>
+                  )}
+                  
+                  {/* Error Messages (red messages) */}
+                  {lastError && (
+                    <span className="status-item error">
+                      ❌ {lastError}
+                    </span>
+                  )}
+                  
+                  {/* Session Error Messages */}
+                  {sessionError && (
+                    <span className="status-item error">
+                      🚫 Session Error: {sessionError}
+                    </span>
+                  )}
+                  
+                  {/* Retry Status */}
+                  {isRetrying && (
+                    <span className="status-item info">
+                      🔄 Retrying... (Attempt {retryCount + 1})
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Wrap the existing avatar + conversation layout */}
+            <div className="dashboard-content-area">
+              {/* Left Side: Avatar + Controls (50%) */}
+              <div className="avatar-section">
+                {/* Enhanced Avatar Mode Toggle with Session Status - KEPT EXACTLY THE SAME */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="avatar-mode-toggle">
+                    <div className="left-section">
+                      <button 
+                        className="mode-status-box"
+                        onClick={toggleAvatarMode}
+                        disabled={isSwitchingAvatar || isCheckingQuota || isLockPeriodActive}
+                        style={{
+                          backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
+                          opacity: (isSwitchingAvatar || isCheckingQuota) ? 0.6 : 1
+                        }}
+                      >
+                        {isSwitchingAvatar ? (
+                          '🔄 Switching...'
+                        ) : isCheckingQuota ? (
+                          '🔍 Checking Quota...'
+                        ) : isLockPeriodActive ? (
+                          `🔒 Wait ${lockCountdown}s`
+                        ) : (
+                          useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'
+                        )}
+                      </button>
+                      <span className="mode-label">
+                        {useStaticAvatar ? 'Static Avatar' : 'Streaming Avatar'}
+                        {isSessionActive && (
+                          <span style={{ color: '#10b981', fontSize: '10px', marginLeft: '5px' }}>
+                            (Session Active)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    
+                    <div className="right-section">
+                      {/* QuotaDisplay moved to status box above - keeping empty for layout */}
+                    </div>
+                  </div>
+                )}
+
+                {/* Avatar Container - Conditional Rendering */}
+                <div className="avatar-container-wrapper">
+                  {useStaticAvatar ? (
+                    <StaticAvatar
+                      ref={staticAvatarRef}
+                      isListening={isListening}
+                      isSpeaking={isSpeaking}
+                      onAvatarReady={handleAvatarReady}
+                      onAvatarStartTalking={handleAvatarStartTalking}
+                      onAvatarStopTalking={handleAvatarStopTalking}
+                    />
+                  ) : (
+                    <HeyGenAvatar
+                      ref={streamingAvatarRef}
+                      isListening={isListening}
+                      isSpeaking={isSpeaking}
+                      onAvatarReady={handleAvatarReady}
+                      onAvatarError={handleAvatarError}
+                    />
+                  )}
+                </div>
+
+                {/* Voice Controls */}
+                <div className="compact-voice-controls">
+                  <button
+                    className={`voice-button mic-button ${isListening ? 'listening' : ''}`}
+                    onClick={isListening ? handleStopListening : handleStartListening}
+                    disabled={!avatarReady || isCreatingSession || isProcessingVoice}
+                  >
+                    {isRecording ? '🔴' : '🎙️'}
+                  </button>
+                  
+                  <div className="volume-control">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volume}
+                      onChange={(e) => setVolume(Number(e.target.value))}
+                    />
+                    <span>{volume}%</span>
                   </div>
                   
-                  {/* Enhanced feedback messages */}
-                  {quotaMessage && (
-                    <div className="quota-message" style={{ 
-                      color: '#ef4444', 
-                      fontSize: '12px', 
-                      marginTop: '4px',
-                      textAlign: 'center' 
-                    }}>
-                      {quotaMessage}
-                    </div>
-                  )}
-                  
-                  {operationStatus && (
-                    <div className="operation-status" style={{ 
-                      color: '#10b981', 
-                      fontSize: '12px', 
-                      marginTop: '4px',
-                      textAlign: 'center' 
-                    }}>
-                      {operationStatus}
-                    </div>
-                  )}
-                  
-                  {lastError && (
-                    <div className="error-message" style={{ 
-                      color: '#ef4444', 
-                      fontSize: '12px', 
-                      marginTop: '4px',
-                      textAlign: 'center' 
-                    }}>
-                      {lastError}
-                    </div>
-                  )}
-                  
-                  {sessionError && (
-                    <div className="session-error" style={{ 
-                      color: '#dc2626', 
-                      fontSize: '12px', 
-                      marginTop: '4px',
-                      textAlign: 'center',
-                      fontWeight: 'bold'
-                    }}>
-                      Session Error: {sessionError}
-                    </div>
+                  <button
+                    className="mute-button"
+                    onClick={() => setIsMuted(!isMuted)}
+                  >
+                    {isMuted ? '🔇' : '🔊'}
+                  </button>
+
+                  {/* Audio Control Buttons */}
+                  {showAudioControls && (
+                    <>
+                      <button
+                        className="audio-control-button pause-button"
+                        onClick={toggleAudioPause}
+                        disabled={!currentAudio || !isSpeaking}
+                        aria-label={isAudioPaused ? 'Resume audio' : 'Pause audio'}
+                      >
+                        {isAudioPaused ? '▶️' : '⏸️'}
+                      </button>
+                      
+                      <button
+                        className="audio-control-button stop-button"
+                        onClick={stopAudioResponse}
+                        disabled={!currentAudio || !isSpeaking}
+                        aria-label="Stop audio"
+                      >
+                        ⏹️
+                      </button>
+                    </>
                   )}
                 </div>
-              )}
 
-              {/* Avatar Container - Conditional Rendering */}
-              <div className="avatar-container-wrapper">
-                {useStaticAvatar ? (
-                  <StaticAvatar
-                    ref={staticAvatarRef}
-                    isListening={isListening}
-                    isSpeaking={isSpeaking}
-                    onAvatarReady={handleAvatarReady}
-                    onAvatarStartTalking={handleAvatarStartTalking}
-                    onAvatarStopTalking={handleAvatarStopTalking}
-                  />
-                ) : (
-                  <HeyGenAvatar
-                    ref={streamingAvatarRef}
-                    isListening={isListening}
-                    isSpeaking={isSpeaking}
-                    onAvatarReady={handleAvatarReady}
-                    onAvatarError={handleAvatarError}
-                  />
+                {/* Recording Feedback */}
+                {(isRecording || isProcessingVoice || recordingError) && (
+                  <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' }}>
+                    {isRecording && (
+                      <div style={{ color: '#ef4444' }}>🔴 Recording...</div>
+                    )}
+                    {isProcessingVoice && (
+                      <div style={{ color: '#3b82f6' }}>⚡ Processing with AI...</div>
+                    )}
+                    {recordingError && (
+                      <div style={{ color: '#ef4444' }}>❌ {recordingError}</div>
+                    )}
+                  </div>
                 )}
               </div>
 
-              {/* Voice Controls */}
-              <div className="compact-voice-controls">
-                <button
-                  className={`voice-button mic-button ${isListening ? 'listening' : ''}`}
-                  onClick={isListening ? handleStopListening : handleStartListening}
-                  disabled={!avatarReady || isCreatingSession || isProcessingVoice}
-                >
-                  {isRecording ? '🔴' : '🎙️'}
-                </button>
-                
-                <div className="volume-control">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={volume}
-                    onChange={(e) => setVolume(Number(e.target.value))}
-                  />
-                  <span>{volume}%</span>
-                </div>
-                
-                <button
-                  className="mute-button"
-                  onClick={() => setIsMuted(!isMuted)}
-                >
-                  {isMuted ? '🔇' : '🔊'}
-                </button>
-
-                {/* NEW: Conditional Audio Control Buttons */}
-                {showAudioControls && (
-                  <>
-                    <button
-                      className="audio-control-button pause-button"
-                      onClick={toggleAudioPause}
-                      disabled={!currentAudio || !isSpeaking}
-                      aria-label={isAudioPaused ? 'Resume audio' : 'Pause audio'}
-                    >
-                      {isAudioPaused ? '▶️' : '⏸️'}
-                    </button>
-                    
-                    <button
-                      className="audio-control-button stop-button"
-                      onClick={stopAudioResponse}
-                      disabled={!currentAudio || !isSpeaking}
-                      aria-label="Stop audio"
-                    >
-                      ⏹️
-                    </button>
-                  </>
-                )}
+              {/* Right Side: Conversation Display (50%) */}
+              <div className="conversation-section">
+                <ConversationDisplay 
+                  messages={messages}
+                  activeSessionId={activeSessionId}
+                  isLoading={isLoadingMessages}
+                />
               </div>
-               
-
-              {/* Recording Feedback */}
-              {(isRecording || isProcessingVoice || recordingError) && (
-                <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem' }}>
-                  {isRecording && (
-                    <div style={{ color: '#ef4444' }}>🔴 Recording...</div>
-                  )}
-                  {isProcessingVoice && (
-                    <div style={{ color: '#3b82f6' }}>⚡ Processing with AI...</div>
-                  )}
-                  {recordingError && (
-                    <div style={{ color: '#ef4444' }}>❌ {recordingError}</div>
-                  )}
-                </div>
-              )}
             </div>
-
-            {/* Right Side: Conversation Display (50%) */}
-            <ConversationDisplay 
-              messages={messages}
-              activeSessionId={activeSessionId}
-              isLoading={isLoadingMessages}
-            />
           </div>
         </div>
       </div>

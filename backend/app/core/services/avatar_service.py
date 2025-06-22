@@ -18,7 +18,7 @@ class AvatarService:
     
     def __init__(self, avatar_repository: AvatarRepository):
         self.avatar_repo = avatar_repository
-        self.max_quota_seconds = 1200  # 20 minutes
+        self.max_quota_seconds = 900  # 15 minutes
     
     # =============================================================================
     # QUOTA MANAGEMENT
@@ -54,7 +54,7 @@ class AvatarService:
                 **quota_status,
                 "minutes_used": round(minutes_used, 2),
                 "minutes_remaining": round(minutes_remaining, 2),
-                "max_quota_minutes": 20,
+                "max_quota_minutes": 15,
                 "max_quota_seconds": self.max_quota_seconds
             }
             

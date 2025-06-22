@@ -133,10 +133,13 @@ const HomePage: React.FC = () => {
             >
               Get Started for Free
             </Button>
+            <p className="cta-device-notice">
+              💻 For better experience, please use login on desktop and laptops only!
+            </p>
           </div>
         </div>
       </section>
-
+      
       <section className="updates-section">
         <div className="container">
           <h2 className="updates-title">Exciting Updates Coming Soon!</h2>

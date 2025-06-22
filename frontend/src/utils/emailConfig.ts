@@ -23,6 +23,31 @@
  * The welcome email service will automatically trigger when new users confirm their email.
  */
 
+/**
+ * Email Service Configuration with Environment Support
+ */
+
+// Get the current environment's base URL
+const getBaseUrl = (): string => {
+  // In browser environment, use window.location.origin
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  
+  // Check for environment variable first
+  if (import.meta.env.VITE_SITE_URL) {
+    return import.meta.env.VITE_SITE_URL;
+  }
+  
+  // Production fallback
+  if (import.meta.env.PROD) {
+    return 'https://oprinaai.com';
+  }
+  
+  // Development fallback
+  return 'http://localhost:5173';
+};
+
 export const EMAIL_CONFIG = {
   // These should be set in Supabase Edge Functions environment
   REQUIRED_ENV_VARS: [
@@ -34,12 +59,18 @@ export const EMAIL_CONFIG = {
   SENDER: 'Oprina <noreply@oprina.com>',
   SUBJECT: 'Welcome to Oprina - Your AI Assistant is Ready!',
   
-  // Default URLs for development
-  DEFAULT_SITE_URL: 'http://localhost:5173'
+  // Dynamic URL based on environment
+  getSiteUrl: () => getBaseUrl(),
+  
+  // Legacy support (deprecated)
+  DEFAULT_SITE_URL: getBaseUrl()
 } as const;
 
 // Type for the email service payload
 export interface WelcomeEmailPayload {
   email: string;
   name?: string;
-} 
+}
+
+// Export utility function for other components
+export const getSiteUrl = getBaseUrl;

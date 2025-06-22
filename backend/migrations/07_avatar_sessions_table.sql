@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS avatar_sessions (
     -- Constraints
     CHECK (status IN ('active', 'completed', 'error', 'timeout')),
     CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
-    CHECK (duration_seconds IS NULL OR duration_seconds <= 1200) -- 20 minutes max
+    CHECK (duration_seconds IS NULL OR duration_seconds <= 900) -- 15 minutes max
 );
 
 -- Create indexes for performance
@@ -74,7 +74,7 @@ BEGIN
     -- Determine final status
     IF p_error_message IS NOT NULL THEN
         final_status := 'error';
-    ELSIF calculated_duration >= 1200 THEN
+    ELSIF calculated_duration >= 900 THEN
         final_status := 'timeout';
     ELSE
         final_status := 'completed';
@@ -140,7 +140,7 @@ BEGIN
             AND duration_seconds IS NOT NULL
         ),
         quota_exhausted = (
-            SELECT COALESCE(SUM(duration_seconds), 0) >= 1200
+            SELECT COALESCE(SUM(duration_seconds), 0) >= 900
             FROM avatar_sessions 
             WHERE avatar_sessions.user_id = user_avatar_quotas.user_id
             AND status IN ('completed', 'timeout', 'error')
