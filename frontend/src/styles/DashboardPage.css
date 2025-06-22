@@ -27,6 +27,7 @@
   border-radius: 1rem;
   box-shadow: 0 8px 32px var(--shadow);
   display: flex;
+  flex-direction: column; /* Changed to column to stack status box above content */
   overflow: hidden;
   border: 1px solid var(--border);
 }
@@ -253,6 +254,82 @@
   }
 }
 
+/* Avatar Status Box - Horizontal status display above avatar area */
+.avatar-status-box {
+  background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
+  border-bottom: 1px solid var(--border);
+  margin: 0; /* No margin needed */
+  padding: 1rem 2rem;
+  width: 100%; /* Full width of container */
+  box-sizing: border-box;
+  flex-shrink: 0; /* Don't shrink */
+}
+
+/* The main content area (avatar + conversation) */
+.dashboard-content-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.status-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem; /* Increased gap for horizontal layout */
+  justify-content: flex-start; /* Left-aligned for horizontal flow */
+  font-size: 0.875rem;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow-x: auto; /* Allow horizontal scroll if needed */
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap; /* Prevent text wrapping within items */
+  flex-shrink: 0; /* Don't shrink items */
+}
+
+.status-item.streaming {
+  color: var(--primary-blue);
+}
+
+.status-item.quota {
+  color: #f59e0b; /* Orange */
+}
+
+.status-item.connection {
+  color: var(--text);
+}
+
+.status-item.success {
+  color: var(--primary-teal);
+}
+
+.status-item.warning {
+  color: #f59e0b; /* Orange */
+}
+
+.status-item.error {
+  color: #ef4444; /* Red */
+}
+
+.status-item.info {
+  color: var(--primary-blue);
+}
+
+/* Add separators between status items */
+.status-item:not(:last-child)::after {
+  content: "•";
+  margin-left: 1rem;
+  color: var(--border);
+  font-weight: bold;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
   .dashboard-page {
@@ -280,6 +357,15 @@
     flex: 1;
     min-height: 400px;
   }
+
+  .dashboard-content-area {
+  flex-direction: column;
+  }
+
+  .avatar-status-box {
+    padding: 0.75rem 1.5rem;
+  }
+
 }
 
 @media (max-width: 768px) {
@@ -313,6 +399,21 @@
     height: 45px;
     font-size: 18px;
   }
+
+  .avatar-status-box {
+  padding: 0.75rem 1rem;
+  }
+
+  .status-content {
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    justify-content: center; /* Center on mobile */
+  }
+
+  .status-item:not(:last-child)::after {
+    margin-left: 0.75rem;
+  }
+
 }
 
 @media (max-width: 480px) {
@@ -344,6 +445,21 @@
     width: 40px;
     height: 40px;
     font-size: 16px;
+  }
+
+  .avatar-status-box {
+    padding: 0.75rem;
+  }
+
+  .status-content {
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    flex-direction: column; /* Stack vertically on very small screens */
+    align-items: flex-start;
+  }
+
+  .status-item:not(:last-child)::after {
+    display: none; /* Remove separators when stacked */
   }
 }
 
@@ -426,4 +542,50 @@
 .audio-control-button:disabled:hover {
   transform: none;
   box-shadow: none;
+}
+
+/* Fix avatar section to properly contain voice controls when status bar is present */
+.avatar-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--background-alt) 0%, var(--background) 100%);
+  border-right: 1px solid var(--border);
+  min-height: 0; /* Allow flexbox to shrink */
+  overflow: hidden; /* Prevent overflow */
+}
+
+/* Ensure avatar container wrapper takes available space properly */
+.avatar-container-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem; /* Reduced from 1.5rem */
+  min-height: 0; /* Allow shrinking */
+}
+
+/* Ensure voice controls stay within bounds */
+.compact-voice-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1rem; /* Reduced from 1.5rem */
+  background-color: var(--background);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
+  margin-top: auto; /* Push to bottom */
+  flex-shrink: 0; /* Don't shrink this */
+}
+
+/* Adjust dashboard-content-area to handle height properly */
+.dashboard-content-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0; /* Important: allows flex children to shrink */
 }
