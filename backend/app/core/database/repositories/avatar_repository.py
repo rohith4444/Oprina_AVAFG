@@ -76,7 +76,7 @@ class AvatarRepository:
                 return {
                     "can_create_session": True,
                     "total_seconds_used": 0,
-                    "remaining_seconds": 1200,
+                    "remaining_seconds": 900,
                     "quota_exhausted": False,
                     "quota_percentage": 0.0
                 }
@@ -84,8 +84,8 @@ class AvatarRepository:
             total_used = quota.get("total_seconds_used", 0)
             quota_exhausted = quota.get("quota_exhausted", False)
             
-            remaining_seconds = max(0, 1200 - total_used)
-            quota_percentage = (total_used / 1200.0) * 100.0
+            remaining_seconds = max(0, 900 - total_used)
+            quota_percentage = (total_used / 900.0) * 100.0
             
             return {
                 "can_create_session": not quota_exhausted and remaining_seconds > 0,

@@ -66,11 +66,21 @@ async def process_voice_message(
         )
         
         if not result["success"]:
+            error_message = result.get('error', 'Unknown error')
+            
+            # Handle "No speech detected" case specifically
+            if "No speech detected" in error_message:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="NO_SPEECH_DETECTED"
+                )
+            
+            # Handle other voice processing errors
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Voice processing failed: {result.get('error')}"
+                detail=f"Voice processing failed: {error_message}"
             )
-        
+          
         return VoiceMessageResponse(
             success=True,
             transcription=result["transcription"],
@@ -78,7 +88,10 @@ async def process_voice_message(
             audio_response=result.get("audio_response"),
             processing_time=result.get("processing_time", {})
         )
-        
+
+    except HTTPException:
+        # Re-raise HTTPExceptions (like our 422) without modification
+        raise
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

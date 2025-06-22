@@ -80,6 +80,9 @@ const DashboardPage: React.FC = () => {
   const [isSwitchingAvatar, setIsSwitchingAvatar] = useState(false);
   const [operationStatus, setOperationStatus] = useState<string | null>(null);
   const [isEndingSession, setIsEndingSession] = useState(false);
+  const [isLockPeriodActive, setIsLockPeriodActive] = useState(false);
+  const [lockCountdown, setLockCountdown] = useState(0);
+  const lockTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const navigate = useNavigate();
 
@@ -634,6 +637,14 @@ const DashboardPage: React.FC = () => {
     }
   }, [quotaMessage]);
 
+  useEffect(() => {
+    return () => {
+      if (lockTimerRef.current) {
+        clearInterval(lockTimerRef.current);
+      }
+    };
+  }, []);
+
   // Update audio volume when volume control changes
   useEffect(() => {
     if (currentAudio) {
@@ -772,6 +783,13 @@ const DashboardPage: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.text();
+        
+        // Handle specific "No speech detected" case
+        if (response.status === 422 && errorData.includes('NO_SPEECH_DETECTED')) {
+          throw new Error("I had a hard time hearing you, can you try again?");
+        }
+        
+        // Handle other API errors
         throw new Error(`API Error: ${response.status} - ${errorData}`);
       }
 
@@ -959,6 +977,25 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const startLockPeriod = () => {
+    setIsLockPeriodActive(true);
+    setLockCountdown(10);
+    
+    const countdownInterval = setInterval(() => {
+      setLockCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          setIsLockPeriodActive(false);
+          setLockCountdown(0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    lockTimerRef.current = countdownInterval;
+  };
+
   // UPDATED: Avatar mode toggle with complete session lifecycle
   const toggleAvatarMode = async () => {
 
@@ -1043,6 +1080,9 @@ const DashboardPage: React.FC = () => {
     } finally {
       setIsSwitchingAvatar(false);
       setIsCheckingQuota(false);
+      
+      // Start 10-second lock period
+      startLockPeriod();
     }
   };
 
@@ -1088,7 +1128,7 @@ const DashboardPage: React.FC = () => {
                     <button 
                       className="mode-status-box"
                       onClick={toggleAvatarMode}
-                      disabled={isSwitchingAvatar || isCheckingQuota}
+                      disabled={isSwitchingAvatar || isCheckingQuota || isLockPeriodActive}
                       style={{
                         backgroundColor: useStaticAvatar ? '#4FD1C5' : '#5B7CFF',
                         opacity: (isSwitchingAvatar || isCheckingQuota) ? 0.6 : 1
@@ -1098,6 +1138,8 @@ const DashboardPage: React.FC = () => {
                         '🔄 Switching...'
                       ) : isCheckingQuota ? (
                         '🔍 Checking Quota...'
+                      ) : isLockPeriodActive ? (
+                        `🔒 Wait ${lockCountdown}s`
                       ) : (
                         useStaticAvatar ? 'Switch to Streaming' : 'Switch to Static'
                       )}
@@ -1171,6 +1213,16 @@ const DashboardPage: React.FC = () => {
                       Session Error: {sessionError}
                     </div>
                   )}
+                </div>
+              )}
+                  {isLockPeriodActive && (
+                    <div className="lock-message" style={{ 
+                      color: '#f59e0b', 
+                      fontSize: '12px', 
+                      marginTop: '4px',
+                      textAlign: 'center' 
+                    }}>
+                    Switch locked for {lockCountdown} seconds to prevent API errors
                 </div>
               )}
 

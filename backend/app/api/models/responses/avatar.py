@@ -13,7 +13,7 @@ class QuotaStatusResponse(BaseModel):
     
     can_create_session: bool = Field(
         ..., 
-        description="Whether user can create a new session (under 20-minute limit)"
+        description="Whether user can create a new session (under 15-minute limit)"
     )
     
     total_seconds_used: int = Field(
@@ -23,12 +23,12 @@ class QuotaStatusResponse(BaseModel):
     
     remaining_seconds: int = Field(
         ..., 
-        description="Remaining seconds before hitting 20-minute limit"
+        description="Remaining seconds before hitting 15-minute limit"
     )
     
     quota_exhausted: bool = Field(
         ..., 
-        description="Whether user has exhausted their 20-minute quota"
+        description="Whether user has exhausted their 15-minute quota"
     )
     
     quota_percentage: float = Field(
@@ -94,7 +94,7 @@ class SessionResponse(BaseModel):
                 "quota_info": {
                     "can_create_session": True,
                     "total_seconds_used": 0,
-                    "remaining_seconds": 1200,
+                    "remaining_seconds": 900,
                     "quota_exhausted": False,
                     "quota_percentage": 0.0
                 },
@@ -129,7 +129,7 @@ class SessionStatusResponse(BaseModel):
     
     remaining_seconds: Optional[int] = Field(
         None, 
-        description="Seconds remaining before 20-minute timeout (for active sessions)"
+        description="Seconds remaining before 15-minute timeout (for active sessions)"
     )
     
     avatar_name: Optional[str] = Field(
@@ -221,11 +221,11 @@ class AvatarErrorResponse(BaseModel):
             "example": {
                 "success": False,
                 "error_code": "QUOTA_EXHAUSTED",
-                "error_message": "20-minute avatar streaming quota has been exhausted",
-                "details": "User has used 1200/1200 seconds",
+                "error_message": "15-minute avatar streaming quota has been exhausted",
+                "details": "User has used 900/900 seconds",
                 "quota_status": {
                     "can_create_session": False,
-                    "total_seconds_used": 1200,
+                    "total_seconds_used": 900,
                     "remaining_seconds": 0,
                     "quota_exhausted": True,
                     "quota_percentage": 100.0
