@@ -1,17 +1,21 @@
+// Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+// Type declarations for Deno
+declare global {
+  const Deno: {
+    env: {
+      get(key: string): string | undefined;
+    };
+    serve(handler: (req: Request) => Promise<Response> | Response): void;
+  };
+}
 
 console.log("📞 Contact form function started");
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-// Initialize Supabase client with service role key for admin operations
-const supabase = createClient(
-  SUPABASE_URL!,
-  SUPABASE_SERVICE_ROLE_KEY!
-);
 
 Deno.serve(async (req) => {
   // Handle CORS
@@ -46,75 +50,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get and increment case ID
-    let caseId = 1;
-    
-    try {
-      // First, try to get the current case counter
-      const { data: counterData, error: counterError } = await supabase
-        .from('case_counter')
-        .select('last_case_id')
-        .single();
-
-      if (counterError && counterError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error fetching case counter:', counterError);
-      }
-
-      if (counterData) {
-        caseId = counterData.last_case_id + 1;
-        
-        // Update the counter
-        const { error: updateError } = await supabase
-          .from('case_counter')
-          .update({ last_case_id: caseId })
-          .eq('id', 1);
-
-        if (updateError) {
-          console.error('Error updating case counter:', updateError);
-        }
-      } else {
-        // Initialize counter if it doesn't exist
-        const { error: insertError } = await supabase
-          .from('case_counter')
-          .insert({ id: 1, last_case_id: 1 });
-
-        if (insertError) {
-          console.error('Error initializing case counter:', insertError);
-        }
-      }
-    } catch (error) {
-      console.error('Case ID generation error:', error);
-      // Fallback to timestamp-based ID if database is not available
-      caseId = Math.floor(Date.now() / 1000);
-    }
-
+    // Generate a simple case ID based on timestamp
+    const caseId = Math.floor(Date.now() / 1000);
     console.log(`📋 Generated Case ID: #${caseId}`);
 
-    // Store the contact submission
-    try {
-      const { error: submissionError } = await supabase
-        .from('contact_submissions')
-        .insert({
-          case_id: caseId,
-          full_name: fullName,
-          email: email,
-          phone: phone || null,
-          subject: subject || 'General Inquiry',
-          message: message,
-          created_at: new Date().toISOString()
-        });
-
-      if (submissionError) {
-        console.error('Error storing submission:', submissionError);
-      }
-    } catch (error) {
-      console.error('Database storage error:', error);
-      // Continue with email sending even if storage fails
-    }
+    // Note: Contact submission storage can be added later via database API
+    console.log(`📝 Contact submission received - Case #${caseId} from ${email}`);
 
     // Send email to support team
     const supportEmail = {
       from: 'Oprina Contact Form <hello@oprinaai.com>',
+      reply_to: ['oprina123789@gmail.com'],
       to: ['oprina123789@gmail.com'],
       subject: `Oprina Support Case #${caseId} - ${subject || 'General Inquiry'}`,
       html: `
@@ -192,6 +138,7 @@ Next Steps:
     // Send confirmation email to user
     const confirmationEmail = {
       from: 'Oprina Support <hello@oprinaai.com>',
+      reply_to: ['oprina123789@gmail.com'],
       to: [email],
       subject: `Case #${caseId} - We've received your message`,
       html: `

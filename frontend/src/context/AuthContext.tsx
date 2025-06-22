@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  signupWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserDisplayName: (displayName: string) => void;
 }
@@ -154,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`
+        emailRedirectTo: `${window.location.origin}/thank-you`
       }
     });
     if (error) throw error;
@@ -164,7 +165,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`
+        redirectTo: `${window.location.origin}/dashboard?login=true`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account' // For login: just account selection, no consent unless new account
+        }
+      }
+    });
+    if (error) throw error;
+  };
+
+  const signupWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard?signup=true`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent select_account'
+        }
       }
     });
     if (error) throw error;
@@ -186,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Update userProfile state if it exists
     if (userProfile) {
-      setUserProfile(prev => ({
+      setUserProfile((prev: any) => ({
         ...prev,
         display_name: displayName
       }));
@@ -200,6 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     signup,
     loginWithGoogle,
+    signupWithGoogle,
     logout,
     updateUserDisplayName
   };

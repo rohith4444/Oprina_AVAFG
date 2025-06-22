@@ -1,6 +1,16 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+// Type declarations for Deno
+declare global {
+  const Deno: {
+    env: {
+      get(key: string): string | undefined;
+    };
+    serve(handler: (req: Request) => Promise<Response> | Response): void;
+  };
+}
+
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 Deno.serve(async (req) => {
@@ -40,6 +50,7 @@ Deno.serve(async (req) => {
     // Prepare welcome email content
     const welcomeEmail = {
       from: 'Oprina <hello@oprinaai.com>',
+      reply_to: ['oprina123789@gmail.com'],
       to: [email],
       subject: 'Welcome to Oprina',
       html: `
@@ -298,7 +309,7 @@ Deno.serve(async (req) => {
 
               <!-- Call-to-Action -->
               <div class="cta-section">
-                <a href="https://oprinaai.com/dashboard" class="cta-button">Get Started with Oprina</a>
+                <a href="http://localhost:5173/get-started" class="cta-button">Get Started with Oprina</a>
               </div>
 
               <!-- Quick Start Tips -->
@@ -316,7 +327,7 @@ Deno.serve(async (req) => {
             <!-- Footer -->
             <div class="footer">
               <p>
-                Need help? <a href="mailto:support@oprina.com">Contact Support</a>
+                Need help? <a href="http://localhost:5173/contact">Contact Support</a>
               </p>
               <p>© 2025 Oprina. All rights reserved.</p>
             </div>
@@ -344,7 +355,7 @@ What You Can Do Now:
 
 🤖 AI Suggestions: Get smart responses and productivity nudges.
 
-🚀 Get Started with Oprina: https://oprinaai.com/dashboard
+🚀 Get Started with Oprina: http://localhost:5173/get-started
 
 🧭 Quick Start Tips:
 • Connect Gmail & Calendar
@@ -352,7 +363,7 @@ What You Can Do Now:
 • Customize Your Preferences
 • Contact Support if Needed
 
-Need help? Contact Support: support@oprina.com
+Need help? Contact Support: http://localhost:5173/contact
 
 © ${new Date().getFullYear()} Oprina. All rights reserved.
       `
