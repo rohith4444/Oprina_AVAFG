@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     TOKEN_REFRESH_INTERVAL_MINUTES: int = 30
     CLEANUP_INTERVAL_HOURS: int = 6
 
-    # ENCRYPTION_KEY: str = ""
+    ENCRYPTION_KEY: str = ""
     
     # Logging
     LOG_LEVEL: str = "INFO"

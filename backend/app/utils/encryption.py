@@ -36,17 +36,18 @@ class EncryptionManager:
     """Manages encryption operations for the application."""
     
     def __init__(self, encryption_key: Optional[str] = None):
-        """Initialize encryption manager with key."""
         if encryption_key:
-            self._key = encryption_key.encode()
+            self._key = base64.b64decode(encryption_key)  # ✅ FIXED encoding issue too
         else:
-            # Use environment variable or generate a key
-            key_b64 = os.getenv('ENCRYPTION_KEY')
+            from app.config import get_settings  # ✅ Import settings
+            settings = get_settings()
+            key_b64 = settings.ENCRYPTION_KEY
             if key_b64:
                 self._key = base64.b64decode(key_b64)
             else:
                 logger.warning("No encryption key provided, generating temporary key")
-                self._key = Fernet.generate_key()
+                # self._key = Fernet.generate_key()  # Your commented line
+                raise ValueError("ENCRYPTION_KEY must be set for secure token storage")  
         
         self._fernet = Fernet(self._key)
     
