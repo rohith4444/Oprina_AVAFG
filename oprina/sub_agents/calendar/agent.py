@@ -12,3 +12,6 @@ calendar_agent = Agent(
     instruction=prompt.CALENDAR_AGENT_INSTR,
     tools=CALENDAR_TOOLS,
 )
+
+# # ADK evaluation framework expects 'root_agent' variable
+# root_agent = calendar_agent

@@ -12,3 +12,6 @@ email_agent = Agent(
     instruction=prompt.EMAIL_AGENT_INSTR,
     tools=GMAIL_TOOLS,
 )
+
+# # ADK evaluation framework expects 'root_agent' variable
+# root_agent = email_agent

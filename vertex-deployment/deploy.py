@@ -49,13 +49,46 @@ def create() -> None:
         enable_tracing=True,
     )
 
+    # ✨ ADD ENVIRONMENT VARIABLES FOR DATABASE ACCESS
+    env_vars = {
+        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
+        "SUPABASE_KEY": os.getenv("SUPABASE_KEY"),
+        "SUPABASE_SERVICE_KEY": os.getenv("SUPABASE_SERVICE_KEY"),
+        "GOOGLE_CLIENT_ID": os.getenv("GOOGLE_CLIENT_ID"),
+        "GOOGLE_CLOUD_STAGING_BUCKET": os.getenv("GOOGLE_CLOUD_STAGING_BUCKET"),
+        "GOOGLE_CLIENT_SECRET": os.getenv("GOOGLE_CLIENT_SECRET"),
+        # "GOOGLE_CLOUD_PROJECT": os.getenv("GOOGLE_CLOUD_PROJECT"),
+        # "GOOGLE_CLOUD_LOCATION": os.getenv("GOOGLE_CLOUD_LOCATION"),
+    }
+
+    # Print each environment variable (mask sensitive ones)
+    for key, value in env_vars.items():
+        if value:
+            if "SECRET" in key or "KEY" in key:
+                # Mask sensitive values
+                masked_value = value[:8] + "*" * (len(value) - 16) + value[-8:] if len(value) > 16 else "*" * len(value)
+                print(f"✅ {key}: {masked_value}")
+            else:
+                # Show full value for non-sensitive variables
+                print(f"✅ {key}: {value}")
+        else:
+            print(f"❌ {key}: NOT SET")
+    
+    print("="*60)
+
     # Now deploy to Agent Engine
     remote_app = agent_engines.create(
         agent_engine=app,
         requirements=[
             "google-cloud-aiplatform[adk,agent_engines]",
+            "supabase",  # ✨ DATABASE ACCESS
+            "google-auth", 
+            "google-auth-oauthlib",
+            "google-api-python-client",
+            "google-generativeai"  # ✨ FOR AI FEATURES
         ],
         extra_packages=["./oprina"],
+        env_vars=env_vars  # ✨ PASS ENVIRONMENT VARIABLES
     )
     print(f"Created remote app: {remote_app.resource_name}")
 
