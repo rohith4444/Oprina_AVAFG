@@ -88,20 +88,30 @@ Update your `backend/.env` for production:
 # Database (same as local)
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SUPABASE_SERVICE_KEY=your-supabase-service-role-key
 
 # AI Services (same agent ID from local deployment)
 VERTEX_AI_AGENT_ID=your-deployed-agent-id
 GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
 
+# OAuth (production credentials)
+GOOGLE_CLIENT_ID=your-production-google-client-id
+GOOGLE_CLIENT_SECRET=your-production-google-secret
+
+# Security
+ENCRYPTION_KEY=your-production-encryption-key
+
+# Application URLs (Production)
+FRONTEND_URL=https://your-frontend-domain.vercel.app
+BACKEND_API_URL=https://your-backend-url.run.app
+GOOGLE_REDIRECT_URI=https://your-backend-url.run.app/api/v1/oauth/callback
+CORS_ORIGINS=https://your-frontend-domain.vercel.app,https://your-custom-domain.com
+
 # Production Server Settings
 HOST=0.0.0.0
 PORT=8080
 ENVIRONMENT=production
-
-# CORS Origins (UPDATE AFTER FRONTEND DEPLOYMENT)
-CORS_ORIGINS=https://your-frontend-domain.vercel.app,https://your-custom-domain.com
 
 # Optional Services
 HEYGEN_API_KEY=your-heygen-api-key  # If using avatars
@@ -177,7 +187,7 @@ git push origin main
    - Import from GitHub
    - Select your Oprina repository
    - **Root Directory**: Set to `frontend/`
-   - **Framework Preset**: Next.js (auto-detected)
+   - **Framework Preset**: Vite (auto-detected)
 
 ### 10.3 Configure Environment Variables
 
@@ -189,24 +199,22 @@ In Vercel Dashboard → Your Project → Settings → Environment Variables:
 # =============================================================================
 
 # Backend Connection (UPDATE with your Cloud Run URL)
-NEXT_PUBLIC_BACKEND_URL=https://oprina-backend-xxx-uc.a.run.app/api
+VITE_BACKEND_URL=https://oprina-backend-xxx-uc.a.run.app
 
 # Supabase (same as local)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# Application URL (Vercel will auto-generate)
-NEXT_PUBLIC_URL=https://your-project.vercel.app
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 # Avatar Services (if using)
-NEXT_PUBLIC_HEYGEN_API_KEY=your-heygen-api-key
-NEXT_PUBLIC_HEYGEN_API_URL=https://api.heygen.com/
-NEXT_PUBLIC_HEYGEN_AVATAR_ID=Ann_Therapist_public
+VITE_HEYGEN_API_KEY=your-heygen-api-key
+VITE_HEYGEN_API_URL=https://api.heygen.com/
+VITE_HEYGEN_AVATAR_ID=Ann_Therapist_public
 
 # Production Settings
-NEXT_PUBLIC_USE_STATIC_AVATAR=true
-NEXT_PUBLIC_SHOW_AVATAR_TOGGLE=true
-NEXT_PUBLIC_DEBUG_AVATAR_API=false  # Disable debug in production
+VITE_USE_STATIC_AVATAR=false
+VITE_SHOW_AVATAR_TOGGLE=false
+VITE_DEBUG_AVATAR_API=false
+VITE_CACHE_AVATAR_IMAGES=true
 ```
 
 **Environment Setting**: Set to "Production" for all variables
@@ -301,7 +309,7 @@ gcloud run domain-mappings create --service oprina-backend --domain api.yourdoma
 1. ✅ Homepage loads with proper branding
 2. ✅ Sign up → Email verification → Login flow
 3. ✅ Dashboard loads after authentication
-4. ✅ Voice features work (microphone permissions)
+4. ✅ Text-based chat features work
 5. ✅ Avatar integration works (if enabled)
 
 **Backend API Testing**:
@@ -316,7 +324,7 @@ open https://your-backend-url.run.app/docs
 **OAuth Integration Testing**:
 1. ✅ Settings → Connect Gmail → OAuth flow completes
 2. ✅ Settings → Connect Calendar → OAuth flow completes  
-3. ✅ Voice commands work: "Check my emails"
+3. ✅ Text commands work: "Check my emails"
 4. ✅ Agent responds through deployed Vertex AI
 
 ### 12.2 Performance Verification
@@ -408,6 +416,7 @@ gcloud builds log BUILD_ID
 - Check build logs in Vercel dashboard
 - Verify `frontend/` directory structure
 - Check Node.js version compatibility
+- Ensure Vite configuration is correct
 
 **Environment Variable Issues**:
 ```bash
@@ -429,7 +438,6 @@ curl https://your-backend-url.run.app/api/v1/health/env-check
 1. Update `CORS_ORIGINS` in backend environment
 2. Redeploy backend after changes
 3. Clear browser cache and test
- 
 
 ---
 
@@ -444,14 +452,14 @@ curl https://your-backend-url.run.app/api/v1/health/env-check
 - ✅ Auto-scaling configured for expected traffic
 
 **Configuration**:
-- ✅ Environment variables properly configured
+- ✅ Environment variables properly configured (including encryption key)
 - ✅ CORS origins updated for production URLs
 - ✅ OAuth redirect URLs updated in Google Console
 - ✅ Supabase redirect URLs configured
 
 **Testing**:
 - ✅ Complete user flow tested (signup → login → chat)
-- ✅ Voice features working in production
+- ✅ Text-based chat features working in production
 - ✅ Gmail/Calendar OAuth integration tested
 - ✅ Agent responses working through Vertex AI
 - ✅ Performance metrics within acceptable ranges
@@ -469,7 +477,4 @@ curl https://your-backend-url.run.app/api/v1/health/env-check
 - **API Documentation**: `https://your-backend-url.run.app/docs`
 - **Health Check**: `https://your-backend-url.run.app/api/v1/health/ping`
 
-
 **🎯 Your Oprina production deployment is now live and ready for users!**
-
- 

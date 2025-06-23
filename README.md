@@ -34,7 +34,9 @@ Oprina's comprehensive platform features HeyGen streaming avatars for lifelike i
 
 ## See it in action
 
-![demo_chat](https://github.com/khoj-ai/khoj/blob/master/documentation/assets/img/quadratic_equation_khoj_web.gif?raw=true)
+<div align="center">
+  <iframe width="560" height="315" src="https://www.youtube.com/embed/m88sOnv-qvM" title="Oprina Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
 
 Go to https://www.oprinaai.com to see Oprina live.
 
@@ -52,7 +54,7 @@ Go to https://www.oprinaai.com to see Oprina live.
 
 ## Oprina Architecture
 
-![Architecture Diagram](docs/images/architecture.png)
+![Architecture Diagram](docs/images/Oprina_Architecture_Diagram.drawio.png)
 
 Oprina consists of five main components working together to deliver a seamless conversational AI experience:
 
@@ -94,7 +96,7 @@ Both guides include:
 <tr>
     <td align="center">
         <a href="https://github.com/rohith4444">
-            <img src="https://github.com/rohith4444.png" width="100px;" alt="Rohith Reddy Mandala"/>
+            <img src="docs/images/Rohith profile pic.jpg" width="100px;" alt="Rohith Reddy Mandala"/>
             <br />
             <sub><b>Rohith Reddy Mandala</b></sub>
         </a>
@@ -112,7 +114,7 @@ Both guides include:
     </td>
     <td align="center">
         <a href="https://github.com/calvinhoang203">
-            <img src="https://github.com/calvinhoang203.png" width="100px;" alt="Hieu Hoang (Calvin)"/>
+            <img src="docs/images/Hieu_Professional_Photo.jpg" width="100px;" alt="Hieu Hoang (Calvin)"/>
             <br />
             <sub><b>Hieu Hoang (Calvin)</b></sub>
         </a>

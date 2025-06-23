@@ -219,13 +219,6 @@ Edit the `.env` file with your actual values:
 
 ```bash
 # =============================================================================
-# 🎯 OPRINA AGENT CONFIGURATION
-# =============================================================================
-
-# Tools Mode - Controls which tool set your agents use
-OPRINA_TOOLS_MODE=local  # Use 'local' for development, 'prod' for deployment
-
-# =============================================================================
 # ☁️ GOOGLE CLOUD CONFIGURATION (REQUIRED)
 # =============================================================================
 
@@ -277,17 +270,13 @@ adk web
 
 **Expected Output:**
 ```
-🔧 Gmail AGENT USING TOOLS_MODE: local
-📁 Using tools_local
-🔧 CALENDAR AGENT USING TOOLS_MODE: local
-📁 Using tools_local
 Starting ADK web interface...
 Server running at: http://localhost:8080
 ```
 
 🌐 **Browser Testing**: 
-- Open adk web hosted url.
-- Test voice commands: "Check my emails", "What's on my calendar?"
+- Open the ADK web interface URL
+- Test text commands: "Check my emails", "What's on my calendar?"
 - Test email operations: "Send an email to john@example.com"
 - Verify OAuth tokens work correctly
 
@@ -298,9 +287,6 @@ Server running at: http://localhost:8080
 # If ADK not found
 pip install google-cloud-aiplatform[adk]
 
-# If tools not loading
-echo $OPRINA_TOOLS_MODE  # Should show 'local'
-
 # If OAuth fails
 ls oprina/*.pickle  # Should show token files
 ```
@@ -309,19 +295,7 @@ ls oprina/*.pickle  # Should show token files
 
 ## Step 7: Agent Deployment to Vertex AI
 
-### 7.1 Switch to Production Mode
-
-```bash
-# Edit .env file and change:
-OPRINA_TOOLS_MODE=prod  # Change from 'local' to 'prod'
-```
-
-**What This Changes:**
-- Agents now use `oprina/tools_prod/` instead of `oprina/tools/`
-- Production tools connect to database for multi-user OAuth
-- No local token files needed for deployed agent
-
-### 7.2 Deploy Agent
+### 7.1 Deploy Agent
 
 ```bash
 # Deploy agent to Vertex AI
@@ -335,7 +309,7 @@ Agent uploaded successfully
 Created remote app: projects/your-project/locations/us-central1/reasoningEngines/1234567890
 ```
 
-### 7.3 Management Commands
+### 7.2 Management Commands
 
 ```bash
 # List all deployments
@@ -375,39 +349,45 @@ python -m vertex-deployment.deploy --send --resource_id=1234567890 --session_id=
    - **Anon public key**: `SUPABASE_KEY`
    - **Service role key**: `SUPABASE_SERVICE_KEY`
 
-8.3 Run Database Migrations
+### 8.3 Run Database Migrations
+
 Navigate to your Supabase project → SQL Editor → New Query, then run the migration files:
-Migration Files Location:
+
+**Migration Files Location:**
 The database migration files are located in your project at:
+```
 backend/migrations/
 ├── 01_extensions.sql
 ├── 02_users_table.sql
 ├── 03_sessions_table.sql
 ├── 04_messages_table.sql
 ├── 06_avatar_qouta_table.sql
-└── o7_avatar_sessions_table.sql
+└── 07_avatar_sessions_table.sql
 
 supabase/migrations/
 └── 20240101_create_contact_tables.sql
-How to Run Migrations:
+```
 
-Open each migration file from the backend/migrations/ and supabase/migrations/ folders
-Copy the SQL content from each file
-Paste into Supabase SQL Editor → New Query
-Execute each migration in order:
+**How to Run Migrations:**
 
-Run in this order:
+1. Open each migration file from the `backend/migrations/` and `supabase/migrations/` folders
+2. Copy the SQL content from each file
+3. Paste into Supabase SQL Editor → New Query
+4. Execute each migration in order:
 
-01_extensions.sql - Enables required PostgreSQL extensions
-02_users_table.sql - User accounts and profiles table
-03_sessions_table.sql - Chat sessions table
-04_messages_table.sql - Messages and conversation history
-06_avatar_qouta_table.sql - Avatar usage quota tracking
-o7_avatar_sessions_table.sql - Avatar streaming sessions
-20240101_create_contact_tables.sql - Contact form system tables
+**Run in this order:**
 
-Quick Access:
-bash# View migration files
+1. `01_extensions.sql` - Enables required PostgreSQL extensions
+2. `02_users_table.sql` - User accounts and profiles table
+3. `03_sessions_table.sql` - Chat sessions table
+4. `04_messages_table.sql` - Messages and conversation history
+5. `06_avatar_qouta_table.sql` - Avatar usage quota tracking
+6. `07_avatar_sessions_table.sql` - Avatar streaming sessions
+7. `20240101_create_contact_tables.sql` - Contact form system tables
+
+**Quick Access:**
+```bash
+# View migration files
 ls backend/migrations/
 ls supabase/migrations/
 
@@ -417,8 +397,9 @@ cat backend/migrations/02_users_table.sql
 cat backend/migrations/03_sessions_table.sql
 cat backend/migrations/04_messages_table.sql
 cat backend/migrations/06_avatar_qouta_table.sql
-cat backend/migrations/o7_avatar_sessions_table.sql
+cat backend/migrations/07_avatar_sessions_table.sql
 cat supabase/migrations/20240101_create_contact_tables.sql
+```
 
 ### 8.4 Configure Database Access
 
@@ -447,7 +428,7 @@ Edit `backend/.env` with your values:
 # =============================================================================
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SUPABASE_SERVICE_KEY=your-supabase-service-role-key
 
 # =============================================================================
 # 🤖 AI SERVICES (REQUIRED)
@@ -458,6 +439,21 @@ VERTEX_AI_AGENT_ID=1234567890  # Replace with your actual agent ID
 # Google Cloud Configuration
 GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
+
+# OAuth (for Gmail/Calendar integration)
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-secret
+
+# Security
+ENCRYPTION_KEY=your-encryption-key-here
+
+# =============================================================================
+# 🌐 APPLICATION URLS (DEVELOPMENT)
+# =============================================================================
+FRONTEND_URL=http://localhost:5173
+BACKEND_API_URL=http://localhost:8000
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/oauth/callback
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:3001
 
 # =============================================================================
 # 🎙️ VOICE SERVICES (OPTIONAL)
@@ -484,31 +480,42 @@ ENVIRONMENT=development
 ```
 
 ### 9.2 Install Backend Dependencies
-bash# Dependencies already installed in Step 1
+
+```bash
+# Dependencies already installed in Step 1
 # No need to install again - same requirements.txt file
 
 # Verify FastAPI installation
 python -c "import fastapi; print('FastAPI installed successfully')"
 python -c "import supabase; print('Supabase client installed successfully')"
-Note: Dependencies were already installed in Step 1 when we ran pip install -r requirements.txt from the root directory.
+```
 
+**Note**: Dependencies were already installed in Step 1 when we ran `pip install -r requirements.txt` from the root directory.
 
 ### 9.3 Run Backend Server
-bash# Make sure you're in backend/ directory
+
+```bash
+# Make sure you're in backend/ directory
 cd backend
 
 # Start the backend API server with auto-reload
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-Expected Output:
+```
+
+**Expected Output:**
+```
 INFO:     Will watch for changes in these directories: ['/path/to/backend']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     Started reloader process [12345]
 INFO:     Started server process [12346]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+```
 
 ### 9.4 Test Backend API
-bash# In another terminal, test the API
+
+```bash
+# In another terminal, test the API
 curl http://localhost:8000/api/v1/health/ping
 
 # Should return:
@@ -537,10 +544,10 @@ npm list @supabase/supabase-js
 
 ```bash
 # Create frontend environment file
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Edit `.env.local`:
+Edit `.env`:
 
 ```bash
 # =============================================================================
@@ -548,29 +555,26 @@ Edit `.env.local`:
 # =============================================================================
 
 # Backend Connection (local development)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000/api
+VITE_BACKEND_URL=http://localhost:8000
 
 # Supabase Configuration (same as backend)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-# Application URL
-NEXT_PUBLIC_URL=http://localhost:3000
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
 # =============================================================================
 # 🎭 AVATAR CONFIGURATION (OPTIONAL)
 # =============================================================================
 
 # HeyGen Configuration (if using avatars)
-NEXT_PUBLIC_HEYGEN_API_KEY=your-heygen-api-key
-NEXT_PUBLIC_HEYGEN_API_URL=https://api.heygen.com/
-NEXT_PUBLIC_HEYGEN_AVATAR_ID=Ann_Therapist_public
+VITE_HEYGEN_API_KEY=your-heygen-api-key
+VITE_HEYGEN_API_URL=https://api.heygen.com/
+VITE_HEYGEN_AVATAR_ID=Ann_Therapist_public
 
 # Avatar Settings
-NEXT_PUBLIC_USE_STATIC_AVATAR=true
-NEXT_PUBLIC_ENABLE_AVATAR_SELECTOR=false
-NEXT_PUBLIC_SHOW_AVATAR_TOGGLE=true
-NEXT_PUBLIC_DEBUG_AVATAR_API=true  # Enable for development debugging
+VITE_USE_STATIC_AVATAR=true
+VITE_ENABLE_AVATAR_SELECTOR=false
+VITE_SHOW_AVATAR_TOGGLE=true
+VITE_DEBUG_AVATAR_API=true  # Enable for development debugging
 ```
 
 ### 10.3 Run Frontend Development Server
@@ -582,11 +586,11 @@ npm run dev
 
 **Expected Output:**
 ```
-   ▲ Next.js 14.0.0
-   - Local:        http://localhost:3000
-   - Network:      http://192.168.1.xxx:3000
+  VITE v5.0.0  ready in 500 ms
 
- ✓ Ready in 2.3s
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
 ```
 
 ---
@@ -595,7 +599,7 @@ npm run dev
 
 ### 11.1 Test Full Integration
 
-**Open your browser to: http://localhost:3000**
+**Open your browser to: http://localhost:5173**
 
 #### Test Authentication Flow:
 1. Click "Sign Up" → Create account
@@ -603,11 +607,10 @@ npm run dev
 3. Verify email and login
 4. Should reach dashboard
 
-#### Test Voice Features:
-1. Grant microphone permissions
-2. Click microphone button
-3. Say: "Check my recent emails"
-4. Verify agent responds appropriately
+#### Test Text-Based Features:
+1. Access the chat interface
+2. Type: "Check my recent emails"
+3. Verify agent responds appropriately
 
 #### Test Email Integration:
 1. Go to settings → Connect Gmail
@@ -626,7 +629,7 @@ npm run dev
 # Check all services are running:
 
 # 1. Frontend
-curl http://localhost:3000  # Should return HTML
+curl http://localhost:5173  # Should return HTML
 
 # 2. Backend API  
 curl http://localhost:8000/api/v1/health/ping  # Should return JSON
@@ -685,15 +688,12 @@ python setup_calendar.py
 ### Frontend Connection Issues
 ```bash
 # Check CORS settings in backend
-# Verify NEXT_PUBLIC_BACKEND_URL in .env.local
+# Verify VITE_BACKEND_URL in .env
 # Check browser developer console for errors
 ```
 
 ### Agent Deployment Issues
 ```bash
-# Check tools mode
-grep OPRINA_TOOLS_MODE .env
-
 # Verify staging bucket exists
 gsutil ls gs://your-bucket-name
 
@@ -715,15 +715,15 @@ python -m vertex-deployment.deploy --list  # Note resource_id
 ✅ Local agent testing works with `adk web`  
 ✅ Agent successfully deployed to Vertex AI with resource ID  
 ✅ Supabase project created and migrations run  
-✅ Backend .env configured with agent ID and Supabase credentials  
+✅ Backend .env configured with agent ID, Supabase credentials, and encryption key  
 ✅ Backend API running on http://localhost:8000  
-✅ Frontend .env.local configured with backend URL  
-✅ Frontend running on http://localhost:3000  
+✅ Frontend .env configured with backend URL  
+✅ Frontend running on http://localhost:5173  
 ✅ Full authentication flow works (signup → verification → login)  
-✅ Voice features work with microphone permissions  
+✅ Text-based chat features work  
 ✅ Gmail OAuth connection works through settings  
 ✅ Calendar OAuth connection works through settings  
-✅ Agent responds to voice commands and API calls  
+✅ Agent responds to text commands and API calls  
 
 ---
 
@@ -734,4 +734,4 @@ python -m vertex-deployment.deploy --list  # Note resource_id
 - **Frontend Customization**: See `frontend/README.md` for component guide
 - **Agent Development**: Review `oprina/README.md` for agent customization
 
-**🎯 Your local development environment is now fully configured!** You can start developing features, testing voice interactions, and customizing the Oprina experience.
+**🎯 Your local development environment is now fully configured!** You can start developing features, testing text interactions, and customizing the Oprina experience.

@@ -46,8 +46,20 @@ GOOGLE_CLOUD_PROJECT=your-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_CLOUD_STAGING_BUCKET=gs://your-bucket-name
 
-# Agent Mode (important!)
-OPRINA_TOOLS_MODE=prod
+# Vertex AI Configuration
+GOOGLE_GENAI_USE_VERTEXAI=1
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Security
+ENCRYPTION_KEY=your-encryption-key
+
+# Database Configuration
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_KEY=your-supabase-service-role-key
 ```
 
 ## 🚀 Deployment Commands
@@ -275,6 +287,7 @@ remote_app = agent_engines.create(
 echo $GOOGLE_CLOUD_PROJECT
 echo $GOOGLE_CLOUD_LOCATION
 echo $GOOGLE_CLOUD_STAGING_BUCKET
+echo $GOOGLE_GENAI_USE_VERTEXAI
 
 # Verify authentication
 gcloud auth list
@@ -306,8 +319,23 @@ gsutil iam get $GOOGLE_CLOUD_STAGING_BUCKET
 # Test agent import locally
 python -c "from oprina.agent import root_agent; print(root_agent.name)"
 
-# Check tools mode
-echo $OPRINA_TOOLS_MODE  # Should be 'prod' for deployment
+# Verify environment variables are loaded
+python -c "import os; print('Project:', os.getenv('GOOGLE_CLOUD_PROJECT'))"
+```
+
+**Database Connection Issues**
+```bash
+# Check Supabase configuration
+echo $SUPABASE_URL
+echo $SUPABASE_KEY
+
+# Test database connection
+python -c "
+from supabase import create_client
+import os
+supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+print('Supabase connection successful')
+"
 ```
 
 ### Session Management Issues
@@ -348,22 +376,19 @@ python -m vertex-deployment.deploy --list
 python -m vertex-deployment.deploy --send --resource_id=ID --user_id=monitor --session_id=health_check --message="ping"
 ```
 
-
 ## 🔄 Development Workflow
 
 ### Development to Production
 
 1. **Local Development**
    ```bash
-   # Set local mode
-   OPRINA_TOOLS_MODE=local
-   adk web  # Test locally
+   # Test locally with ADK
+   adk web  # Test locally at http://localhost:8080
    ```
 
 2. **Production Deployment**
    ```bash
-   # Set production mode
-   OPRINA_TOOLS_MODE=prod
+   # Deploy to Vertex AI
    python -m vertex-deployment.deploy --create
    ```
 
@@ -404,5 +429,23 @@ const response = await fetch('/api/v1/agent/chat', {
   body: JSON.stringify({ message: userInput })
 });
 ```
+
+### Required Environment Variables Summary
+
+**Essential Variables:**
+- `GOOGLE_CLOUD_PROJECT` - Your Google Cloud project ID
+- `GOOGLE_CLOUD_LOCATION` - Deployment region (e.g., us-central1)
+- `GOOGLE_CLOUD_STAGING_BUCKET` - Cloud Storage bucket for deployment staging
+- `GOOGLE_GENAI_USE_VERTEXAI` - Enable Vertex AI (set to 1)
+
+**Authentication:**
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- `ENCRYPTION_KEY` - Security encryption key
+
+**Database:**
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_KEY` - Supabase anonymous key
+- `SUPABASE_SERVICE_KEY` - Supabase service role key
 
 For local development and testing, see the [Oprina README](../oprina/README.md).

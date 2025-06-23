@@ -49,93 +49,19 @@ backend/
 ├── .env.production.example      # Production environment template
 ├── README.md                    # This documentation
 ├── app/
-│   ├── __init__.py             # Package initialization
 │   ├── main.py                 # FastAPI application entry point
 │   ├── config.py               # Configuration management
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── dependencies.py     # Dependency injection
+│   ├── api/                    # API endpoints and models
 │   │   ├── endpoints/          # API route handlers
-│   │   │   ├── __init__.py
-│   │   │   ├── health.py       # Health check endpoints
-│   │   │   ├── auth.py         # Authentication utilities (Supabase integration)
-│   │   │   ├── user.py         # User management
-│   │   │   ├── sessions.py     # Chat session management
-│   │   │   ├── oauth.py        # OAuth integration
-│   │   │   ├── voice.py        # Voice processing
-│   │   │   ├── avatar.py       # Avatar session management
-│   │   │   └── test_supabase.py # Supabase connection testing
 │   │   └── models/             # Request/response schemas
-│   │       ├── __init__.py
-│   │       ├── requests/       # API request models
-│   │       │   ├── __init__.py
-│   │       │   ├── auth.py
-│   │       │   ├── avatar.py
-│   │       │   ├── oauth.py
-│   │       │   ├── sessions.py
-│   │       │   ├── user.py
-│   │       │   └── voice.py
-│   │       └── responses/      # API response models
-│   │           ├── __init__.py
-│   │           ├── auth.py
-│   │           ├── avatar.py
-│   │           ├── oauth.py
-│   │           ├── sessions.py
-│   │           ├── user.py
-│   │           └── voice.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── database/
-│   │   │   ├── __init__.py
-│   │   │   ├── connection.py   # Database client setup
-│   │   │   ├── models.py       # Database models
-│   │   │   ├── schema_validator.py
-│   │   │   └── repositories/   # Data access objects
-│   │   │       ├── __init__.py
-│   │   │       ├── user_repository.py
-│   │   │       ├── session_repository.py
-│   │   │       ├── message_repository.py
-│   │   │       ├── avatar_repository.py
-│   │   │       └── token_repository.py
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   ├── user_service.py     # User business logic
-│   │   │   ├── agent_service.py    # AI agent integration
-│   │   │   ├── voice_service.py    # Voice processing
-│   │   │   ├── avatar_service.py   # Avatar management
-│   │   │   ├── google_oauth_service.py # OAuth integration
-│   │   │   └── background_tasks.py # Background services
+│   ├── core/                   # Business logic
+│   │   ├── database/           # Database connections and repositories
+│   │   ├── services/           # Business logic services
 │   │   └── integrations/       # External service clients
-│   │       ├── __init__.py
-│   │       ├── client.py       # HTTP client configuration
-│   │       └── speech/         # Google Cloud Speech services
-│   │           ├── __init__.py
-│   │           ├── speech_to_text.py
-│   │           └── text_to_speech.py
-│   └── utils/
-│       ├── __init__.py
-│       ├── auth.py             # Authentication utilities
-│       ├── encryption.py       # Data encryption utilities
-│       ├── errors.py           # Custom exceptions
-│       ├── logging.py          # Logging configuration
-│       ├── supabase_auth.py    # Supabase authentication integration
-│       └── validation.py       # Input validation helpers
-├── credentials/
-│   └── oprina-voice.json       # Google Cloud service account credentials
+│   └── utils/                  # Utilities and helpers
+├── credentials/                # Google Cloud service account credentials
 ├── migrations/                 # Database migration scripts
-│   ├── __init__.py
-│   ├── 01_extensions.sql       # PostgreSQL extensions
-│   ├── 02_users_table.sql      # User accounts and profiles
-│   ├── 03_sessions_table.sql   # Chat sessions
-│   ├── 04_messages_table.sql   # Messages and conversations
-│   ├── 05_oauth_columns.sql    # OAuth token columns
-│   ├── 06_avatar_qouta_table.sql # Avatar usage tracking
-│   └── 07_avatar_sessions_table.sql # Avatar streaming sessions
 └── tests/                      # Testing utilities
-    ├── debug_config.py         # Configuration debugging
-    ├── test_database_audit.py  # Database testing
-    ├── test_oauth_integration.py # OAuth testing
-    └── test_supabase_auth.py   # Supabase authentication testing
 ```
 
 ## 🚀 Quick Start
@@ -170,6 +96,15 @@ GOOGLE_CLOUD_LOCATION=us-central1
 GOOGLE_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_CLIENT_SECRET=your-google-oauth-secret
 
+# Security
+ENCRYPTION_KEY=your-encryption-key-here
+
+# Application URLs (Development)
+FRONTEND_URL=http://localhost:5173
+BACKEND_API_URL=http://localhost:8000
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/oauth/callback
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:3001
+
 # Optional: Avatar Service
 HEYGEN_API_KEY=your-heygen-api-key
 
@@ -197,6 +132,9 @@ GOOGLE_CLOUD_LOCATION=us-central1
 # OAuth (production credentials)
 GOOGLE_CLIENT_ID=your-production-google-client-id
 GOOGLE_CLIENT_SECRET=your-production-google-secret
+
+# Security
+ENCRYPTION_KEY=your-production-encryption-key
 
 # Production settings
 ENVIRONMENT=production
@@ -356,6 +294,7 @@ open http://localhost:8000/docs
 | `VERTEX_AI_AGENT_ID` | ✅ | Deployed agent resource ID |
 | `GOOGLE_CLOUD_PROJECT` | ✅ | Google Cloud project ID |
 | `GOOGLE_CLOUD_LOCATION` | ✅ | Google Cloud location (e.g., us-central1) |
+| `ENCRYPTION_KEY` | ✅ | Encryption key for OAuth tokens stored in database |
 | `GOOGLE_APPLICATION_CREDENTIALS` | ⚠️ | Path to service account JSON (only if not using gcloud SDK) |
 | `GOOGLE_CLIENT_ID` | ⚠️ | Required for OAuth features |
 | `GOOGLE_CLIENT_SECRET` | ⚠️ | Required for OAuth features |
@@ -401,6 +340,15 @@ gcloud config set project your-project-id
 - Calendar API (for OAuth)
 
 **⚠️ Important:** Never use both authentication methods simultaneously to avoid conflicts.
+
+### Encryption Key Generation
+
+For the `ENCRYPTION_KEY` environment variable, generate a secure key:
+
+```bash
+# Generate encryption key
+python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
+```
 
 ## 📚 API Endpoints
 
@@ -643,7 +591,6 @@ The API provides health endpoints for monitoring:
 3. **Add business logic** in `app/core/services/`
 4. **Add data access** in `app/core/database/repositories/`
 5. **Register router** in `app/main.py`
-
 
 ### Database Changes
 - Add migration files to `migrations/`
