@@ -260,3 +260,38 @@ class MessageRepository:
         except Exception as e:
             logger.error(f"Failed to get message context for session {session_id}: {e}")
             raise
+
+    async def update_message_metadata(
+        self, 
+        message_id: str, 
+        metadata_update: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update message metadata (e.g., voice processing data)."""
+        try:
+            update_data = {
+                "voice_metadata": metadata_update,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Serialize data
+            serialized_data = serialize_for_db(update_data)
+            
+            # Update message
+            response = (
+                self.db.table(self.table_name)
+                .update(serialized_data)
+                .eq("id", message_id)
+                .execute()
+            )
+            
+            if not response.data:
+                raise RecordNotFoundError(f"Message {message_id} not found")
+            
+            result = handle_supabase_response(response)
+            logger.debug(f"Updated metadata for message {message_id}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to update message metadata {message_id}: {e}")
+            raise
