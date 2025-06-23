@@ -54,6 +54,7 @@ def create() -> None:
         agent_engine=app,
         requirements=[
             "google-cloud-aiplatform[adk,agent_engines]",
+            "supabase",
         ],
         extra_packages=["./oprina"],
     )
