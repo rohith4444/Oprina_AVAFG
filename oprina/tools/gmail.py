@@ -99,7 +99,7 @@ def gmail_list_messages(query: str = "", max_results: int = 10, tool_context=Non
         update_agent_activity(tool_context, "email_agent", "listing_messages")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -258,7 +258,7 @@ def gmail_get_message(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "getting_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -358,7 +358,7 @@ def gmail_search_messages(search_query: str, max_results: int = 10, tool_context
         update_agent_activity(tool_context, "email_agent", "searching_messages")
         
         # Get Gmail service for direct search handling
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -581,7 +581,7 @@ Would you like me to:
 Please let me know how you'd like to proceed."""
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -646,7 +646,7 @@ def gmail_reply_to_message(message_id: str, reply_body: str, tool_context=None) 
         update_agent_activity(tool_context, "email_agent", "replying_to_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -776,7 +776,7 @@ def gmail_confirm_and_reply(message_id: str, reply_body: str, tool_context=None)
         log_tool_execution(tool_context, "gmail_confirm_and_reply", "prepare_reply", True, f"Message: {message_id}")
         
         # Get original message info for context
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
             
@@ -838,7 +838,7 @@ def gmail_mark_as_read(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "marking_read")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -885,7 +885,7 @@ def gmail_archive_message(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "archiving_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -931,7 +931,7 @@ def gmail_delete_message(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "deleting_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1048,7 +1048,7 @@ def gmail_summarize_message(message_id: str, detail_level: str = "moderate", too
         update_agent_activity(tool_context, "email_agent", "ai_summarizing_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1095,7 +1095,7 @@ def gmail_analyze_sentiment(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "ai_analyzing_sentiment")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1143,7 +1143,7 @@ def gmail_extract_action_items(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "ai_extracting_tasks")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1190,7 +1190,7 @@ def gmail_generate_reply(message_id: str, reply_intent: str, style: str = "profe
         update_agent_activity(tool_context, "email_agent", "ai_generating_reply")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1242,7 +1242,7 @@ def gmail_create_draft(to: str, subject: str, body: str, cc: str = "", bcc: str 
         update_agent_activity(tool_context, "email_agent", "creating_draft")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1289,7 +1289,7 @@ def gmail_list_drafts(max_results: int = 10, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "listing_drafts")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1355,7 +1355,7 @@ def gmail_send_draft(draft_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "sending_draft")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1390,7 +1390,7 @@ def gmail_delete_draft(draft_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "deleting_draft")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1425,7 +1425,7 @@ def gmail_list_labels(tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "listing_labels")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1486,7 +1486,7 @@ def gmail_create_label(label_name: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "creating_label")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1528,7 +1528,7 @@ def gmail_apply_label(message_id: str, label_name: str, tool_context=None) -> st
         update_agent_activity(tool_context, "email_agent", "applying_label")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1581,7 +1581,7 @@ def gmail_remove_label(message_id: str, label_name: str, tool_context=None) -> s
         update_agent_activity(tool_context, "email_agent", "removing_label")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1637,7 +1637,7 @@ def gmail_star_message(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "starring_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1678,7 +1678,7 @@ def gmail_unstar_message(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "unstarring_message")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1719,7 +1719,7 @@ def gmail_mark_important(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "marking_important")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1760,7 +1760,7 @@ def gmail_mark_not_important(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "marking_not_important")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1802,7 +1802,7 @@ def gmail_mark_spam(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "marking_spam")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1843,7 +1843,7 @@ def gmail_unmark_spam(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "unmarking_spam")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1888,7 +1888,7 @@ def gmail_get_thread(thread_id_or_message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "getting_thread")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -1973,7 +1973,7 @@ def gmail_modify_thread(thread_id: str, add_labels: str = "", remove_labels: str
         update_agent_activity(tool_context, "email_agent", "modifying_thread")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -2050,7 +2050,7 @@ def gmail_list_attachments(message_id: str, tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "listing_attachments")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -2133,7 +2133,7 @@ def gmail_get_profile(tool_context=None) -> str:
         update_agent_activity(tool_context, "email_agent", "getting_profile")
         
         # Get Gmail service
-        service = get_gmail_service()
+        service = get_gmail_service(tool_context)
         if not service:
             return "Gmail not set up. Please run: python setup_gmail.py"
         
@@ -2221,7 +2221,7 @@ def _get_message_id_by_reference(reference: str, tool_context=None) -> Optional[
         if not message_index_map or not last_listed_messages:
             try:
                 # Get Gmail service for fresh fetch
-                service = get_gmail_service()
+                service = get_gmail_service(tool_context)
                 if service:
                     logger.info(f"RESOLVE: No session data found, attempting fresh email fetch for reference '{reference}'")
                     recent_result = service.users().messages().list(userId='me', maxResults=10).execute()

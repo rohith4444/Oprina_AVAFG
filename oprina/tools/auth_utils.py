@@ -23,42 +23,117 @@ _user_services = {}
 
 def extract_user_id_from_context(tool_context) -> Optional[str]:
     """
-    Extract user_id from tool context session state using session key constants.
-    
-    Args:
-        tool_context: ADK tool context
-        
-    Returns:
-        user_id string or None
+    Extract user_id from ADK tool context.
+    ADK stores user_id when stream_query(user_id=...) is called.
     """
     try:
-        # PRIMARY: Check Vertex AI session.userId (this is where it actually stores it)
-        if tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'userId'):
-            user_id = tool_context.session.userId  # ✅ Correct Vertex AI attribute
-            print(f"Found user_id in session.userId: {user_id}")
-            if user_id:
-                logger.debug(f"Found user_id in session.userId: {user_id}")
-                return user_id
+        logger.info("🔍 DEBUGGING: Starting user_id extraction")
         
-        # FALLBACK 1: Check session state (using our USER_ID constant)
+        if not tool_context:
+            logger.error("🔍 No tool_context provided")
+            return None
+        
+        # Log the entire tool_context structure for debugging
+        logger.info(f"🔍 tool_context type: {type(tool_context)}")
+        logger.info(f"🔍 tool_context attributes: {[attr for attr in dir(tool_context) if not attr.startswith('_')]}")
+        
+        # Method 1: Check ADK invocation context (where stream_query params are stored)
+        if hasattr(tool_context, '_invocation_context'):
+            invocation_context = tool_context._invocation_context
+            logger.info(f"🔍 invocation_context type: {type(invocation_context)}")
+            logger.info(f"🔍 invocation_context attributes: {[attr for attr in dir(invocation_context) if not attr.startswith('_')]}")
+            
+            # Try to get user_id from invocation context
+            if hasattr(invocation_context, 'user_id'):
+                user_id = invocation_context.user_id
+                logger.info(f"🔍 Found user_id in invocation_context: {user_id}")
+                if user_id:
+                    return str(user_id)
+            
+            # Try userId (alternative naming)
+            if hasattr(invocation_context, 'userId'):
+                user_id = invocation_context.userId
+                logger.info(f"🔍 Found userId in invocation_context: {user_id}")
+                if user_id:
+                    return str(user_id)
+        
+        # Method 2: Check tool_context.state (YOUR MISSING METHOD 1)
         if tool_context and hasattr(tool_context, 'state'):
-            user_id = tool_context.state.get(USER_ID)
-            if user_id:
-                logger.debug(f"Found user_id in session state: {user_id}")
-                return user_id
+            logger.info(f"🔍 state type: {type(tool_context.state)}")
+            logger.info(f"🔍 state attributes: {[attr for attr in dir(tool_context.state) if not attr.startswith('_')]}")
+            
+            # Try to get from state as dict
+            if hasattr(tool_context.state, 'get'):
+                user_id = tool_context.state.get(USER_ID)
+                if user_id:
+                    logger.info(f"🔍 Found user_id in state.get(USER_ID): {user_id}")
+                    return str(user_id)
+                    
+                # Try other key formats
+                for key in ['user_id', 'userId', 'user:id']:
+                    user_id = tool_context.state.get(key)
+                    if user_id:
+                        logger.info(f"🔍 Found user_id in state.get({key}): {user_id}")
+                        return str(user_id)
+            
+            # Try state as object with attributes
+            if hasattr(tool_context.state, 'user_id'):
+                user_id = tool_context.state.user_id
+                logger.info(f"🔍 Found user_id in state.user_id: {user_id}")
+                if user_id:
+                    return str(user_id)
+                    
+            if hasattr(tool_context.state, 'userId'):
+                user_id = tool_context.state.userId
+                logger.info(f"🔍 Found userId in state.userId: {user_id}")
+                if user_id:
+                    return str(user_id)
         
-        # FALLBACK 2: Check session.user_id (alternative naming)
-        if tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'user_id'):
-            user_id = tool_context.session.user_id  # ✅ Fixed: consistent naming
+        # Method 3: Check direct attributes on tool_context
+        if hasattr(tool_context, 'user_id'):
+            user_id = tool_context.user_id
+            logger.info(f"🔍 Found user_id on tool_context: {user_id}")
             if user_id:
-                logger.debug(f"Found user_id in session.user_id: {user_id}")
-                return user_id
+                return str(user_id)
+                
+        if hasattr(tool_context, 'userId'):
+            user_id = tool_context.userId
+            logger.info(f"🔍 Found userId on tool_context: {user_id}")
+            if user_id:
+                return str(user_id)
         
-        logger.warning("No user_id found in tool context - multi-user functionality disabled")
+        # Method 4: Try to access session through ADK session management
+        # Since there's no direct session attribute, let's check user_content
+        if hasattr(tool_context, 'user_content'):
+            logger.info(f"🔍 user_content type: {type(tool_context.user_content)}")
+            logger.info(f"🔍 user_content: {tool_context.user_content}")
+        
+        # Method 5: YOUR MISSING METHOD 2 - Modified for ADK structure
+        # ADK doesn't have tool_context.session, but we'll check for session data
+        if hasattr(tool_context, '_state') and hasattr(tool_context._state, 'user_id'):
+            user_id = tool_context._state.user_id
+            logger.info(f"🔍 Found user_id in _state.user_id: {user_id}")
+            if user_id:
+                return str(user_id)
+        
+        # Method 6: Last resort - check all attributes for anything containing user
+        logger.info("🔍 Checking all attributes for user-related data:")
+        for attr_name in dir(tool_context):
+            if not attr_name.startswith('__'):
+                try:
+                    attr_value = getattr(tool_context, attr_name)
+                    if 'user' in str(attr_name).lower() or 'user' in str(attr_value).lower():
+                        logger.info(f"🔍 Found user-related attribute {attr_name}: {attr_value}")
+                except Exception:
+                    pass
+        
+        logger.warning("🔍 No user_id found in any location")
         return None
         
     except Exception as e:
-        logger.error(f"Error extracting user_id from context: {e}")
+        logger.error(f"🔍 Error extracting user_id: {e}")
+        import traceback
+        logger.error(f"🔍 Full traceback: {traceback.format_exc()}")
         return None
 
 def get_oauth_credentials(user_id: str, service_type: str) -> Optional[Credentials]:
