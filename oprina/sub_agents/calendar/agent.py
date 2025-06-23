@@ -6,7 +6,7 @@ from oprina.sub_agents.calendar import prompt
 import os
 
 # Smart tool selection
-TOOLS_MODE = os.getenv("OPRINA_TOOLS_MODE")
+TOOLS_MODE = os.getenv("OPRINA_TOOLS_MODE", "local")
 print(f"🔧 CALENDAR AGENT USING TOOLS_MODE: {TOOLS_MODE}")
 
 if TOOLS_MODE == "prod":
@@ -23,6 +23,3 @@ calendar_agent = Agent(
     instruction=prompt.CALENDAR_AGENT_INSTR,
     tools=CALENDAR_TOOLS,
 )
-
-# # ADK evaluation framework expects 'root_agent' variable
-# root_agent = calendar_agent
