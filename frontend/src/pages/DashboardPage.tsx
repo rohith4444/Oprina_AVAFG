@@ -1,4 +1,4 @@
-// src/pages/DashboardPage.tsx - Updated with Session Lifecycle Tracking
+/// <reference types="vite/client" />
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -1312,7 +1312,7 @@ const DashboardPage: React.FC = () => {
               {/* Left Side: Avatar + Controls (50%) */}
               <div className="avatar-section">
                 {/* Enhanced Avatar Mode Toggle with Session Status - KEPT EXACTLY THE SAME */}
-                {process.env.NODE_ENV === 'development' && (
+                {import.meta.env.VITE_SHOW_AVATAR_TOGGLE === 'true' && (
                   <div className="avatar-mode-toggle">
                     <div className="left-section">
                       <button 
