@@ -35,10 +35,11 @@ Oprina's comprehensive platform features HeyGen streaming avatars for lifelike i
 ## See it in action
 
 <div align="center">
-  <video width="560" controls>
-    <source src="docs/demo-video.mp4" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
+  <a href="https://youtu.be/m88sOnv-qvM">
+    <img src="https://img.youtube.com/vi/m88sOnv-qvM/maxresdefault.jpg" alt="Oprina Demo Video" width="560">
+    <br>
+    <b>🎥 Click to Watch Oprina Demo</b>
+  </a>
 </div>
 
 Go to https://www.oprinaai.com to see Oprina live.
