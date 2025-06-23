@@ -35,7 +35,7 @@ def extract_user_id_from_context(tool_context) -> Optional[str]:
         # PRIMARY: Check Vertex AI session.userId (this is where it actually stores it)
         if tool_context and hasattr(tool_context, 'session') and hasattr(tool_context.session, 'userId'):
             user_id = tool_context.session.userId  # ✅ Correct Vertex AI attribute
-            print("Found user_id in session.userId: {user_id}")
+            print(f"Found user_id in session.userId: {user_id}")
             if user_id:
                 logger.debug(f"Found user_id in session.userId: {user_id}")
                 return user_id
@@ -143,11 +143,16 @@ def get_gmail_service(tool_context=None, user_id: str = None):
         return _user_services[cache_key]
     
     try:
+
         # Get credentials
         creds = get_oauth_credentials(user_id, "gmail")
         if not creds:
             logger.warning(f"No Gmail credentials available for user {user_id}")
+            # 🔍 ADD DEBUG HERE:
+            debug_result = debug_user_tokens(user_id)
+            logger.error(f"🔍 DEBUG: {debug_result}")
             return None
+         
         
         # Build service
         service = build('gmail', 'v1', credentials=creds)
@@ -292,3 +297,34 @@ def validate_user_context(tool_context) -> bool:
     
     logger.debug(f"Tool context validation passed for user: {user_id}")
     return True
+
+def debug_user_tokens(user_id: str) -> str:
+    """Debug function to check token availability."""
+    try:
+        logger.info(f"🔍 DEBUGGING: Checking tokens for user {user_id}")
+        
+        token_service = get_token_service()
+        user_tokens = token_service.get_user_tokens(user_id)
+        
+        gmail_tokens = user_tokens.get('gmail_tokens')
+        logger.info(f"🔍 Gmail tokens present: {gmail_tokens is not None}")
+        
+        if gmail_tokens:
+            tokens = token_service.decrypt_tokens(gmail_tokens)
+            logger.info(f"🔍 Decrypted tokens: {tokens is not None}")
+            
+            if tokens:
+                has_access = 'access_token' in tokens
+                has_refresh = 'refresh_token' in tokens
+                has_client_id = 'client_id' in tokens
+                has_client_secret = 'client_secret' in tokens
+                
+                logger.info(f"🔍 Token fields - access: {has_access}, refresh: {has_refresh}, client_id: {has_client_id}, client_secret: {has_client_secret}")
+                
+                return f"User {user_id}: Gmail tokens found, access: {has_access}, refresh: {has_refresh}, client_id: {has_client_id}, client_secret: {has_client_secret}"
+        
+        return f"User {user_id}: No Gmail tokens found"
+        
+    except Exception as e:
+        logger.error(f"🔍 Debug failed: {e}")
+        return f"Debug failed: {e}"

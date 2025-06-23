@@ -193,6 +193,7 @@ def create() -> None:
         "GOOGLE_CLIENT_ID": os.getenv("GOOGLE_CLIENT_ID"),
         "GOOGLE_CLOUD_STAGING_BUCKET": os.getenv("GOOGLE_CLOUD_STAGING_BUCKET"),
         "GOOGLE_CLIENT_SECRET": os.getenv("GOOGLE_CLIENT_SECRET"),
+        "ENCRYPTION_KEY": os.getenv("ENCRYPTION_KEY"),
     }
 
     # Print each environment variable (mask sensitive ones)
@@ -217,7 +218,8 @@ def create() -> None:
         "google-auth", 
         "google-auth-oauthlib",
         "google-api-python-client",
-        "google-genai"
+        "google-genai",
+        "cryptography",
     ]
     
     print("📦 Using lightweight requirements (no Supabase client):")

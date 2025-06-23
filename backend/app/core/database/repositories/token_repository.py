@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc
 
-from app.models.database.token import ServiceToken, TokenRefreshLog
+# from app.models.database.token import ServiceToken, TokenRefreshLog
 from app.utils.errors import DatabaseError, TokenError
 from app.utils.logging import get_logger
 from app.utils.encryption import encrypt_token, decrypt_token

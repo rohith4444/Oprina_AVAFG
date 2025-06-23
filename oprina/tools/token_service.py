@@ -6,6 +6,8 @@ Uses direct HTTP requests instead of Supabase client to avoid dependency conflic
 
 import os
 import json
+import base64
+from cryptography.fernet import Fernet
 from typing import Optional, Dict, Any
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
@@ -19,6 +21,21 @@ class TokenService:
     def __init__(self):
         self.supabase_url = os.getenv('SUPABASE_URL')
         self.service_key = os.getenv('SUPABASE_SERVICE_KEY')
+        
+        # ✅ ADD: Get encryption key for token decryption
+        self.encryption_key = os.getenv('ENCRYPTION_KEY')
+        if not self.encryption_key:
+            logger.warning("ENCRYPTION_KEY not set - token decryption will fail")
+            self._fernet = None
+        else:
+            try:
+                key_bytes = base64.b64decode(self.encryption_key.encode())
+                self._fernet = Fernet(key_bytes)
+                logger.info("Encryption manager initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize encryption: {e}")
+                self._fernet = None
+    
         
         if not self.supabase_url:
             logger.error("SUPABASE_URL environment variable not set")
@@ -95,33 +112,66 @@ class TokenService:
             raise Exception(error_msg)
     
     def decrypt_tokens(self, encrypted_tokens: Optional[str]) -> Optional[Dict[str, Any]]:
-        """Decrypt token data (implement your decryption logic)."""
+        """Decrypt token data using Fernet encryption (matching backend)."""
         if not encrypted_tokens:
             return None
         
         try:
-            # If tokens are stored as JSON string (no encryption)
+            # Parse the token data structure
             if isinstance(encrypted_tokens, str):
-                tokens = json.loads(encrypted_tokens)
-                logger.debug("Successfully decrypted token data")
-                return tokens
+                token_data = json.loads(encrypted_tokens)
             elif isinstance(encrypted_tokens, dict):
-                # Already a dictionary
-                logger.debug("Token data already in dict format")
-                return encrypted_tokens
+                token_data = encrypted_tokens
             else:
                 logger.warning(f"Unexpected token format: {type(encrypted_tokens)}")
                 return None
-                
+            
+            # Check if we have encryption capability
+            if not self._fernet:
+                logger.error("No encryption key available for token decryption")
+                return None
+            
+            # Decrypt the encrypted fields
+            decrypted_tokens = {}
+            
+            # Decrypt access_token
+            if 'access_token' in token_data:
+                try:
+                    encrypted_access = token_data['access_token']
+                    decoded_data = base64.b64decode(encrypted_access.encode())
+                    decrypted_access = self._fernet.decrypt(decoded_data).decode()
+                    decrypted_tokens['access_token'] = decrypted_access
+                    logger.debug("Successfully decrypted access_token")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt access_token: {e}")
+                    return None
+            
+            # Decrypt refresh_token
+            if 'refresh_token' in token_data:
+                try:
+                    encrypted_refresh = token_data['refresh_token']
+                    decoded_data = base64.b64decode(encrypted_refresh.encode())
+                    decrypted_refresh = self._fernet.decrypt(decoded_data).decode()
+                    decrypted_tokens['refresh_token'] = decrypted_refresh
+                    logger.debug("Successfully decrypted refresh_token")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt refresh_token: {e}")
+                    return None
+            
+            # Copy non-encrypted fields as-is
+            for key, value in token_data.items():
+                if key not in ['access_token', 'refresh_token']:
+                    decrypted_tokens[key] = value
+            
+            logger.debug("Successfully decrypted token data")
+            return decrypted_tokens
+            
         except json.JSONDecodeError as e:
             logger.error(f"Failed to decode token JSON: {e}")
-            # If actual encryption is used, implement decryption here
-            # For now, assume it's a different format and return None
             return None
         except Exception as e:
             logger.error(f"Error processing tokens: {e}")
             return None
-
     def test_connection(self) -> bool:
         """Test connection to Supabase database."""
         try:
