@@ -1,38 +1,81 @@
-/* DashboardPage.css - Fixed with Sidebar + 50/50 Layout */
+/* DashboardPage.css - Fixed Layout with Proper Scrolling */
 
-/* Main container - Grid with sidebar */
+/* Main container - Fixed sidebar + scrollable content */
 .dashboard-page {
-  display: grid;
-  grid-template-columns: 260px 1fr; /* Sidebar + Main content */
-  height: 100vh;
+  position: relative;
   width: 100vw;
-  overflow: hidden;
+  height: 100vh;
+  overflow: hidden; /* Prevent page-level scrolling */
   background: linear-gradient(135deg, var(--background-alt) 0%, var(--background) 100%);
-}
-
-/* Main Content Area */
-.main-content {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem;
-  overflow: hidden;
+  --sidebar-width: 260px; /* CSS variable for sidebar width */
 }
 
-/* Unified 50/50 Container - Now fits in main content area */
+/* Fallback for browsers that don't support :has() */
+.dashboard-page.sidebar-collapsed {
+  --sidebar-width: 60px;
+}
+
+/* Sidebar will be positioned absolutely via Sidebar.css */
+
+/* Main Content Area - Takes remaining space and is scrollable */
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width); /* Use CSS variable for responsive sidebar width */
+  height: 100vh;
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal overflow */
+  padding: 2rem 1rem; /* Comfortable padding */
+  box-sizing: border-box;
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+  transition: margin-left 0.3s ease; /* Smooth transition when sidebar collapses */
+}
+
+/* Custom scrollbar for main content */
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: var(--background-alt);
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text);
+  opacity: 0.7;
+}
+
+/* Unified Dashboard Container */
 .dashboard-unified {
-  width: 95%;
-  height: 650px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 4rem); /* Account for padding */
   background-color: var(--background);
   border-radius: 1rem;
   box-shadow: 0 8px 32px var(--shadow);
   display: flex;
-  flex-direction: column; /* Changed to column to stack status box above content */
-  overflow: hidden;
+  flex-direction: column;
   border: 1px solid var(--border);
+  margin-bottom: 4rem; /* Space for scrolling */
+  overflow: visible; /* Allow content to expand */
+  transition: all 0.3s ease; /* Smooth transitions */
 }
 
-/* Left Side: Avatar + Controls (50%) */
+/* Enhanced dashboard container when sidebar is collapsed */
+.dashboard-page.sidebar-collapsed .dashboard-unified {
+  max-width: 1400px; /* Allow wider container when more space available */
+}
+
+/* Left Side: Avatar + Controls (flexible width) */
 .avatar-section {
   flex: 1;
   display: flex;
@@ -40,6 +83,16 @@
   padding: 2rem;
   background: linear-gradient(135deg, var(--background-alt) 0%, var(--background) 100%);
   border-right: 1px solid var(--border);
+  min-width: 200px; /* Reduced minimum width for mobile compatibility */
+  max-width: 600px; /* Maximum width to prevent too wide layout */
+  transition: all 0.3s ease;
+}
+
+/* Enhanced avatar section when sidebar is collapsed */
+.dashboard-page.sidebar-collapsed .avatar-section {
+  flex: 1.2; /* Take slightly more space when sidebar collapsed */
+  max-width: 700px; /* Allow wider avatar section */
+  padding: 2.5rem; /* More padding with extra space */
 }
 
 .avatar-container-wrapper {
@@ -62,6 +115,13 @@
   border-radius: 0.75rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+/* Enhanced voice controls when sidebar is collapsed */
+.dashboard-page.sidebar-collapsed .compact-voice-controls {
+  gap: 2rem; /* More spacing between controls */
+  padding: 2rem; /* More padding with extra space */
 }
 
 /* Voice Button - Using existing button system */
@@ -233,12 +293,41 @@
   font-weight: 500;
 }
 
-/* Right Side: Conversation (50%) */
+/* Right Side: Conversation (flexible width) */
 .conversation-section {
   flex: 1;
   background-color: var(--background);
   display: flex;
   flex-direction: column;
+  min-width: 200px; /* Reduced minimum width for mobile compatibility */
+  transition: all 0.3s ease;
+}
+
+/* Enhanced conversation section when sidebar is collapsed */
+.dashboard-page.sidebar-collapsed .conversation-section {
+  flex: 1.3; /* Take more space when sidebar collapsed */
+  min-width: 300px; /* Reduced for mobile compatibility */
+}
+
+/* Mobile-specific adjustments for very limited space */
+@media (max-width: 768px) {
+  .conversation-section {
+    min-width: 100px; /* Very compact for mobile when sidebar is open */
+  }
+  
+  .avatar-section {
+    min-width: 100px; /* Very compact for mobile when sidebar is open */
+    padding: 1rem; /* Reduced padding */
+  }
+  
+  .dashboard-page.sidebar-collapsed .conversation-section {
+    min-width: 200px; /* Better space when sidebar collapsed */
+  }
+  
+  .dashboard-page.sidebar-collapsed .avatar-section {
+    min-width: 200px; /* Better space when sidebar collapsed */
+    padding: 1.5rem; /* More padding when more space available */
+  }
 }
 
 /* Animations - Using existing system */
@@ -270,6 +359,13 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  gap: 1rem; /* Add spacing between sections */
+  transition: all 0.3s ease; /* Smooth transitions */
+}
+
+/* Enhanced layout when sidebar is collapsed (more space available) */
+.dashboard-page.sidebar-collapsed .dashboard-content-area {
+  gap: 2rem; /* More spacing when more space is available */
 }
 
 .status-content {
@@ -333,18 +429,25 @@
 /* Responsive Design */
 @media (max-width: 1200px) {
   .dashboard-page {
-    grid-template-columns: 1fr; /* Remove sidebar on smaller screens */
+    display: block; /* Switch from flex to block layout */
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto; /* Enable page-level scrolling on tablets */
   }
   
   .main-content {
+    margin-left: 0; /* Remove sidebar margin */
+    height: auto;
+    min-height: 100vh;
+    overflow-y: visible; /* Let page handle scrolling */
     padding: 1rem;
+    padding-bottom: 4rem; /* Extra bottom space */
   }
   
   .dashboard-unified {
     max-width: 100%;
-    height: auto;
     min-height: 80vh;
-    flex-direction: column;
+    margin-bottom: 3rem; /* Ensure bottom spacing */
   }
   
   .avatar-section {
@@ -359,23 +462,45 @@
   }
 
   .dashboard-content-area {
-  flex-direction: column;
+    flex-direction: column;
   }
 
   .avatar-status-box {
     padding: 0.75rem 1.5rem;
   }
-
 }
 
 @media (max-width: 768px) {
+  .dashboard-page {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* Prevent page-level scrolling */
+    display: flex;
+    --sidebar-width: 80vw; /* 80% of screen width when expanded */
+  }
+  
+  .dashboard-page.sidebar-collapsed {
+    --sidebar-width: 60px; /* Collapsed width on tablets */
+  }
+
   .main-content {
-    padding: 1rem;
+    flex: 1;
+    margin-left: var(--sidebar-width); /* Use responsive variable */
+    height: 100vh;
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden;
+    padding: 0.5rem; /* Smaller padding for limited space */
+    box-sizing: border-box;
   }
   
   .dashboard-unified {
-    height: auto;
-    min-height: 70vh;
+    width: 100%;
+    max-width: none; /* Remove max-width constraint for mobile */
+    margin: 0;
+    min-height: calc(100vh - 1rem);
+    margin-bottom: 1rem;
+    border-radius: 0.5rem; /* Smaller border radius for limited space */
   }
   
   .avatar-section {
@@ -401,22 +526,44 @@
   }
 
   .avatar-status-box {
-  padding: 0.75rem 1rem;
+    padding: 0.75rem 1rem;
   }
 
   .status-content {
     gap: 0.75rem;
     font-size: 0.8rem;
-    justify-content: center; /* Center on mobile */
+    justify-content: center;
   }
 
   .status-item:not(:last-child)::after {
     margin-left: 0.75rem;
   }
-
 }
 
 @media (max-width: 480px) {
+  .dashboard-page {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* Prevent page-level scrolling */
+    display: flex;
+    --sidebar-width: 85vw; /* 85% of screen width on small screens */
+  }
+  
+  .dashboard-page.sidebar-collapsed {
+    --sidebar-width: 60px; /* Collapsed width on small screens */
+  }
+
+  .main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width); /* Use responsive variable */
+    height: 100vh;
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden;
+    padding: 0.25rem; /* Even smaller padding for very small screens */
+    box-sizing: border-box;
+  }
+
   .volume-slider {
     width: 80px;
   }
@@ -435,6 +582,11 @@
   
   .dashboard-unified {
     border-radius: 0.5rem;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: calc(100vh - 1rem);
+    margin-bottom: 1rem;
   }
   
   .avatar-section {
@@ -454,12 +606,12 @@
   .status-content {
     gap: 0.5rem;
     font-size: 0.75rem;
-    flex-direction: column; /* Stack vertically on very small screens */
+    flex-direction: column;
     align-items: flex-start;
   }
 
   .status-item:not(:last-child)::after {
-    display: none; /* Remove separators when stacked */
+    display: none;
   }
 }
 

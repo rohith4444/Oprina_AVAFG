@@ -33,6 +33,7 @@ interface SidebarProps {
   onSessionSelect: (sessionId: string) => void;
   onSessionDelete: (sessionId: string) => void;
   onSessionUpdate?: (sessionId: string, newTitle: string) => void;
+  onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -42,11 +43,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNewChat, 
   onSessionSelect,
   onSessionDelete,
-  onSessionUpdate 
+  onSessionUpdate,
+  onCollapseChange
 }) => {
   const { user, userProfile, logout } = useAuth();
   const navigate = useNavigate();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Default to collapsed on login
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
@@ -169,7 +171,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 };
 
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+    const newCollapsedState = !isCollapsed;
+    setIsCollapsed(newCollapsedState);
+    onCollapseChange?.(newCollapsedState);
   };
 
   return (

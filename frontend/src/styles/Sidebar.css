@@ -1,4 +1,7 @@
 .sidebar {
+  position: fixed; /* Fixed positioning to stay in place during scrolling */
+  top: 0;
+  left: 0;
   width: 260px;
   height: 100vh;
   background-color: var(--background);
@@ -7,11 +10,16 @@
   flex-direction: column;
   flex-shrink: 0;
   transition: width 0.3s ease;
-  position: relative;
+  overflow: hidden; /* Prevent overall sidebar scrolling */
+  z-index: 100; /* Ensure sidebar stays above main content */
 }
 
 .sidebar.collapsed {
   width: 60px;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  width: 60px; /* Match collapsed sidebar width */
 }
 
 .sidebar-header {
@@ -21,6 +29,7 @@
   padding: 1rem;
   border-bottom: 1px solid var(--border);
   height: 60px;
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .logo-section {
@@ -50,11 +59,12 @@
 }
 
 .sidebar-content {
-  flex: 1;
+  flex: 1; /* Take remaining space between header and footer */
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  padding: 1rem;
+  overflow: hidden; /* Prevent content overflow */
+  padding: 1rem 1rem 140px 1rem; /* Add bottom padding to account for fixed footer height */
+  min-height: 0; /* Allow content to shrink */
 }
 
 .new-chat-button {
@@ -70,6 +80,7 @@
   cursor: pointer;
   transition: background-color 0.2s ease;
   margin-bottom: 1rem;
+  flex-shrink: 0; /* Prevent button from shrinking */
 }
 
 .new-chat-button:hover {
@@ -77,8 +88,32 @@
 }
 
 .conversations-section {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1; /* Take remaining space in content area */
+  overflow-y: auto; /* Make this section scrollable */
+  overflow-x: hidden;
+  min-height: 0; /* Allow section to shrink */
+  /* Custom scrollbar styling for better appearance */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Webkit scrollbar styling */
+.conversations-section::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversations-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversations-section::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
+.conversations-section::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text);
+  opacity: 0.5;
 }
 
 .section-title {
@@ -95,6 +130,35 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  padding-bottom: 1rem; /* Add padding at bottom for better scrolling */
+}
+
+/* Ensure no conversations state doesn't affect footer positioning */
+.no-conversations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text);
+  opacity: 0.7;
+}
+
+.no-conversations-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.no-conversations p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.no-conversations small {
+  font-size: 0.75rem;
+  opacity: 0.8;
 }
 
 .conversation-item {
@@ -128,11 +192,18 @@
 }
 
 .sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 260px; /* Match sidebar width */
   padding: 1rem;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  background-color: var(--background); /* Ensure footer has solid background */
+  z-index: 10; /* Keep footer above scrolling content */
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 .connect-apps-button {
@@ -222,40 +293,38 @@
 
 /* Collapsed state styles */
 .sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .new-chat-button span,
 .sidebar.collapsed .conversation-preview,
 .sidebar.collapsed .conversation-time,
-.sidebar.collapsed .user-info,
-.sidebar.collapsed .section-title {
-  display: none;
+.sidebar.collapsed .user-info {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .sidebar.collapsed .conversation-item {
   justify-content: center;
-  padding: 0.75rem;
+  padding: 0.75rem 0.5rem;
 }
 
 .sidebar.collapsed .user-profile {
   justify-content: center;
+  padding: 0.75rem 0.5rem;
 }
 
-/* Fix New Chat Button */
 .sidebar.collapsed .new-chat-button {
-  justify-content: center;
-  align-items: center;
+  justify-content: center !important;
+  align-items: center !important;
   padding: 0.75rem;
+  margin-bottom: 1rem;
   min-width: 44px;
   min-height: 44px;
-  display: flex;
+  flex-shrink: 0; /* Maintain button size even when collapsed */
 }
 
 .sidebar.collapsed .new-chat-button svg {
-  width: 20px !important;
-  height: 20px !important;
+  width: 18px !important;
+  height: 18px !important;
   flex-shrink: 0;
-}
-
-.sidebar.collapsed .new-chat-button span {
-  display: none;
 }
 
 /* Fix Connect Apps Button */
@@ -301,14 +370,55 @@
 
 @media (max-width: 768px) {
   .sidebar {
-    width: 100%;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+    position: fixed; /* Keep sidebar fixed on mobile too */
+    top: 0;
+    left: 0;
+    width: 80vw; /* 80% of screen width when expanded */
+    height: 100vh; /* Use full viewport height */
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+    overflow: hidden; /* Maintain overflow control */
+    z-index: 1000; /* High z-index for mobile */
+    display: flex;
+    flex-direction: column; /* Ensure proper column layout */
+  }
+  
+  .sidebar-header {
+    flex-shrink: 0; /* Never shrink header */
+  }
+  
+  .sidebar-content {
+    flex: 1; /* Take remaining space between header and footer */
+    padding: 0.75rem 0.75rem 120px 0.75rem; /* Add bottom padding for fixed footer */
+    overflow: hidden; /* Prevent content overflow */
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for flex child to shrink */
+  }
+  
+  .new-chat-button {
+    flex-shrink: 0; /* Don't shrink the new chat button */
+    margin-bottom: 0.75rem;
   }
   
   .conversations-section {
-    max-height: 200px;
+    flex: 1; /* Take remaining space in content area */
+    overflow-y: auto; /* Enable scrolling for conversations */
+    overflow-x: hidden;
+    min-height: 0; /* Allow section to shrink */
+  }
+  
+  /* Keep footer absolutely positioned at bottom */
+  .sidebar-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 80vw; /* Match sidebar width on mobile */
+    background-color: var(--background);
+    border-top: 1px solid var(--border);
+    padding: 0.75rem;
+    z-index: 10;
+    box-sizing: border-box;
   }
 }
 
@@ -318,15 +428,22 @@
   right: -14px;
   background-color: white;
   border: 1px solid var(--border);
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10;
-  transition: transform 0.2s ease;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.sidebar-header .collapse-button:hover {
+  background-color: var(--background-alt);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar.collapsed .collapse-button {
@@ -451,4 +568,33 @@
 
 .logo-section:active {
   transform: scale(0.98);
+}
+
+/* Add this after the existing 768px media query */
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 85vw; /* 85% of screen width on very small screens */
+  }
+  
+  .sidebar-footer {
+    width: 85vw; /* Match the sidebar width */
+  }
+  
+  .sidebar-content {
+    padding: 0.5rem 0.5rem 120px 0.5rem; /* Smaller padding */
+  }
+  
+  .sidebar-header {
+    padding: 0.75rem; /* Smaller header padding */
+  }
+  
+  .user-profile {
+    padding: 0.5rem; /* Smaller user profile padding */
+  }
+  
+  .connect-apps-button {
+    padding: 0.5rem; /* Smaller button padding */
+    font-size: 0.875rem; /* Smaller font size */
+  }
 }

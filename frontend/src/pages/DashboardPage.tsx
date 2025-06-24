@@ -71,6 +71,9 @@ const DashboardPage: React.FC = () => {
   const hasControllableAudio = currentAudio !== null;
   const showAudioControls = useStaticAvatar || hasControllableAudio; // Always show in static mode
   
+  // Sidebar collapse state - Default to collapsed on login
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  
   
   // Refs for both avatar types
   const streamingAvatarRef = useRef<HeyGenAvatarRef>(null);
@@ -1148,7 +1151,7 @@ const DashboardPage: React.FC = () => {
   }, [activeSessionId]);
 
   return (
-    <div className="dashboard-page min-h-screen flex flex-col">
+    <div className={`dashboard-page min-h-screen flex flex-col ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="flex flex-1">
         {/* Sidebar */}
         <Sidebar
@@ -1158,6 +1161,7 @@ const DashboardPage: React.FC = () => {
           onSessionSelect={handleSelectSession}
           onSessionDelete={handleDeleteSession}
           onSessionUpdate={handleSessionUpdate}
+          onCollapseChange={setIsSidebarCollapsed}
         />
         
         {/* Main Content Area - 50/50 Layout */}
