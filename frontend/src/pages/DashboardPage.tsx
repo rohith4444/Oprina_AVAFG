@@ -878,8 +878,10 @@ const DashboardPage: React.FC = () => {
         throw new Error('Recording is empty');
       }
       
-      if (audioBlob.size > 10 * 1024 * 1024) {
-        throw new Error('Recording too large (max 10MB)');
+      // if (audioBlob.size > 10 * 1024 * 1024) {
+      //   throw new Error('Recording too large (max 10MB)');
+      if (audioBlob.size > 25 * 1024 * 1024) {
+        throw new Error('Recording too large (max 25MB)');
       }
       
       console.log('🎵 Processing audio blob:', audioBlob.size, 'bytes');

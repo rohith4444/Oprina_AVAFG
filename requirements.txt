@@ -30,8 +30,8 @@ schedule
 
 # Google Cloud Services
 google-cloud-aiplatform
-google-cloud-speech
-google-cloud-texttospeech
+# google-cloud-speech
+# google-cloud-texttospeech
 google-auth
 google-auth-oauthlib
 
@@ -48,3 +48,6 @@ requests
 python-dotenv
 pydub
 aiofiles
+
+# Eleven Labs
+elevenlabs

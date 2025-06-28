@@ -29,9 +29,9 @@ class TokenService:
             self._fernet = None
         else:
             try:
-                # FIXED: Use same logic as backend (no .encode())
-                key_bytes = base64.b64decode(self.encryption_key)
-                self._fernet = Fernet(key_bytes)
+                # FIXED: Use same logic as backend - key is already base64 encoded Fernet key
+                # Don't double-decode it, just use it directly as bytes
+                self._fernet = Fernet(self.encryption_key.encode())
                 logger.info("Encryption manager initialized successfully")
             except Exception as e:
                 logger.error(f"Failed to initialize encryption: {e}")

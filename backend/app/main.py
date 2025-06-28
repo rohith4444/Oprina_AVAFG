@@ -116,7 +116,8 @@ async def root():
         "docs": "/docs",
         "redoc": "/redoc",
         "oauth_configured": settings.oauth_configured,
-        "voice_configured": hasattr(settings, 'GOOGLE_CLOUD_PROJECT') and bool(getattr(settings, 'GOOGLE_CLOUD_PROJECT', None)),
+        # "voice_configured": hasattr(settings, 'GOOGLE_CLOUD_PROJECT') and bool(getattr(settings, 'GOOGLE_CLOUD_PROJECT', None)),
+        "voice_configured": bool(settings.ELEVENLABS_API_KEY),
         "background_service": {
             "enabled": bg_stats["enabled"],
             "running": bg_stats["is_running"],
@@ -240,10 +241,17 @@ async def startup_event():
         logger.warning("  ⚠️  OAuth not configured - check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
     
     # Log Voice service configuration status
-    if hasattr(settings, 'GOOGLE_CLOUD_PROJECT') and getattr(settings, 'GOOGLE_CLOUD_PROJECT', None):
+    # if hasattr(settings, 'GOOGLE_CLOUD_PROJECT') and getattr(settings, 'GOOGLE_CLOUD_PROJECT', None):
+    if bool(settings.ELEVENLABS_API_KEY):
         logger.info("  ✅ Voice services are configured and ready")
+        logger.info(f"     Service: ElevenLabs Text-to-Speech & Speech-to-Text")
+        logger.info(f"     Voice ID: {settings.ELEVENLABS_VOICE_ID}")
+        logger.info(f"     Model: {settings.ELEVENLABS_MODEL_ID}")
+        logger.info(f"     Output Format: {settings.ELEVENLABS_OUTPUT_FORMAT}")
+        logger.info(f"     Voice Settings: Stability={settings.ELEVENLABS_STABILITY}, Similarity={settings.ELEVENLABS_SIMILARITY_BOOST}")
     else:
-        logger.warning("  ⚠️  Voice services not configured - check GOOGLE_CLOUD_PROJECT and credentials")
+        # logger.warning("  ⚠️  Voice services not configured - check GOOGLE_CLOUD_PROJECT and credentials")
+        logger.warning("  ⚠️  Voice services not configured - check ELEVENLABS_API_KEY")
     
     # Log Avatar service status
     logger.info("  ✅ Avatar tracking service is ready")

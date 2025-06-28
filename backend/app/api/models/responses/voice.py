@@ -49,7 +49,8 @@ class VoiceMessageResponse(BaseModel):
                 "transcription": {
                     "text": "Hello, how are you today?",
                     "confidence": 0.95,
-                    "service": "google_cloud_speech"
+                    # "service": "google_cloud_speech"
+                    "service": "elevenlabs_stt"
                 },
                 "chat_response": {
                     "text": "Hello! I'm doing well, thank you for asking. How can I help you today?",
@@ -81,7 +82,8 @@ class TranscriptionResponse(BaseModel):
                 "transcript": "Hello, this is a test message for speech recognition.",
                 "confidence": 0.92,
                 "language_code": "en-US",
-                "service": "google_cloud_speech"
+                # "service": "google_cloud_speech"
+                "service": "elevenlabs_stt"
             }
         }
 
@@ -110,7 +112,8 @@ class SynthesisResponse(BaseModel):
                 "voice_name": "en-US-Neural2-F",
                 "language_code": "en-US",
                 "speaking_rate": 1.0,
-                "service": "google_cloud_tts"
+                # "service": "google_cloud_tts"
+                "service": "elevenlabs_tts"
             }
         }
 

@@ -200,6 +200,8 @@ async def oauth_callback(
 ):
     """Handle OAuth callback from Google."""
     try:
+        logger.info(f"OAuth callback received - code: {'✅' if code else '❌'}, state: {'✅' if state else '❌'}, error: {error}")
+        
         if error:
             logger.warning(f"OAuth error: {error} - {error_description}")
             # For now, default to settings page for errors
@@ -215,8 +217,12 @@ async def oauth_callback(
                 status_code=302
             )
         
+        logger.info(f"Processing OAuth callback with state: {state[:50]}...")
+        
         # Process the OAuth callback
         result = await oauth_service.handle_callback(code, state)
+        
+        logger.info(f"OAuth callback processed successfully: {result.get('action')}")
         
         # 🎯 KEY CHANGE: Use the redirect_url from the service result
         if result["action"] in ["gmail_connect", "calendar_connect"]:
@@ -232,13 +238,13 @@ async def oauth_callback(
             logger.warning(f"Unknown OAuth action: {result['action']}")
             frontend_url = f"{settings.FRONTEND_SETTINGS_URL}?status=unknown"
         
-        logger.info(f"OAuth callback successful: {result['action']}")
+        logger.info(f"OAuth callback successful: {result['action']}, redirecting to: {frontend_url}")
         return RedirectResponse(url=frontend_url, status_code=302)
         
     except Exception as e:
-        logger.error(f"OAuth callback failed: {str(e)}")
+        logger.error(f"OAuth callback failed with detailed error: {str(e)}", exc_info=True)
         return RedirectResponse(
-            url=f"{settings.FRONTEND_SETTINGS_URL}?error=callback_failed",
+            url=f"{settings.FRONTEND_SETTINGS_URL}?error=callback_failed&details={str(e)[:100]}",
             status_code=302
         )
 

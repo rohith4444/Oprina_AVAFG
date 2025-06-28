@@ -6,27 +6,41 @@ Simple approach with multiple env files.
 import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 def get_env_file():
     """
     Determine which environment file to use.
     NOTE: This expects to be run from the backend/ directory.
+    
+    For ElevenLabs voice services:
+    - Development: Load from .env file
+    - Production: Use environment variables directly (Netlify/cloud deployment)
     """
     
+    # Check if we're explicitly in production environment
     is_production = any([
-        os.getenv("GOOGLE_CLOUD_PROJECT"),
-        os.getenv("K_SERVICE"), 
-        os.getenv("GAE_ENV"),
-        os.getenv("ENVIRONMENT") == "production"
+        # Comment out GOOGLE_CLOUD_PROJECT for now - will use for Vertex AI only
+        # os.getenv("GOOGLE_CLOUD_PROJECT"),
+        os.getenv("K_SERVICE"),  # Google Cloud Run
+        os.getenv("GAE_ENV"),    # Google App Engine
+        # Temporarily comment out to force development mode
+        # os.getenv("ENVIRONMENT") == "production"  # Fixed: was "development"
     ])
     
     if is_production:
+        # Production: Use environment variables directly (Netlify, Docker, etc.)
+        print("🔧 Loading config from: environment variables (production)")
         return None
     else:
-        # This will look for .env in current working directory
-        # Make sure to run: cd backend && python -m app.main
-        return ".env" if os.path.exists(".env") else None
+        # Development: Load from .env file
+        env_file = ".env" if os.path.exists(".env") else None
+        if env_file:
+            print("🔧 Loading config from: .env")
+        else:
+            print("🔧 Loading config from: environment variables (no .env file)")
+        return env_file
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -94,11 +108,32 @@ class Settings(BaseSettings):
     # Voice Services Configuration
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
     
+    # =============================================================================
+    # ElevenLabs Configuration (replaces Google TTS)
+    # =============================================================================
+
+    # ElevenLabs API Settings  
+    ELEVENLABS_API_KEY: str = ""
+    ELEVENLABS_VOICE_ID: str = "v8DWAeuEGQSfwxqdH9t2"  # Lauren B voice
+    ELEVENLABS_MODEL_ID: str = "eleven_multilingual_v2"
+    ELEVENLABS_OUTPUT_FORMAT: str = "mp3_44100_128"
+
+    # ElevenLabs Voice Quality Settings
+    ELEVENLABS_STABILITY: float = 0.75
+    ELEVENLABS_SIMILARITY_BOOST: float = 0.75  
+    ELEVENLABS_STYLE: float = 0.0
+    ELEVENLABS_USE_SPEAKER_BOOST: bool = True
+
+    # Updated Voice Service Defaults (for ElevenLabs)
+    VOICE_DEFAULT_SERVICE: str = "elevenlabs"
+    VOICE_DEFAULT_VOICE_NAME: str = "Lauren B"
+    
+    
     # Voice Service Settings
-    VOICE_MAX_AUDIO_SIZE_MB: int = 10
-    VOICE_MAX_TEXT_LENGTH: int = 5000
-    VOICE_DEFAULT_LANGUAGE: str = "en-US"
-    VOICE_DEFAULT_VOICE_NAME: str = "en-US-Neural2-F"
+    VOICE_MAX_AUDIO_SIZE_MB: int = 25
+    VOICE_MAX_TEXT_LENGTH: int = 10000
+    # VOICE_DEFAULT_LANGUAGE: str = "en-US"
+    # VOICE_DEFAULT_VOICE_NAME: str = "en-US-Neural2-F"
     VOICE_DEFAULT_SPEAKING_RATE: float = 1.0
     VOICE_DEFAULT_AUDIO_FORMAT: str = "mp3"
     
@@ -142,6 +177,22 @@ class Settings(BaseSettings):
     def oauth_configured(self) -> bool:
         return bool(self.GOOGLE_CLIENT_ID and self.GOOGLE_CLIENT_SECRET)
     
+    # Production Agent Service Configuration
+    AGENT_SERVICE_CACHE_TTL: int = Field(default=300, description="Cache TTL in seconds")
+    AGENT_SERVICE_CACHE_MAX_SIZE: int = Field(default=1000, description="Maximum cache entries")
+    AGENT_SERVICE_TIMEOUT: int = Field(default=30, description="Agent response timeout in seconds")
+    AGENT_SERVICE_MAX_WORKERS: int = Field(default=4, description="Maximum worker threads for agent execution")
+    AGENT_SERVICE_ENABLE_METRICS: bool = Field(default=True, description="Enable metrics collection")
+
+    # Oprina Agent Configuration
+    OPRINA_AGENT_ENABLED: bool = Field(default=True, description="Enable Oprina agent integration")
+    OPRINA_AGENT_FALLBACK_ENABLED: bool = Field(default=True, description="Enable intelligent fallback responses")
+
+    # Monitoring and Logging
+    ENABLE_PERFORMANCE_MONITORING: bool = Field(default=True, description="Enable performance monitoring")
+    LOG_AGENT_RESPONSES: bool = Field(default=False, description="Log agent responses (disable in production for privacy)")
+    METRICS_RETENTION_HOURS: int = Field(default=24, description="How long to retain metrics in memory")
+
     class Config:
         env_file = get_env_file()
         case_sensitive = True

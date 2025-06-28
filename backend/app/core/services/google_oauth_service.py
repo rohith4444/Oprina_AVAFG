@@ -114,29 +114,42 @@ class GoogleOAuthService:
     async def handle_callback(self, code: str, state: str) -> Dict[str, Any]:
         """Handle OAuth callback and process based on state."""
         try:
+            logger.info(f"🔄 Starting OAuth callback processing...")
+            logger.info(f"📝 State received: {state}")
+            
             # Parse state to understand the purpose
+            logger.info(f"🔍 Parsing OAuth state...")
             user_id, purpose = self._parse_state(state)
+            logger.info(f"✅ State parsed - User ID: {user_id}, Purpose: {purpose}")
             
             # Exchange code for tokens
+            logger.info(f"🔄 Exchanging authorization code for tokens...")
             tokens = await self._exchange_code_for_tokens(code)
+            logger.info(f"✅ Tokens received - Access token: {'✅' if tokens.get('access_token') else '❌'}, Refresh token: {'✅' if tokens.get('refresh_token') else '❌'}")
             
             # Get user info from Google
+            logger.info(f"🔄 Getting user info from Google...")
             user_info = await self._get_google_user_info(tokens["access_token"])
+            logger.info(f"✅ User info received - Email: {user_info.get('email')}, Name: {user_info.get('name')}")
             
             # Route to appropriate handler based on purpose
+            logger.info(f"🔄 Routing to handler for purpose: {purpose}")
             if purpose == "gmail_connect":
-                return await self._handle_gmail_connect(user_id, tokens, user_info)
+                result = await self._handle_gmail_connect(user_id, tokens, user_info)
             elif purpose == "calendar_connect":
-                return await self._handle_calendar_connect(user_id, tokens, user_info)
+                result = await self._handle_calendar_connect(user_id, tokens, user_info)
             elif purpose == "google_login":
-                return await self._handle_google_login(tokens, user_info)
+                result = await self._handle_google_login(tokens, user_info)
             elif purpose == "google_signup":
-                return await self._handle_google_signup(tokens, user_info)
+                result = await self._handle_google_signup(tokens, user_info)
             else:
                 raise OAuthError(f"Unknown OAuth purpose: {purpose}")
+            
+            logger.info(f"✅ OAuth callback completed successfully: {result.get('action')}")
+            return result
                 
         except Exception as e:
-            logger.error(f"OAuth callback failed: {str(e)}")
+            logger.error(f"❌ OAuth callback failed at step: {str(e)}", exc_info=True)
             raise OAuthError(f"OAuth callback failed: {str(e)}")
     
     # =============================================================================

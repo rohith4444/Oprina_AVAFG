@@ -8,6 +8,7 @@ Only includes the endpoints needed for basic voice chat functionality.
 import json
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from datetime import datetime
 
 from app.api.dependencies import get_current_user, get_voice_service, get_current_user_supabase, get_current_user_supabase_optional
 from app.core.services.voice_service import VoiceService
@@ -230,3 +231,62 @@ async def synthesize_speech(
 # ❌ @router.get("/languages") - Hardcoded to en-US
 # ❌ @router.get("/voices") - Hardcoded to en-US-Neural2-F
 # ❌ @router.get("/health") - Use main health endpoint instead
+
+
+# New change to have the status/health endpoint
+@router.get("/status")
+async def get_voice_status():
+    """Get voice service status and configuration."""
+    try:
+        return {
+            "status": "operational",
+            "speech_to_text": {
+                "service": "elevenlabs_stt",
+                "available": speech_service.is_available()
+            },
+            "text_to_speech": {
+                "service": "elevenlabs_tts", 
+                "available": tts_service.is_available(),
+                "voice_id": settings.ELEVENLABS_VOICE_ID,
+                "model": settings.ELEVENLABS_MODEL_ID,
+                "output_format": settings.ELEVENLABS_OUTPUT_FORMAT
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Failed to get voice status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get voice status")
+
+@router.get("/metrics")
+async def get_agent_metrics(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get agent service metrics for monitoring (requires authentication)."""
+    try:
+        # Get agent service from dependency injection
+        from app.core.services.agent_service import AgentService
+        from app.core.database.repositories.session_repository import SessionRepository
+        from app.core.database.repositories.message_repository import MessageRepository
+        
+        # Create temporary instance to get metrics
+        # In production, this should be injected as a singleton
+        session_repo = SessionRepository()
+        message_repo = MessageRepository() 
+        agent_service = AgentService(session_repo, message_repo)
+        
+        metrics = agent_service.get_metrics()
+        health = agent_service.health_check()
+        
+        return {
+            "agent_metrics": metrics,
+            "health_check": health,
+            "voice_services": {
+                "speech_to_text_available": speech_service.is_available(),
+                "text_to_speech_available": tts_service.is_available()
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get agent metrics: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get metrics")
